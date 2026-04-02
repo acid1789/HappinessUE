@@ -2,6 +2,7 @@
 
 #include <CoreMinimal.h>
 #include "UObject/Object.h"
+#include "ClueHelp.h"
 #include "Clue.generated.h"
 
 class UPuzzle;
@@ -82,6 +83,9 @@ public:
 	UPROPERTY(BlueprintReadOnly)
 	eHorizontalType m_HorizontalType;
 
+	UPROPERTY(BlueprintReadOnly)
+	FClueHelp ClueHelp;
+
 public:
 
 	UFUNCTION(BlueprintCallable)
@@ -89,7 +93,7 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void GetIcons(UPuzzle* Puzzle, TArray<int>& Icons);
-
+	
 	void Init(UPuzzle& UPuzzle, FRandomStream& Rand);
 
 	bool operator<(const UClue& Other) const
@@ -165,4 +169,6 @@ private:
 
 	FString HorizontalToString() const;
 	FString VerticalToString() const;
+
+	void GenerateClueHelp(UPuzzle& P);
 };

@@ -28,6 +28,8 @@ void UClue::GenerateClue(UPuzzle& P, FRandomStream& Rand)
 		GenerateHorizontal(P, Rand);
 		break;
 	}
+
+	GenerateClueHelp(P);
 }
 
 void UClue::PickClueType(UPuzzle& P, FRandomStream& Rand)
@@ -3556,5 +3558,126 @@ void UClue::GetIcons(UPuzzle* P, TArray<int32>& Icons)
 			}
 		}
 		break;
+	}
+}
+
+void UClue::GenerateClueHelp(UPuzzle& P)
+{
+	TArray<int> Rows;
+	TArray<int32> Icons;
+	GetRows(Rows);
+	GetIcons(&P, Icons);
+	ClueHelp.Segments.Empty();
+	switch (m_Type)
+	{
+		case eClueType::Horizontal:
+			switch (m_HorizontalType)
+			{
+				case eHorizontalType::NextTo:					
+					ClueHelp.AddIcon(Rows[0], Icons[0]);
+					ClueHelp.AddText(TEXT("is next to"));
+					ClueHelp.AddIcon(Rows[1], Icons[1]);					
+					break;
+				case eHorizontalType::NotNextTo:
+					ClueHelp.AddIcon(Rows[0], Icons[0]);
+					ClueHelp.AddText(TEXT("is not next to"));
+					ClueHelp.AddIcon(Rows[1], Icons[1]);
+					break;
+				case eHorizontalType::LeftOf:
+					ClueHelp.AddIcon(Rows[0], Icons[0]);
+					ClueHelp.AddText(TEXT("is left of"));
+					ClueHelp.AddIcon(Rows[1], Icons[1]);
+					break;
+				case eHorizontalType::NotLeftOf:
+					ClueHelp.AddIcon(Rows[0], Icons[0]);
+					ClueHelp.AddText(TEXT("is not left of"));
+					ClueHelp.AddIcon(Rows[1], Icons[1]);
+					break;
+				case eHorizontalType::Span:
+					ClueHelp.AddIcon(Rows[1], Icons[1]);
+					ClueHelp.AddText(TEXT("has"));
+					ClueHelp.AddIcon(Rows[0], Icons[0]);
+					ClueHelp.AddText(TEXT("next to it on one side, and"));
+					ClueHelp.AddIcon(Rows[2], Icons[2]);
+					ClueHelp.AddText(TEXT("next to it on the other"));
+					break;
+				case eHorizontalType::SpanNotLeft:
+					ClueHelp.AddIcon(Rows[1], Icons[1]);
+					ClueHelp.AddText(TEXT("has"));
+					ClueHelp.AddIcon(Rows[2], Icons[2]);
+					ClueHelp.AddText(TEXT("next to it on one side, and not"));
+					ClueHelp.AddIcon(Rows[0], Icons[0]);
+					ClueHelp.AddText(TEXT("next to it on the other"));
+					break;
+				case eHorizontalType::SpanNotMid:
+					ClueHelp.AddIcon(Rows[0], Icons[0]);
+					ClueHelp.AddText(TEXT("and"));
+					ClueHelp.AddIcon(Rows[2], Icons[2]);
+					ClueHelp.AddText(TEXT("have one column between them without"));
+					ClueHelp.AddIcon(Rows[1], Icons[1]);
+					break;
+				case eHorizontalType::SpanNotRight:
+					ClueHelp.AddIcon(Rows[1], Icons[1]);
+					ClueHelp.AddText(TEXT("has"));
+					ClueHelp.AddIcon(Rows[0], Rows[1]);
+					ClueHelp.AddText(TEXT("on one side, and not"));
+					ClueHelp.AddIcon(Rows[2], Icons[2]);
+					ClueHelp.AddText(TEXT("on the other"));
+					break;
+			}
+			break;
+		case eClueType::Vertical:
+			switch (m_VerticalType)
+			{
+			case eVerticalType::Two:
+				ClueHelp.AddIcon(Rows[0], Icons[0]);
+				ClueHelp.AddText(TEXT("is in the same column as"));
+				ClueHelp.AddIcon(Rows[1], Icons[1]);
+				break;
+			case eVerticalType::Three:
+				ClueHelp.AddIcon(Rows[0], Icons[0]);
+				ClueHelp.AddText(TEXT("is in the same column as"));
+				ClueHelp.AddIcon(Rows[1], Icons[1]);
+				ClueHelp.AddText(TEXT("and"));
+				ClueHelp.AddIcon(Rows[2], Icons[2]);
+				break;
+			case eVerticalType::EitherOr:
+				ClueHelp.AddIcon(Rows[0], Icons[0]);
+				ClueHelp.AddText(TEXT("is either in the column with"));
+				ClueHelp.AddIcon(Rows[1], Icons[1]);
+				ClueHelp.AddText(TEXT("or the column with"));
+				ClueHelp.AddIcon(Rows[2], Icons[2]);
+				break;
+			case eVerticalType::TwoNot:
+				ClueHelp.AddIcon(Rows[0], Icons[0]);
+				ClueHelp.AddText(TEXT("is not in the same column as"));
+				ClueHelp.AddIcon(Rows[1], Icons[1]);
+				break;
+			case eVerticalType::ThreeTopNot:
+				ClueHelp.AddIcon(Rows[1], Icons[1]);
+				ClueHelp.AddText(TEXT("and"));
+				ClueHelp.AddIcon(Rows[2], Icons[2]);
+				ClueHelp.AddText(TEXT("are in the same column but"));
+				ClueHelp.AddIcon(Rows[0], Icons[0]);
+				ClueHelp.AddText(TEXT("is not"));				
+				break;
+			case eVerticalType::ThreeMidNot:
+				ClueHelp.AddIcon(Rows[0], Icons[0]);
+				ClueHelp.AddText(TEXT("and"));
+				ClueHelp.AddIcon(Rows[2], Icons[2]);
+				ClueHelp.AddText(TEXT("are in the same column but"));
+				ClueHelp.AddIcon(Rows[1], Icons[1]);
+				ClueHelp.AddText(TEXT("is not"));				
+				break;
+			case eVerticalType::ThreeBotNot:
+				ClueHelp.AddIcon(Rows[0], Icons[0]);
+				ClueHelp.AddText(TEXT("and"));
+				ClueHelp.AddIcon(Rows[1], Icons[1]);
+				ClueHelp.AddText(TEXT("are in the same column but"));
+				ClueHelp.AddIcon(Rows[2], Icons[2]);
+				ClueHelp.AddText(TEXT("is not"));
+				break;
+			}
+			break;
 	}
 }
