@@ -3,12 +3,14 @@
 #include "PuzzleRow.h"
 #include "PuzzleCell.h"
 
-Clue::Clue(Puzzle& P, FRandomStream& Rand)
+#pragma optimize("", off)
+
+void UClue::Init(UPuzzle& P, FRandomStream& Rand)
 {
 	GenerateClue(P, Rand);
 }
 
-void Clue::GenerateClue(Puzzle& P, FRandomStream& Rand)
+void UClue::GenerateClue(UPuzzle& P, FRandomStream& Rand)
 {
 	PickClueType(P, Rand);
 
@@ -28,7 +30,7 @@ void Clue::GenerateClue(Puzzle& P, FRandomStream& Rand)
 	}
 }
 
-void Clue::PickClueType(Puzzle& P, FRandomStream& Rand)
+void UClue::PickClueType(UPuzzle& P, FRandomStream& Rand)
 {
 	float Val = Rand.FRand();
 
@@ -40,7 +42,7 @@ void Clue::PickClueType(Puzzle& P, FRandomStream& Rand)
 		m_Type = eClueType::Horizontal;
 }
 
-void Clue::GenerateGiven(Puzzle& P, FRandomStream& Rand)
+void UClue::GenerateGiven(UPuzzle& P, FRandomStream& Rand)
 {
 	bool bGood = false;
 
@@ -54,7 +56,7 @@ void Clue::GenerateGiven(Puzzle& P, FRandomStream& Rand)
 	}
 }
 
-void Clue::GenerateVertical(Puzzle& P, FRandomStream& Rand)
+void UClue::GenerateVertical(UPuzzle& P, FRandomStream& Rand)
 {	
 	// Pick a random column that isnt complete
 	bool bGoodColumn = false;
@@ -120,7 +122,7 @@ void Clue::GenerateVertical(Puzzle& P, FRandomStream& Rand)
 				{
 					m_iHorizontal1 = Rand.RandRange(0, iSize - 1);
 
-					if (P.m_Solution[m_iNotCell][m_iCol] != m_iHorizontal1)
+					if (P.m_Solution[(m_iNotCell * iSize) + m_iCol] != m_iHorizontal1)
 						break;
 				}
 
@@ -142,7 +144,7 @@ void Clue::GenerateVertical(Puzzle& P, FRandomStream& Rand)
 			while (!bGoodCell)
 			{
 				m_iNotCell = Rand.RandRange(0, iSize - 1);
-				bGoodCell = (m_iNotCell != P.m_Solution[m_iRow2][m_iCol]);
+				bGoodCell = (m_iNotCell != P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol]);
 			}
 			break;
 		}
@@ -153,7 +155,7 @@ void Clue::GenerateVertical(Puzzle& P, FRandomStream& Rand)
 			while (!bGoodCell)
 			{
 				m_iNotCell = Rand.RandRange(0, iSize - 1);
-				bGoodCell = (m_iNotCell != P.m_Solution[m_iRow][m_iCol]);
+				bGoodCell = (m_iNotCell != P.m_Solution[(m_iRow * P.m_iSize) + m_iCol]);
 			}
 			break;
 		}
@@ -164,7 +166,7 @@ void Clue::GenerateVertical(Puzzle& P, FRandomStream& Rand)
 			while (!bGoodCell)
 			{
 				m_iNotCell = Rand.RandRange(0, iSize - 1);
-				bGoodCell = (m_iNotCell != P.m_Solution[m_iRow2][m_iCol]);
+				bGoodCell = (m_iNotCell != P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol]);
 			}
 			break;
 		}
@@ -175,14 +177,14 @@ void Clue::GenerateVertical(Puzzle& P, FRandomStream& Rand)
 			while (!bGoodCell)
 			{
 				m_iNotCell = Rand.RandRange(0, iSize - 1);
-				bGoodCell = (m_iNotCell != P.m_Solution[m_iRow3][m_iCol]);
+				bGoodCell = (m_iNotCell != P.m_Solution[(m_iRow3 * P.m_iSize) + m_iCol]);
 			}
 			break;
 		}
 	}
 }
 
-void Clue::GenerateTwoRowColumn(Puzzle& P, FRandomStream& Rand)
+void UClue::GenerateTwoRowColumn(UPuzzle& P, FRandomStream& Rand)
 {
 	bool bGoodRows = false;
 
@@ -209,23 +211,23 @@ void Clue::GenerateTwoRowColumn(Puzzle& P, FRandomStream& Rand)
 	m_iRow2 = FMath::Max(iTemp1, iTemp2);
 }
 
-void Clue::GenerateThreeRowColumn(Puzzle& P, FRandomStream& Rand)
+void UClue::GenerateThreeRowColumn(UPuzzle& P, FRandomStream& Rand)
 {
 	bool bGoodRows = false;
 	int iSize = P.m_iSize;
 	while (!bGoodRows)
 	{
 		// Pick 3 random rows
-		m_iRow = Rand.RandRange(0, iSize);
-		m_iRow2 = Rand.RandRange(0, iSize);
-		m_iRow3 = Rand.RandRange(0, iSize);
+		m_iRow = Rand.RandRange(0, iSize - 1);
+		m_iRow2 = Rand.RandRange(0, iSize - 1);
+		m_iRow3 = Rand.RandRange(0, iSize - 1);
 		while (m_iRow2 == m_iRow)
 		{
-			m_iRow2 = Rand.RandRange(0, iSize);
+			m_iRow2 = Rand.RandRange(0, iSize - 1);
 		}
 		while (m_iRow3 == m_iRow2 || m_iRow3 == m_iRow)
 		{
-			m_iRow3 = Rand.RandRange(0, iSize);
+			m_iRow3 = Rand.RandRange(0, iSize - 1);
 		}
 
 		// Make sure one of the rows is at least useful
@@ -242,7 +244,7 @@ void Clue::GenerateThreeRowColumn(Puzzle& P, FRandomStream& Rand)
 	m_iRow2 = (iTemp1 != m_iRow && iTemp1 != m_iRow3) ? iTemp1 : (iTemp2 != m_iRow && iTemp2 != m_iRow3) ? iTemp2 : iTemp3;
 }
 
-void Clue::GenerateHorizontal(Puzzle& P, FRandomStream& Rand)
+void UClue::GenerateHorizontal(UPuzzle& P, FRandomStream& Rand)
 {
 	int iSize = P.m_iSize;
 	int Type = Rand.RandRange(0, 7);
@@ -255,8 +257,8 @@ void Clue::GenerateHorizontal(Puzzle& P, FRandomStream& Rand)
 			while (true)
 			{
 				// Pick first icon randomly
-				m_iRow = Rand.RandRange(0, iSize);
-				m_iCol = Rand.RandRange(0, iSize);
+				m_iRow = Rand.RandRange(0, iSize - 1);
+				m_iCol = Rand.RandRange(0, iSize - 1);
 				// Pick neighboring column
 				if (m_iCol == 0)
 					m_iCol2 = 1;
@@ -271,7 +273,7 @@ void Clue::GenerateHorizontal(Puzzle& P, FRandomStream& Rand)
 						m_iCol2 = m_iCol + 1;
 				}
 				// Pick a neighboring row
-				m_iRow2 = Rand.RandRange(0, iSize);
+				m_iRow2 = Rand.RandRange(0, iSize - 1);
 				// Make sure this clue is useful
 				if (P.m_Rows[m_iRow].m_Cells[m_iCol].m_iFinalIcon < 0 || P.m_Rows[m_iRow2].m_Cells[m_iCol2].m_iFinalIcon < 0)
 					break;
@@ -281,36 +283,33 @@ void Clue::GenerateHorizontal(Puzzle& P, FRandomStream& Rand)
 		}
 		case eHorizontalType::NotNextTo:
 		{
+			// Pick first icon randomly
+			m_iRow = Rand.RandRange(0, iSize - 1);
+			m_iCol = Rand.RandRange(0, iSize - 1);
+			// Pick a neighboring row
+			m_iRow2 = Rand.RandRange(0, iSize - 1);
+			// Pick an icon that is not in m_iRow2 on either side of m_iCol
+			int iTries = 0;
 			while (true)
 			{
-				// Pick first icon randomly
-				m_iRow = Rand.RandRange(0, iSize);
-				m_iCol = Rand.RandRange(0, iSize);
-				// Pick a neighboring row
-				m_iRow2 = Rand.RandRange(0, iSize);
-				// Pick an icon that is not in m_iRow2 on either side of m_iCol
-				int iTries = 0;
-				while (true)
+				if (iTries++ > 25)
 				{
-					if (iTries++ > 25)
-					{
-						GenerateHorizontal(P, Rand);
-						return;
-					}
-					// Pick one randomly
-					m_iHorizontal1 = Rand.RandRange(0, iSize);
-					// Make sure its not the same as the first icon
-					if (m_iRow2 == m_iRow && P.m_Solution[m_iRow][m_iCol] == m_iHorizontal1)
-						continue;
-					// Make sure its not on the left of the first column
-					if (m_iCol > 0 && P.m_Solution[m_iRow2][m_iCol - 1] == m_iHorizontal1)
-						continue;
-					// Make sure its not on the right of the first column
-					if (m_iCol < (P.m_iSize - 1) && P.m_Solution[m_iRow2][m_iCol + 1] == m_iHorizontal1)
-						continue;
-					// This one looks fine
-					break;
+					GenerateHorizontal(P, Rand);
+					return;
 				}
+				// Pick one randomly
+				m_iHorizontal1 = Rand.RandRange(0, iSize - 1);
+				// Make sure its not the same as the first icon
+				if (m_iRow2 == m_iRow && P.m_Solution[(m_iRow * P.m_iSize) + m_iCol] == m_iHorizontal1)
+					continue;
+				// Make sure its not on the left of the first column
+				if (m_iCol > 0 && P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol - 1] == m_iHorizontal1)
+					continue;
+				// Make sure its not on the right of the first column
+				if (m_iCol < (P.m_iSize - 1) && P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol + 1] == m_iHorizontal1)
+					continue;
+				// This one looks fine
+				break;			
 			}
 			m_iRow3 = m_iRow;
 			break;
@@ -320,11 +319,11 @@ void Clue::GenerateHorizontal(Puzzle& P, FRandomStream& Rand)
 			while (true)
 			{
 				// Pick first icon randomly
-				m_iCol = Rand.RandRange(0, iSize - 1);
-				m_iRow = Rand.RandRange(0, iSize);
+				m_iCol = Rand.RandRange(0, iSize - 2);
+				m_iRow = Rand.RandRange(0, iSize - 1);
 				// Pick second icon
-				m_iCol2 = Rand.RandRange(m_iCol + 1, iSize);
-				m_iRow2 = Rand.RandRange(0, iSize);
+				m_iCol2 = Rand.RandRange(m_iCol + 1, iSize - 1);
+				m_iRow2 = Rand.RandRange(0, iSize - 1);
 				// Make sure this is useful
 				if (P.m_Rows[m_iRow].m_Cells[m_iCol].m_iFinalIcon < 0 || P.m_Rows[m_iRow2].m_Cells[m_iCol2].m_iFinalIcon < 0)
 					break;
@@ -337,11 +336,11 @@ void Clue::GenerateHorizontal(Puzzle& P, FRandomStream& Rand)
 			while (true)
 			{
 				// Pick first icon randomly
-				m_iCol = Rand.RandRange(1, iSize);
-				m_iRow = Rand.RandRange(0, iSize);
+				m_iCol = Rand.RandRange(1, iSize - 1);
+				m_iRow = Rand.RandRange(0, iSize - 1);
 				// Pick second icon
-				m_iCol2 = Rand.RandRange(0, m_iCol);
-				m_iRow2 = Rand.RandRange(0, iSize);
+				m_iCol2 = Rand.RandRange(0, m_iCol - 1);
+				m_iRow2 = Rand.RandRange(0, iSize - 1);
 				// Make sure this is useful
 				if (P.m_Rows[m_iRow].m_Cells[m_iCol].m_iFinalIcon < 0 || P.m_Rows[m_iRow2].m_Cells[m_iCol2].m_iFinalIcon < 0)
 					break;
@@ -371,12 +370,12 @@ void Clue::GenerateHorizontal(Puzzle& P, FRandomStream& Rand)
 					GenerateHorizontal(P, Rand);
 					return;
 				}
-				m_iHorizontal1 = Rand.RandRange(0, iSize);
-				if (P.m_Solution[m_iRow][m_iCol] == m_iHorizontal1)
+				m_iHorizontal1 = Rand.RandRange(0, iSize - 1);
+				if (P.m_Solution[(m_iRow * P.m_iSize) + m_iCol] == m_iHorizontal1)
 					continue;
-				if (P.m_Solution[m_iRow2][m_iCol2] == m_iHorizontal1)
+				if (P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol2] == m_iHorizontal1)
 					continue;
-				if (P.m_Solution[m_iRow3][m_iCol3] == m_iHorizontal1)
+				if (P.m_Solution[(m_iRow3 * P.m_iSize) + m_iCol3] == m_iHorizontal1)
 					continue;
 				break;
 			}
@@ -394,12 +393,12 @@ void Clue::GenerateHorizontal(Puzzle& P, FRandomStream& Rand)
 					GenerateHorizontal(P, Rand);
 					return;
 				}
-				m_iHorizontal1 = Rand.RandRange(0, iSize);
-				if (P.m_Solution[m_iRow][m_iCol] == m_iHorizontal1)
+				m_iHorizontal1 = Rand.RandRange(0, iSize - 1);
+				if (P.m_Solution[(m_iRow * P.m_iSize) + m_iCol] == m_iHorizontal1)
 					continue;
-				if (P.m_Solution[m_iRow2][m_iCol2] == m_iHorizontal1)
+				if (P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol2] == m_iHorizontal1)
 					continue;
-				if (P.m_Solution[m_iRow3][m_iCol3] == m_iHorizontal1)
+				if (P.m_Solution[(m_iRow3 * P.m_iSize) + m_iCol3] == m_iHorizontal1)
 					continue;
 				break;
 			}
@@ -417,12 +416,12 @@ void Clue::GenerateHorizontal(Puzzle& P, FRandomStream& Rand)
 					GenerateHorizontal(P, Rand);
 					return;
 				}
-				m_iHorizontal1 = Rand.RandRange(0, iSize);
-				if (P.m_Solution[m_iRow][m_iCol] == m_iHorizontal1)
+				m_iHorizontal1 = Rand.RandRange(0, iSize - 1);
+				if (P.m_Solution[(m_iRow * P.m_iSize) + m_iCol] == m_iHorizontal1)
 					continue;
-				if (P.m_Solution[m_iRow2][m_iCol2] == m_iHorizontal1)
+				if (P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol2] == m_iHorizontal1)
 					continue;
-				if (P.m_Solution[m_iRow3][m_iCol3] == m_iHorizontal1)
+				if (P.m_Solution[(m_iRow3 * P.m_iSize) + m_iCol3] == m_iHorizontal1)
 					continue;
 				break;
 			}
@@ -431,13 +430,13 @@ void Clue::GenerateHorizontal(Puzzle& P, FRandomStream& Rand)
 	}
 }
 
-void Clue::GenerateHorizontalSpan(Puzzle& P, FRandomStream& Rand)
+void UClue::GenerateHorizontalSpan(UPuzzle& P, FRandomStream& Rand)
 {
 	int iSize = P.m_iSize;
 	while (true)
 	{
 		// Pick the first icon
-		m_iCol = Rand.RandRange(0, iSize);
+		m_iCol = Rand.RandRange(0, iSize - 1);
 
 		// Pick the second & third columns
 		if (m_iCol + 2 < iSize)
@@ -454,9 +453,9 @@ void Clue::GenerateHorizontalSpan(Puzzle& P, FRandomStream& Rand)
 			continue;
 
 		// Generate the rows randomly
-		m_iRow = Rand.RandRange(0, iSize);
-		m_iRow2 = Rand.RandRange(0, iSize);
-		m_iRow3 = Rand.RandRange(0, iSize);
+		m_iRow = Rand.RandRange(0, iSize - 1);
+		m_iRow2 = Rand.RandRange(0, iSize - 1);
+		m_iRow3 = Rand.RandRange(0, iSize - 1);
 
 		// Make sure the clue is useful
 		if (P.m_Rows[m_iRow].m_Cells[m_iCol].m_iFinalIcon < 0 ||
@@ -466,7 +465,7 @@ void Clue::GenerateHorizontalSpan(Puzzle& P, FRandomStream& Rand)
 	}
 }
 
-void Clue::Analyze(Puzzle& P)
+void UClue::Analyze(UPuzzle& P)
 {
 	switch (m_Type)
 	{
@@ -484,16 +483,16 @@ void Clue::Analyze(Puzzle& P)
 	}
 }
 
-void Clue::AnalyzeGiven(Puzzle& P)
+void UClue::AnalyzeGiven(UPuzzle& P)
 {
-	int Icon = P.m_Solution[m_iRow][m_iCol];
+	int Icon = P.m_Solution[(m_iRow * P.m_iSize) + m_iCol];
 
-	P.SetFinalIcon(this, m_iRow, m_iCol, Icon);
+	P.SetFinalIconWithClue(this, m_iRow, m_iCol, Icon);
 
 	m_iUseCount += 25;
 }
 
-void Clue::AnalyzeVertical(Puzzle& P)
+void UClue::AnalyzeVertical(UPuzzle& P)
 {
 	switch (m_VerticalType)
 	{
@@ -527,7 +526,7 @@ void Clue::AnalyzeVertical(Puzzle& P)
 	}
 }
 
-void Clue::AnalyzeHorizontal(Puzzle& P)
+void UClue::AnalyzeHorizontal(UPuzzle& P)
 {
 	switch (m_HorizontalType)
 	{
@@ -565,83 +564,83 @@ void Clue::AnalyzeHorizontal(Puzzle& P)
 	}
 }
 
-void Clue::AnalyzeVerticalTwo(Puzzle& P)
+void UClue::AnalyzeVerticalTwo(UPuzzle& P)
 {
-	int iIcon1 = P.m_Solution[m_iRow][m_iCol];
-	int iIcon2 = P.m_Solution[m_iRow2][m_iCol];
+	int iIcon1 = P.m_Solution[(m_iRow * P.m_iSize) + m_iCol];
+	int iIcon2 = P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol];
 	for (int i = 0; i < P.m_iSize; i++)
 	{
 		if (!P.m_Rows[m_iRow].m_Cells[i].m_bValues[iIcon1])
 		{
-			P.EliminateIcon(this, m_iRow2, i, iIcon2);
+			P.EliminateIconWithClue(this, m_iRow2, i, iIcon2);
 		}
 		else if (!P.m_Rows[m_iRow2].m_Cells[i].m_bValues[iIcon2])
 		{
-			P.EliminateIcon(this, m_iRow, i, iIcon1);
+			P.EliminateIconWithClue(this, m_iRow, i, iIcon1);
 		}
 
 		if (P.m_Rows[m_iRow].m_Cells[i].m_iFinalIcon == iIcon1)
 		{
-			P.SetFinalIcon(this, m_iRow2, i, iIcon2);
+			P.SetFinalIconWithClue(this, m_iRow2, i, iIcon2);
 			return;
 		}
 		else if (P.m_Rows[m_iRow2].m_Cells[i].m_iFinalIcon == iIcon2)
 		{
-			P.SetFinalIcon(this, m_iRow, i, iIcon1);
+			P.SetFinalIconWithClue(this, m_iRow, i, iIcon1);
 			return;
 		}
 	}
 }
 
-void Clue::AnalyzeVerticalThree(Puzzle& P)
+void UClue::AnalyzeVerticalThree(UPuzzle& P)
 {
-	int iIcon1 = P.m_Solution[m_iRow][ m_iCol];
-	int iIcon2 = P.m_Solution[m_iRow2][m_iCol];
-	int iIcon3 = P.m_Solution[m_iRow3][m_iCol];
+	int iIcon1 = P.m_Solution[(m_iRow * P.m_iSize) + m_iCol];
+	int iIcon2 = P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol];
+	int iIcon3 = P.m_Solution[(m_iRow3 * P.m_iSize) + m_iCol];
 	for (int i = 0; i < P.m_iSize; i++)
 	{
 		if (P.m_Rows[m_iRow].m_Cells[i].m_iFinalIcon == iIcon1)
 		{
-			P.SetFinalIcon(this, m_iRow2, i, iIcon2);
-			P.SetFinalIcon(this, m_iRow3, i, iIcon3);
+			P.SetFinalIconWithClue(this, m_iRow2, i, iIcon2);
+			P.SetFinalIconWithClue(this, m_iRow3, i, iIcon3);
 			return;
 		}
 		else if (P.m_Rows[m_iRow2].m_Cells[i].m_iFinalIcon == iIcon2)
 		{
-			P.SetFinalIcon(this, m_iRow, i, iIcon1);
-			P.SetFinalIcon(this, m_iRow3, i, iIcon3);
+			P.SetFinalIconWithClue(this, m_iRow, i, iIcon1);
+			P.SetFinalIconWithClue(this, m_iRow3, i, iIcon3);
 			return;
 		}
 		else if (P.m_Rows[m_iRow3].m_Cells[i].m_iFinalIcon == iIcon3)
 		{
-			P.SetFinalIcon(this, m_iRow, i, iIcon1);
-			P.SetFinalIcon(this, m_iRow2, i, iIcon2);
+			P.SetFinalIconWithClue(this, m_iRow, i, iIcon1);
+			P.SetFinalIconWithClue(this, m_iRow2, i, iIcon2);
 			return;
 		}
 
 		if (!P.m_Rows[m_iRow].m_Cells[i].m_bValues[iIcon1])
 		{
-			P.EliminateIcon(this, m_iRow2, i, iIcon2);
-			P.EliminateIcon(this, m_iRow3, i, iIcon3);
+			P.EliminateIconWithClue(this, m_iRow2, i, iIcon2);
+			P.EliminateIconWithClue(this, m_iRow3, i, iIcon3);
 		}
 		else if (!P.m_Rows[m_iRow2].m_Cells[i].m_bValues[iIcon2])
 		{
-			P.EliminateIcon(this, m_iRow, i, iIcon1);
-			P.EliminateIcon(this, m_iRow3, i, iIcon3);
+			P.EliminateIconWithClue(this, m_iRow, i, iIcon1);
+			P.EliminateIconWithClue(this, m_iRow3, i, iIcon3);
 		}
 		else if (!P.m_Rows[m_iRow3].m_Cells[i].m_bValues[iIcon3])
 		{
-			P.EliminateIcon(this, m_iRow, i, iIcon1);
-			P.EliminateIcon(this, m_iRow2, i, iIcon2);
+			P.EliminateIconWithClue(this, m_iRow, i, iIcon1);
+			P.EliminateIconWithClue(this, m_iRow2, i, iIcon2);
 		}
 	}
 }
 
-void Clue::AnalyzeVerticalEitherOr(Puzzle& P)
+void UClue::AnalyzeVerticalEitherOr(UPuzzle& P)
 {
-	int iIcon1 = P.m_Solution[m_iRow][m_iCol];
-	int iIcon2 = (m_iRow2 == m_iNotCell) ? m_iHorizontal1 : P.m_Solution[m_iRow2][m_iCol];
-	int iIcon3 = (m_iRow3 == m_iNotCell) ? m_iHorizontal1 : P.m_Solution[m_iRow3][m_iCol];
+	int iIcon1 = P.m_Solution[(m_iRow * P.m_iSize) + m_iCol];
+	int iIcon2 = (m_iRow2 == m_iNotCell) ? m_iHorizontal1 : P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol];
+	int iIcon3 = (m_iRow3 == m_iNotCell) ? m_iHorizontal1 : P.m_Solution[(m_iRow3 * P.m_iSize) + m_iCol];
 
 	int iSize = P.m_iSize;
 	int iIcon2Col = -1;
@@ -650,19 +649,19 @@ void Clue::AnalyzeVerticalEitherOr(Puzzle& P)
 	{
 		if (P.m_Rows[m_iRow2].m_Cells[i].m_iFinalIcon == iIcon2)
 		{
-			P.EliminateIcon(this, m_iRow3, i, iIcon3);
+			P.EliminateIconWithClue(this, m_iRow3, i, iIcon3);
 			iIcon2Col = i;
 		}
 		if (P.m_Rows[m_iRow3].m_Cells[i].m_iFinalIcon == iIcon3)
 		{
-			P.EliminateIcon(this, m_iRow2, i, iIcon2);
+			P.EliminateIconWithClue(this, m_iRow2, i, iIcon2);
 			iIcon3Col = i;
 		}
 		if (!P.m_Rows[m_iRow2].m_Cells[i].m_bValues[iIcon2] &&
 			!P.m_Rows[m_iRow3].m_Cells[i].m_bValues[iIcon3])
 		{
 			// If neither icon is in this column, icon1 cant be here either
-			P.EliminateIcon(this, m_iRow, i, iIcon1);
+			P.EliminateIconWithClue(this, m_iRow, i, iIcon1);
 		}
 
 		if (P.m_Rows[m_iRow].m_Cells[i].m_iFinalIcon == iIcon1)
@@ -674,11 +673,11 @@ void Clue::AnalyzeVerticalEitherOr(Puzzle& P)
 
 				if (P.m_Rows[m_iRow2].m_Cells[j].m_iFinalIcon == iIcon2)
 				{
-					P.SetFinalIcon(this, m_iRow3, i, iIcon3);
+					P.SetFinalIconWithClue(this, m_iRow3, i, iIcon3);
 				}
 				else if (P.m_Rows[m_iRow3].m_Cells[j].m_iFinalIcon == iIcon3)
 				{
-					P.SetFinalIcon(this, m_iRow2, i, iIcon2);
+					P.SetFinalIconWithClue(this, m_iRow2, i, iIcon2);
 				}
 			}
 		}
@@ -690,145 +689,145 @@ void Clue::AnalyzeVerticalEitherOr(Puzzle& P)
 		{
 			if (i != iIcon2Col && i != iIcon3Col)
 			{
-				P.EliminateIcon(this, m_iRow, i, iIcon1);
+				P.EliminateIconWithClue(this, m_iRow, i, iIcon1);
 			}
 		}
 	}
 }
 
-void Clue::AnalyzeVerticalTwoNot(Puzzle& P)
+void UClue::AnalyzeVerticalTwoNot(UPuzzle& P)
 {
-	int iIcon1 = P.m_Solution[m_iRow][m_iCol];
+	int iIcon1 = P.m_Solution[(m_iRow * P.m_iSize) + m_iCol];
 	int iIcon2 = m_iNotCell;
 
 	for (int i = 0; i < P.m_iSize; i++)
 	{
 		if (P.m_Rows[m_iRow].m_Cells[i].m_iFinalIcon == iIcon1)
 		{
-			P.EliminateIcon(this, m_iRow2, i, iIcon2);
+			P.EliminateIconWithClue(this, m_iRow2, i, iIcon2);
 
 		}
 		else if (P.m_Rows[m_iRow2].m_Cells[i].m_iFinalIcon == iIcon2)
 		{
-			P.EliminateIcon(this, m_iRow, i, iIcon1);
+			P.EliminateIconWithClue(this, m_iRow, i, iIcon1);
 		}
 	}
 }
 
-void Clue::AnalyzeVerticalThreeTopNot(Puzzle& P)
+void UClue::AnalyzeVerticalThreeTopNot(UPuzzle& P)
 {
 	int iIcon1 = m_iNotCell;
-	int iIcon2 = P.m_Solution[m_iRow2][m_iCol];
-	int iIcon3 = P.m_Solution[m_iRow3][m_iCol];
+	int iIcon2 = P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol];
+	int iIcon3 = P.m_Solution[(m_iRow3 * P.m_iSize) + m_iCol];
 
 	for (int i = 0; i < P.m_iSize; i++)
 	{
 		if (P.m_Rows[m_iRow].m_Cells[i].m_iFinalIcon == iIcon1)
 		{
-			P.EliminateIcon(this, m_iRow2, i, iIcon2);
-			P.EliminateIcon(this, m_iRow3, i, iIcon3);
+			P.EliminateIconWithClue(this, m_iRow2, i, iIcon2);
+			P.EliminateIconWithClue(this, m_iRow3, i, iIcon3);
 		}
 		else if (P.m_Rows[m_iRow2].m_Cells[i].m_iFinalIcon == iIcon2)
 		{
-			P.EliminateIcon(this, m_iRow, i, iIcon1);
-			P.SetFinalIcon(this, m_iRow3, i, iIcon3);
+			P.EliminateIconWithClue(this, m_iRow, i, iIcon1);
+			P.SetFinalIconWithClue(this, m_iRow3, i, iIcon3);
 			return;
 		}
 		else if (P.m_Rows[m_iRow3].m_Cells[i].m_iFinalIcon == iIcon3)
 		{
-			P.EliminateIcon(this, m_iRow, i, iIcon1);
-			P.SetFinalIcon(this, m_iRow2, i, iIcon2);
+			P.EliminateIconWithClue(this, m_iRow, i, iIcon1);
+			P.SetFinalIconWithClue(this, m_iRow2, i, iIcon2);
 			return;
 		}
 		else if (!P.m_Rows[m_iRow2].m_Cells[i].m_bValues[iIcon2])
 		{
-			P.EliminateIcon(this, m_iRow3, i, iIcon3);
+			P.EliminateIconWithClue(this, m_iRow3, i, iIcon3);
 		}
 		else if (!P.m_Rows[m_iRow3].m_Cells[i].m_bValues[iIcon3])
 		{
-			P.EliminateIcon(this, m_iRow2, i, iIcon2);
+			P.EliminateIconWithClue(this, m_iRow2, i, iIcon2);
 		}
 	}
 }
 
-void Clue::AnalyzeVerticalThreeMidNot(Puzzle& P)
+void UClue::AnalyzeVerticalThreeMidNot(UPuzzle& P)
 {
-	int iIcon1 = P.m_Solution[m_iRow][m_iCol];
+	int iIcon1 = P.m_Solution[(m_iRow * P.m_iSize) + m_iCol];
 	int iIcon2 = m_iNotCell;
-	int iIcon3 = P.m_Solution[m_iRow3][m_iCol];
+	int iIcon3 = P.m_Solution[(m_iRow3 * P.m_iSize) + m_iCol];
 
 	for (int i = 0; i < P.m_iSize; i++)
 	{
 		if (P.m_Rows[m_iRow2].m_Cells[i].m_iFinalIcon == iIcon2)
 		{
-			P.EliminateIcon(this, m_iRow, i, iIcon1);
-			P.EliminateIcon(this, m_iRow3, i, iIcon3);
+			P.EliminateIconWithClue(this, m_iRow, i, iIcon1);
+			P.EliminateIconWithClue(this, m_iRow3, i, iIcon3);
 
 		}
 		else if (P.m_Rows[m_iRow].m_Cells[i].m_iFinalIcon == iIcon1)
 		{
-			P.EliminateIcon(this, m_iRow2, i, iIcon2);
-			P.SetFinalIcon(this, m_iRow3, i, iIcon3);
+			P.EliminateIconWithClue(this, m_iRow2, i, iIcon2);
+			P.SetFinalIconWithClue(this, m_iRow3, i, iIcon3);
 			return;
 		}
 		else if (P.m_Rows[m_iRow3].m_Cells[i].m_iFinalIcon == iIcon3)
 		{
-			P.EliminateIcon(this, m_iRow2, i, iIcon2);
-			P.SetFinalIcon(this, m_iRow, i, iIcon1);
+			P.EliminateIconWithClue(this, m_iRow2, i, iIcon2);
+			P.SetFinalIconWithClue(this, m_iRow, i, iIcon1);
 			return;
 		}
 		else if (P.m_Rows[m_iRow].m_Cells[i].m_iFinalIcon >= 0)
 		{
-			P.EliminateIcon(this, m_iRow3, i, iIcon3);
+			P.EliminateIconWithClue(this, m_iRow3, i, iIcon3);
 		}
 		else if (P.m_Rows[m_iRow3].m_Cells[i].m_iFinalIcon >= 0)
 		{
-			P.EliminateIcon(this, m_iRow, i, iIcon1);
+			P.EliminateIconWithClue(this, m_iRow, i, iIcon1);
 		}
 	}
 }
 
-void Clue::AnalyzeVerticalThreeBotNot(Puzzle& P)
+void UClue::AnalyzeVerticalThreeBotNot(UPuzzle& P)
 {
-	int iIcon1 = P.m_Solution[m_iRow][m_iCol];
-	int iIcon2 = P.m_Solution[m_iRow2][m_iCol];
+	int iIcon1 = P.m_Solution[(m_iRow * P.m_iSize) + m_iCol];
+	int iIcon2 = P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol];
 	int iIcon3 = m_iNotCell;
 
 	for (int i = 0; i < P.m_iSize; i++)
 	{
 		if (P.m_Rows[m_iRow3].m_Cells[i].m_iFinalIcon == iIcon3)
 		{
-			P.EliminateIcon(this, m_iRow2, i, iIcon2);
-			P.EliminateIcon(this, m_iRow, i, iIcon1);
+			P.EliminateIconWithClue(this, m_iRow2, i, iIcon2);
+			P.EliminateIconWithClue(this, m_iRow, i, iIcon1);
 
 		}
 		else if (P.m_Rows[m_iRow2].m_Cells[i].m_iFinalIcon == iIcon2)
 		{
-			P.EliminateIcon(this, m_iRow3, i, iIcon3);
-			P.SetFinalIcon(this, m_iRow, i, iIcon1);
+			P.EliminateIconWithClue(this, m_iRow3, i, iIcon3);
+			P.SetFinalIconWithClue(this, m_iRow, i, iIcon1);
 			return;
 		}
 		else if (P.m_Rows[m_iRow].m_Cells[i].m_iFinalIcon == iIcon1)
 		{
-			P.EliminateIcon(this, m_iRow3, i, iIcon3);
-			P.SetFinalIcon(this, m_iRow2, i, iIcon2);
+			P.EliminateIconWithClue(this, m_iRow3, i, iIcon3);
+			P.SetFinalIconWithClue(this, m_iRow2, i, iIcon2);
 			return;
 		}
 		else if (!P.m_Rows[m_iRow2].m_Cells[i].m_bValues[iIcon2])
 		{
-			P.EliminateIcon(this, m_iRow, i, iIcon1);
+			P.EliminateIconWithClue(this, m_iRow, i, iIcon1);
 		}
 		else if (!P.m_Rows[m_iRow].m_Cells[i].m_bValues[iIcon1])
 		{
-			P.EliminateIcon(this, m_iRow2, i, iIcon2);
+			P.EliminateIconWithClue(this, m_iRow2, i, iIcon2);
 		}
 	}
 }
 
-void Clue::AnalyzeHorizontalNextTo(Puzzle& P)
+void UClue::AnalyzeHorizontalNextTo(UPuzzle& P)
 {
-	int iIcon1 = P.m_Solution[m_iRow][m_iCol];
-	int iIcon2 = P.m_Solution[m_iRow2][m_iCol2];
+	int iIcon1 = P.m_Solution[(m_iRow * P.m_iSize) + m_iCol];
+	int iIcon2 = P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol2];
 
 	for (int i = 0; i < P.m_iSize; i++)
 	{
@@ -836,12 +835,12 @@ void Clue::AnalyzeHorizontalNextTo(Puzzle& P)
 		{
 			if (i == 0)
 			{
-				P.SetFinalIcon(this, m_iRow2, 1, iIcon2);
+				P.SetFinalIconWithClue(this, m_iRow2, 1, iIcon2);
 
 			}
 			else if (i == P.m_iSize - 1)
 			{
-				P.SetFinalIcon(this, m_iRow2, i - 1, iIcon2);
+				P.SetFinalIconWithClue(this, m_iRow2, i - 1, iIcon2);
 
 			}
 			else
@@ -850,7 +849,7 @@ void Clue::AnalyzeHorizontalNextTo(Puzzle& P)
 				{
 					if (j == (i - 1) || j == (i + 1))
 						continue;
-					P.EliminateIcon(this, m_iRow2, j, iIcon2);
+					P.EliminateIconWithClue(this, m_iRow2, j, iIcon2);
 
 				}
 			}
@@ -860,12 +859,12 @@ void Clue::AnalyzeHorizontalNextTo(Puzzle& P)
 		{
 			if (i == 0)
 			{
-				P.SetFinalIcon(this, m_iRow, 1, iIcon1);
+				P.SetFinalIconWithClue(this, m_iRow, 1, iIcon1);
 
 			}
 			else if (i == P.m_iSize - 1)
 			{
-				P.SetFinalIcon(this, m_iRow, i - 1, iIcon1);
+				P.SetFinalIconWithClue(this, m_iRow, i - 1, iIcon1);
 
 			}
 			else
@@ -874,7 +873,7 @@ void Clue::AnalyzeHorizontalNextTo(Puzzle& P)
 				{
 					if (j == (i - 1) || j == (i + 1))
 						continue;
-					P.EliminateIcon(this, m_iRow, j, iIcon1);
+					P.EliminateIconWithClue(this, m_iRow, j, iIcon1);
 
 				}
 			}
@@ -886,12 +885,12 @@ void Clue::AnalyzeHorizontalNextTo(Puzzle& P)
 			{
 				if (!P.m_Rows[m_iRow2].m_Cells[i + 1].m_bValues[iIcon2])
 				{
-					P.EliminateIcon(this, m_iRow, i, iIcon1);
+					P.EliminateIconWithClue(this, m_iRow, i, iIcon1);
 
 				}
 				if (!P.m_Rows[m_iRow].m_Cells[i + 1].m_bValues[iIcon1])
 				{
-					P.EliminateIcon(this, m_iRow2, i, iIcon2);
+					P.EliminateIconWithClue(this, m_iRow2, i, iIcon2);
 
 				}
 			}
@@ -899,12 +898,12 @@ void Clue::AnalyzeHorizontalNextTo(Puzzle& P)
 			{
 				if (!P.m_Rows[m_iRow2].m_Cells[i - 1].m_bValues[iIcon2])
 				{
-					P.EliminateIcon(this, m_iRow, i, iIcon1);
+					P.EliminateIconWithClue(this, m_iRow, i, iIcon1);
 
 				}
 				if (!P.m_Rows[m_iRow].m_Cells[i - 1].m_bValues[iIcon1])
 				{
-					P.EliminateIcon(this, m_iRow2, i, iIcon2);
+					P.EliminateIconWithClue(this, m_iRow2, i, iIcon2);
 
 				}
 			}
@@ -913,13 +912,13 @@ void Clue::AnalyzeHorizontalNextTo(Puzzle& P)
 				if (!P.m_Rows[m_iRow2].m_Cells[i + 1].m_bValues[iIcon2] &&
 					!P.m_Rows[m_iRow2].m_Cells[i - 1].m_bValues[iIcon2])
 				{
-					P.EliminateIcon(this, m_iRow, i, iIcon1);
+					P.EliminateIconWithClue(this, m_iRow, i, iIcon1);
 
 				}
 				if (!P.m_Rows[m_iRow].m_Cells[i + 1].m_bValues[iIcon1] &&
 					!P.m_Rows[m_iRow].m_Cells[i - 1].m_bValues[iIcon1])
 				{
-					P.EliminateIcon(this, m_iRow2, i, iIcon2);
+					P.EliminateIconWithClue(this, m_iRow2, i, iIcon2);
 
 				}
 			}
@@ -927,9 +926,9 @@ void Clue::AnalyzeHorizontalNextTo(Puzzle& P)
 	}
 }
 
-void Clue::AnalyzeHorizontalNotNextTo(Puzzle& P)
+void UClue::AnalyzeHorizontalNotNextTo(UPuzzle& P)
 {
-	int iIcon1 = P.m_Solution[m_iRow][m_iCol];
+	int iIcon1 = P.m_Solution[(m_iRow * P.m_iSize) + m_iCol];
 	int iIcon2 = m_iHorizontal1;
 
 	for (int i = 0; i < P.m_iSize; i++)
@@ -938,18 +937,18 @@ void Clue::AnalyzeHorizontalNotNextTo(Puzzle& P)
 		{
 			if (i == 0)
 			{
-				P.EliminateIcon(this, m_iRow2, i + 1, iIcon2);
+				P.EliminateIconWithClue(this, m_iRow2, i + 1, iIcon2);
 
 			}
 			else if (i == P.m_iSize - 1)
 			{
-				P.EliminateIcon(this, m_iRow2, i - 1, iIcon2);
+				P.EliminateIconWithClue(this, m_iRow2, i - 1, iIcon2);
 
 			}
 			else
 			{
-				P.EliminateIcon(this, m_iRow2, i - 1, iIcon2);
-				P.EliminateIcon(this, m_iRow2, i + 1, iIcon2);
+				P.EliminateIconWithClue(this, m_iRow2, i - 1, iIcon2);
+				P.EliminateIconWithClue(this, m_iRow2, i + 1, iIcon2);
 
 			}
 			break;
@@ -958,18 +957,18 @@ void Clue::AnalyzeHorizontalNotNextTo(Puzzle& P)
 		{
 			if (i == 0)
 			{
-				P.EliminateIcon(this, m_iRow, i + 1, iIcon1);
+				P.EliminateIconWithClue(this, m_iRow, i + 1, iIcon1);
 
 			}
 			else if (i == P.m_iSize - 1)
 			{
-				P.EliminateIcon(this, m_iRow, i - 1, iIcon1);
+				P.EliminateIconWithClue(this, m_iRow, i - 1, iIcon1);
 
 			}
 			else
 			{
-				P.EliminateIcon(this, m_iRow, i - 1, iIcon1);
-				P.EliminateIcon(this, m_iRow, i + 1, iIcon1);
+				P.EliminateIconWithClue(this, m_iRow, i - 1, iIcon1);
+				P.EliminateIconWithClue(this, m_iRow, i + 1, iIcon1);
 
 			}
 			break;
@@ -977,10 +976,10 @@ void Clue::AnalyzeHorizontalNotNextTo(Puzzle& P)
 	}
 }
 
-void Clue::AnalyzeHorizontalLeftOf(Puzzle& P)
+void UClue::AnalyzeHorizontalLeftOf(UPuzzle& P)
 {
-	int iIcon1 = P.m_Solution[m_iRow][m_iCol];
-	int iIcon2 = P.m_Solution[m_iRow2][m_iCol2];
+	int iIcon1 = P.m_Solution[(m_iRow * P.m_iSize) + m_iCol];
+	int iIcon2 = P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol2];
 
 	int iFirstPossibleLeft = 0;
 	for (iFirstPossibleLeft = 0; iFirstPossibleLeft < P.m_iSize; iFirstPossibleLeft++)
@@ -999,38 +998,38 @@ void Clue::AnalyzeHorizontalLeftOf(Puzzle& P)
 	if (iFirstPossibleLeft + 1 == iFirstPossibleRight)
 	{
 		// we have a solution for this clue
-		P.SetFinalIcon(this, m_iRow, iFirstPossibleLeft, iIcon1);
-		P.SetFinalIcon(this, m_iRow2, iFirstPossibleRight, iIcon2);
+		P.SetFinalIconWithClue(this, m_iRow, iFirstPossibleLeft, iIcon1);
+		P.SetFinalIconWithClue(this, m_iRow2, iFirstPossibleRight, iIcon2);
 	}
 	else
 	{
 		// Remove all icon2's from the left side of the first possible left
 		for (int i = 0; i <= iFirstPossibleLeft; i++)
 		{
-			P.EliminateIcon(this, m_iRow2, i, iIcon2);
+			P.EliminateIconWithClue(this, m_iRow2, i, iIcon2);
 		}
 
 		// Remove all the icon1's from the right side of the first possible right
 		for (int i = iFirstPossibleRight; i < P.m_iSize; i++)
 		{
-			P.EliminateIcon(this, m_iRow, i, iIcon1);
+			P.EliminateIconWithClue(this, m_iRow, i, iIcon1);
 		}
 	}
 }
 
-void Clue::AnalyzeHorizontalNotLeftOf(Puzzle& P)
+void UClue::AnalyzeHorizontalNotLeftOf(UPuzzle& P)
 {
-	int iIcon1 = P.m_Solution[m_iRow][m_iCol];
-	int iIcon2 = P.m_Solution[m_iRow2][m_iCol2];
+	int iIcon1 = P.m_Solution[(m_iRow * P.m_iSize) + m_iCol];
+	int iIcon2 = P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol2];
 
 	// If both icons are on the same row
 	if (m_iRow == m_iRow2)
 	{
 		// Icon1 cant be in the zero column, because that would ensure that it is always left of Icon2
-		P.EliminateIcon(this, m_iRow, 0, iIcon1);
+		P.EliminateIconWithClue(this, m_iRow, 0, iIcon1);
 
 		// Icon2 cant be in the last column, because that would ensure that it is always right of Icon1
-		P.EliminateIcon(this, m_iRow2, P.m_iSize - 1, iIcon2);
+		P.EliminateIconWithClue(this, m_iRow2, P.m_iSize - 1, iIcon2);
 
 	}
 
@@ -1041,7 +1040,7 @@ void Clue::AnalyzeHorizontalNotLeftOf(Puzzle& P)
 			// Icon1 is known, remove all instances of icon2 to the right
 			for (int j = i + 1; j < P.m_iSize; j++)
 			{
-				P.EliminateIcon(this, m_iRow2, j, iIcon2);
+				P.EliminateIconWithClue(this, m_iRow2, j, iIcon2);
 
 			}
 			break;
@@ -1051,7 +1050,7 @@ void Clue::AnalyzeHorizontalNotLeftOf(Puzzle& P)
 			// Icon2 is known, remove all instances of icon1 to the left
 			for (int j = 0; j < i; j++)
 			{
-				P.EliminateIcon(this, m_iRow, j, iIcon1);
+				P.EliminateIconWithClue(this, m_iRow, j, iIcon1);
 
 			}
 			break;
@@ -1059,7 +1058,7 @@ void Clue::AnalyzeHorizontalNotLeftOf(Puzzle& P)
 	}
 }
 
-bool Clue::SolveSpan(int iCol, int iRow1, int iIcon1, bool bNot1, int iRow2, int iIcon2, bool bNot2, int iRow3, int iIcon3, bool bNot3, Puzzle& P)
+bool UClue::SolveSpan(int iCol, int iRow1, int iIcon1, bool bNot1, int iRow2, int iIcon2, bool bNot2, int iRow3, int iIcon3, bool bNot3, UPuzzle& P)
 {
 	int iFinal1 = P.m_Rows[iRow1].m_Cells[iCol].m_iFinalIcon;
 	if (iFinal1 == iIcon1)
@@ -1071,7 +1070,7 @@ bool Clue::SolveSpan(int iCol, int iRow1, int iIcon1, bool bNot1, int iRow2, int
 				int iFinal2Right = P.m_Rows[iRow2].m_Cells[iCol + 1].m_iFinalIcon;
 				if (iFinal2Right == iIcon2)
 				{
-					P.SetFinalIcon(this, iRow3, iCol, iIcon3);
+					P.SetFinalIconWithClue(this, iRow3, iCol, iIcon3);
 
 				}
 			}
@@ -1079,23 +1078,23 @@ bool Clue::SolveSpan(int iCol, int iRow1, int iIcon1, bool bNot1, int iRow2, int
 			{
 				if (bNot2)
 				{
-					P.EliminateIcon(this, iRow2, iCol + 1, iIcon2);
+					P.EliminateIconWithClue(this, iRow2, iCol + 1, iIcon2);
 
 				}
 				else
 				{
-					P.SetFinalIcon(this, iRow2, iCol + 1, iIcon2);
+					P.SetFinalIconWithClue(this, iRow2, iCol + 1, iIcon2);
 
 				}
 
 				if (bNot3)
 				{
-					P.EliminateIcon(this, iRow3, iCol + 2, iIcon3);
+					P.EliminateIconWithClue(this, iRow3, iCol + 2, iIcon3);
 
 				}
 				else
 				{
-					P.SetFinalIcon(this, iRow3, iCol + 2, iIcon3);
+					P.SetFinalIconWithClue(this, iRow3, iCol + 2, iIcon3);
 
 				}
 				return true;
@@ -1108,21 +1107,21 @@ bool Clue::SolveSpan(int iCol, int iRow1, int iIcon1, bool bNot1, int iRow2, int
 				int iFinal2Left = P.m_Rows[iRow2].m_Cells[iCol - 1].m_iFinalIcon;
 				if (iFinal2Left == iIcon2)
 				{
-					P.SetFinalIcon(this, iRow3, iCol, iIcon3);
+					P.SetFinalIconWithClue(this, iRow3, iCol, iIcon3);
 
 				}
 			}
 			else
 			{
 				if (bNot2)
-					P.EliminateIcon(this, iRow2, iCol - 1, iIcon2);
+					P.EliminateIconWithClue(this, iRow2, iCol - 1, iIcon2);
 				else
-					P.SetFinalIcon(this, iRow2, iCol - 1, iIcon2);
+					P.SetFinalIconWithClue(this, iRow2, iCol - 1, iIcon2);
 
 				if (bNot3)
-					P.EliminateIcon(this, iRow3, iCol - 2, iIcon3);
+					P.EliminateIconWithClue(this, iRow3, iCol - 2, iIcon3);
 				else
-					P.SetFinalIcon(this, iRow3, iCol - 2, iIcon3);
+					P.SetFinalIconWithClue(this, iRow3, iCol - 2, iIcon3);
 
 				return true;
 			}
@@ -1135,22 +1134,22 @@ bool Clue::SolveSpan(int iCol, int iRow1, int iIcon1, bool bNot1, int iRow2, int
 			{
 				if (bNot1)
 				{
-					P.SetFinalIcon(this, iRow3, iCol, iIcon3);
+					P.SetFinalIconWithClue(this, iRow3, iCol, iIcon3);
 
 				}
 				else if (bNot2)
 				{
-					P.SetFinalIcon(this, iRow3, iCol + 2, iIcon3);
+					P.SetFinalIconWithClue(this, iRow3, iCol + 2, iIcon3);
 
 				}
 				else if (bNot3)
 				{
-					P.EliminateIcon(this, iRow3, iCol - 2, iIcon3);
+					P.EliminateIconWithClue(this, iRow3, iCol - 2, iIcon3);
 
 				}
 				else
 				{
-					P.SetFinalIcon(this, iRow3, iCol - 2, iIcon3);
+					P.SetFinalIconWithClue(this, iRow3, iCol - 2, iIcon3);
 
 				}
 				return true;
@@ -1159,43 +1158,43 @@ bool Clue::SolveSpan(int iCol, int iRow1, int iIcon1, bool bNot1, int iRow2, int
 			{
 				if (bNot1)
 				{
-					P.SetFinalIcon(this, iRow3, iCol, iIcon3);
+					P.SetFinalIconWithClue(this, iRow3, iCol, iIcon3);
 
 				}
 				else if (bNot2)
 				{
-					P.SetFinalIcon(this, iRow3, iCol - 2, iIcon3);
+					P.SetFinalIconWithClue(this, iRow3, iCol - 2, iIcon3);
 
 				}
 				else if (bNot3)
 				{
-					P.EliminateIcon(this, iRow3, iCol + 2, iIcon3);
+					P.EliminateIconWithClue(this, iRow3, iCol + 2, iIcon3);
 
 				}
 				else
 				{
-					P.SetFinalIcon(this, iRow3, iCol + 2, iIcon3);
+					P.SetFinalIconWithClue(this, iRow3, iCol + 2, iIcon3);
 
 				}
 				return true;
 			}
 			else if (!P.m_Rows[iRow2].m_Cells[iCol - 1].m_bValues[iIcon2] && !bNot1 && !bNot2)
 			{
-				P.SetFinalIcon(this, iRow2, iCol + 1, iIcon2);
+				P.SetFinalIconWithClue(this, iRow2, iCol + 1, iIcon2);
 				if (bNot3)
-					P.EliminateIcon(this, iRow3, iCol + 2, iIcon3);
+					P.EliminateIconWithClue(this, iRow3, iCol + 2, iIcon3);
 				else
-					P.SetFinalIcon(this, iRow3, iCol + 2, iIcon3);
+					P.SetFinalIconWithClue(this, iRow3, iCol + 2, iIcon3);
 
 				return true;
 			}
 			else if (!P.m_Rows[iRow2].m_Cells[iCol + 1].m_bValues[iIcon2] && !bNot1 && !bNot2)
 			{
-				P.SetFinalIcon(this, iRow2, iCol - 1, iIcon2);
+				P.SetFinalIconWithClue(this, iRow2, iCol - 1, iIcon2);
 				if (bNot3)
-					P.EliminateIcon(this, iRow3, iCol - 2, iIcon3);
+					P.EliminateIconWithClue(this, iRow3, iCol - 2, iIcon3);
 				else
-					P.SetFinalIcon(this, iRow3, iCol - 2, iIcon3);
+					P.SetFinalIconWithClue(this, iRow3, iCol - 2, iIcon3);
 
 				return true;
 			}
@@ -1207,18 +1206,18 @@ bool Clue::SolveSpan(int iCol, int iRow1, int iIcon1, bool bNot1, int iRow2, int
 				{
 					if (bNot1)
 					{
-						P.SetFinalIcon(this, iRow2, iCol - 3, iIcon2);
+						P.SetFinalIconWithClue(this, iRow2, iCol - 3, iIcon2);
 
 						return true;
 					}
 					else if (bNot2)
 					{
-						P.EliminateIcon(this, iRow2, iCol - 1, iIcon2);
+						P.EliminateIconWithClue(this, iRow2, iCol - 1, iIcon2);
 
 					}
 					else
 					{
-						P.SetFinalIcon(this, iRow2, iCol - 1, iIcon2);
+						P.SetFinalIconWithClue(this, iRow2, iCol - 1, iIcon2);
 
 						return true;
 					}
@@ -1227,33 +1226,33 @@ bool Clue::SolveSpan(int iCol, int iRow1, int iIcon1, bool bNot1, int iRow2, int
 				{
 					if (bNot1)
 					{
-						P.SetFinalIcon(this, iRow2, iCol + 3, iIcon2);
+						P.SetFinalIconWithClue(this, iRow2, iCol + 3, iIcon2);
 
 						return true;
 					}
 					else if (bNot2)
 					{
-						P.EliminateIcon(this, iRow2, iCol + 1, iIcon2);
+						P.EliminateIconWithClue(this, iRow2, iCol + 1, iIcon2);
 
 					}
 					else
 					{
-						P.SetFinalIcon(this, iRow2, iCol + 1, iIcon2);
+						P.SetFinalIconWithClue(this, iRow2, iCol + 1, iIcon2);
 
 						return true;
 					}
 				}
 				else if (!P.m_Rows[iRow3].m_Cells[iCol - 2].m_bValues[iIcon3] && !bNot1 && !bNot2)
 				{
-					P.SetFinalIcon(this, iRow2, iCol + 1, iIcon2);
-					P.SetFinalIcon(this, iRow3, iCol + 2, iIcon3);
+					P.SetFinalIconWithClue(this, iRow2, iCol + 1, iIcon2);
+					P.SetFinalIconWithClue(this, iRow3, iCol + 2, iIcon3);
 
 					return true;
 				}
 				else if (!P.m_Rows[iRow3].m_Cells[iCol + 2].m_bValues[iIcon3] && !bNot1 && !bNot2)
 				{
-					P.SetFinalIcon(this, iRow2, iCol - 1, iIcon2);
-					P.SetFinalIcon(this, iRow3, iCol - 2, iIcon3);
+					P.SetFinalIconWithClue(this, iRow2, iCol - 1, iIcon2);
+					P.SetFinalIconWithClue(this, iRow3, iCol - 2, iIcon3);
 
 					return true;
 				}
@@ -1263,12 +1262,12 @@ bool Clue::SolveSpan(int iCol, int iRow1, int iIcon1, bool bNot1, int iRow2, int
 					{
 						if (!bNot2 && j != (iCol - 1) && j != (iCol + 1))
 						{
-							P.EliminateIcon(this, iRow2, j, iIcon2);
+							P.EliminateIconWithClue(this, iRow2, j, iIcon2);
 
 						}
 						if (j != (iCol - 2) && j != (iCol + 2))
 						{
-							P.EliminateIcon(this, iRow3, j, iIcon3);
+							P.EliminateIconWithClue(this, iRow3, j, iIcon3);
 
 						}
 					}
@@ -1283,26 +1282,26 @@ bool Clue::SolveSpan(int iCol, int iRow1, int iIcon1, bool bNot1, int iRow2, int
 		{
 			if (iCol == 0)
 			{
-				P.EliminateIcon(this, iRow2, iCol + 1, iIcon2);
+				P.EliminateIconWithClue(this, iRow2, iCol + 1, iIcon2);
 
 			}
 			else if (iCol == P.m_iSize - 1)
 			{
-				P.EliminateIcon(this, iRow2, iCol - 1, iIcon2);
+				P.EliminateIconWithClue(this, iRow2, iCol - 1, iIcon2);
 
 			}
 			else if (iCol == P.m_iSize - 3)
 			{
-				P.EliminateIcon(this, iRow1, iCol + 2, iIcon1);
-				P.EliminateIcon(this, iRow2, iCol + 1, iIcon2);
-				P.EliminateIcon(this, iRow3, iCol + 2, iIcon3);
+				P.EliminateIconWithClue(this, iRow1, iCol + 2, iIcon1);
+				P.EliminateIconWithClue(this, iRow2, iCol + 1, iIcon2);
+				P.EliminateIconWithClue(this, iRow3, iCol + 2, iIcon3);
 
 			}
 			else if (iCol == 2)
 			{
-				P.EliminateIcon(this, iRow1, iCol - 2, iIcon1);
-				P.EliminateIcon(this, iRow2, iCol - 1, iIcon2);
-				P.EliminateIcon(this, iRow3, iCol - 2, iIcon3);
+				P.EliminateIconWithClue(this, iRow1, iCol - 2, iIcon1);
+				P.EliminateIconWithClue(this, iRow2, iCol - 1, iIcon2);
+				P.EliminateIconWithClue(this, iRow3, iCol - 2, iIcon3);
 
 			}
 		}
@@ -1315,23 +1314,23 @@ bool Clue::SolveSpan(int iCol, int iRow1, int iIcon1, bool bNot1, int iRow2, int
 			{
 				if (!P.m_Rows[iRow1].m_Cells[iCol + 4].m_bValues[iIcon1])
 				{
-					P.EliminateIcon(this, iRow3, iCol + 2, iIcon3);
+					P.EliminateIconWithClue(this, iRow3, iCol + 2, iIcon3);
 				}
 			}
 			else if (iCol + 2 < P.m_iSize)
 			{
-				P.EliminateIcon(this, iRow3, iCol + 2, iIcon3);
+				P.EliminateIconWithClue(this, iRow3, iCol + 2, iIcon3);
 			}
 			if (iCol - 4 >= 0)
 			{
 				if (!P.m_Rows[iRow1].m_Cells[iCol - 4].m_bValues[iIcon1])
 				{
-					P.EliminateIcon(this, iRow3, iCol - 2, iIcon3);
+					P.EliminateIconWithClue(this, iRow3, iCol - 2, iIcon3);
 				}
 			}
 			else if (iCol - 2 >= 0)
 			{
-				P.EliminateIcon(this, iRow3, iCol - 2, iIcon3);
+				P.EliminateIconWithClue(this, iRow3, iCol - 2, iIcon3);
 			}
 		}
 		if (!bNot2)
@@ -1340,14 +1339,14 @@ bool Clue::SolveSpan(int iCol, int iRow1, int iIcon1, bool bNot1, int iRow2, int
 			{
 				if (!P.m_Rows[iRow1].m_Cells[iCol + 2].m_bValues[iIcon1])
 				{
-					P.EliminateIcon(this, iRow2, iCol + 1, iIcon2);
+					P.EliminateIconWithClue(this, iRow2, iCol + 1, iIcon2);
 				}
 			}
 			if (iCol - 2 >= 0)
 			{
 				if (!P.m_Rows[iRow1].m_Cells[iCol - 2].m_bValues[iIcon1])
 				{
-					P.EliminateIcon(this, iRow2, iCol - 1, iIcon2);
+					P.EliminateIconWithClue(this, iRow2, iCol - 1, iIcon2);
 				}
 			}
 		}
@@ -1360,9 +1359,9 @@ bool Clue::SolveSpan(int iCol, int iRow1, int iIcon1, bool bNot1, int iRow2, int
 			if (i != iCol - 1 && i != iCol + 1)
 			{
 				if (!bNot1)
-					P.EliminateIcon(this, iRow1, i, iIcon1);
+					P.EliminateIconWithClue(this, iRow1, i, iIcon1);
 				if (!bNot3)
-					P.EliminateIcon(this, iRow3, i, iIcon3);
+					P.EliminateIconWithClue(this, iRow3, i, iIcon3);
 			}
 		}
 	}
@@ -1370,15 +1369,15 @@ bool Clue::SolveSpan(int iCol, int iRow1, int iIcon1, bool bNot1, int iRow2, int
 	return false;
 }
 
-void Clue::AnalyzeHorizontalSpan(Puzzle& P)
+void UClue::AnalyzeHorizontalSpan(UPuzzle& P)
 {
-	int iIcon1 = P.m_Solution[m_iRow][m_iCol];
-	int iIcon2 = P.m_Solution[m_iRow2][m_iCol2];
-	int iIcon3 = P.m_Solution[m_iRow3][m_iCol3];
+	int iIcon1 = P.m_Solution[(m_iRow * P.m_iSize) + m_iCol];
+	int iIcon2 = P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol2];
+	int iIcon3 = P.m_Solution[(m_iRow3 * P.m_iSize) + m_iCol3];
 
 	// Icon2 cant be on either end
-	P.EliminateIcon(this, m_iRow2, 0, iIcon2);
-	P.EliminateIcon(this, m_iRow2, P.m_iSize - 1, iIcon2);
+	P.EliminateIconWithClue(this, m_iRow2, 0, iIcon2);
+	P.EliminateIconWithClue(this, m_iRow2, P.m_iSize - 1, iIcon2);
 
 
 	for (int i = 0; i < P.m_iSize; i++)
@@ -1390,15 +1389,15 @@ void Clue::AnalyzeHorizontalSpan(Puzzle& P)
 	}
 }
 
-void Clue::AnalyzeHorizontalSpanNotLeft(Puzzle& P)
+void UClue::AnalyzeHorizontalSpanNotLeft(UPuzzle& P)
 {
 	int iIcon1 = m_iHorizontal1;
-	int iIcon2 = P.m_Solution[m_iRow2][m_iCol2];
-	int iIcon3 = P.m_Solution[m_iRow3][m_iCol3];
+	int iIcon2 = P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol2];
+	int iIcon3 = P.m_Solution[(m_iRow3 * P.m_iSize) + m_iCol3];
 
 	// Icon2 cant be on either end
-	P.EliminateIcon(this, m_iRow2, 0, iIcon2);
-	P.EliminateIcon(this, m_iRow2, P.m_iSize - 1, iIcon2);
+	P.EliminateIconWithClue(this, m_iRow2, 0, iIcon2);
+	P.EliminateIconWithClue(this, m_iRow2, P.m_iSize - 1, iIcon2);
 
 
 	for (int i = 0; i < P.m_iSize; i++)
@@ -1410,11 +1409,11 @@ void Clue::AnalyzeHorizontalSpanNotLeft(Puzzle& P)
 	}
 }
 
-void Clue::AnalyzeHorizontalSpanNotMid(Puzzle& P)
+void UClue::AnalyzeHorizontalSpanNotMid(UPuzzle& P)
 {
-	int iIcon1 = P.m_Solution[m_iRow][m_iCol];
+	int iIcon1 = P.m_Solution[(m_iRow * P.m_iSize) + m_iCol];
 	int iIcon2 = m_iHorizontal1;
-	int iIcon3 = P.m_Solution[m_iRow3][m_iCol3];
+	int iIcon3 = P.m_Solution[(m_iRow3 * P.m_iSize) + m_iCol3];
 
 	for (int i = 0; i < P.m_iSize; i++)
 	{
@@ -1425,15 +1424,15 @@ void Clue::AnalyzeHorizontalSpanNotMid(Puzzle& P)
 	}
 }
 
-void Clue::AnalyzeHorizontalSpanNotRight(Puzzle& P)
+void UClue::AnalyzeHorizontalSpanNotRight(UPuzzle& P)
 {
-	int iIcon1 = P.m_Solution[m_iRow][m_iCol];
-	int iIcon2 = P.m_Solution[m_iRow2][m_iCol2];
+	int iIcon1 = P.m_Solution[(m_iRow * P.m_iSize) + m_iCol];
+	int iIcon2 = P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol2];
 	int iIcon3 = m_iHorizontal1;
 
 	// Icon2 cant be on either end
-	P.EliminateIcon(this, m_iRow2, 0, iIcon2);
-	P.EliminateIcon(this, m_iRow2, P.m_iSize - 1, iIcon2);
+	P.EliminateIconWithClue(this, m_iRow2, 0, iIcon2);
+	P.EliminateIconWithClue(this, m_iRow2, P.m_iSize - 1, iIcon2);
 
 
 	for (int i = 0; i < P.m_iSize; i++)
@@ -1445,27 +1444,27 @@ void Clue::AnalyzeHorizontalSpanNotRight(Puzzle& P)
 	}
 }
 
-void Clue::Dump(int32 iIndex, Puzzle& P)
+void UClue::Dump(int32 iIndex, UPuzzle& P)
 {
 	FString Output = FString::Printf(TEXT("Clue(%d): "), iIndex);
 
 	switch (m_Type)
 	{
 		case eClueType::Given:
-			Output += FString::Printf(TEXT("Type: Given (%d, %d, %d)"), m_iRow, m_iCol, P.m_Solution[m_iRow][m_iCol]);
+			Output += FString::Printf(TEXT("Type: Given (%d, %d, %d)"), m_iRow, m_iCol, P.m_Solution[(m_iRow * P.m_iSize) + m_iCol]);
 			break;
 
 		case eClueType::Vertical:
 			Output += TEXT("Type: Vertical  VType: ");
 			switch (m_VerticalType)
 			{
-				case eVerticalType::Two: Output += FString::Printf(TEXT("Two ([%d]:%d, [%d]:%d)"), m_iRow, P.m_Solution[m_iRow][m_iCol],	m_iRow2, P.m_Solution[m_iRow2][m_iCol]); break;
-				case eVerticalType::Three: Output += FString::Printf(TEXT("Three ([%d]:%d, [%d]:%d, [%d]:%d)"), m_iRow, P.m_Solution[m_iRow][m_iCol], m_iRow2, P.m_Solution[m_iRow2][m_iCol], m_iRow3, P.m_Solution[m_iRow3][m_iCol]); break;
-				case eVerticalType::EitherOr: Output += FString::Printf(TEXT("EitherOr ([%d]:%d, [%d]:%d, [%d]:%d)"), m_iRow, P.m_Solution[m_iRow][m_iCol], m_iRow2, (m_iRow2 == m_iNotCell) ? m_iHorizontal1 : P.m_Solution[m_iRow2][m_iCol], m_iRow3, (m_iRow3 == m_iNotCell) ? m_iHorizontal1 : P.m_Solution[m_iRow3][m_iCol]); break;
-				case eVerticalType::TwoNot: Output += FString::Printf(TEXT("TwoNot ([%d]:%d, [%d]:%d)"), m_iRow, P.m_Solution[m_iRow][m_iCol], m_iRow2, m_iNotCell); break;
-				case eVerticalType::ThreeTopNot: Output += FString::Printf(TEXT("ThreeTopNot ([%d]:%d, [%d]:%d, [%d]:%d)"), m_iRow, m_iNotCell, m_iRow2, P.m_Solution[m_iRow2][m_iCol], m_iRow3, P.m_Solution[m_iRow3][m_iCol]); break;
-				case eVerticalType::ThreeMidNot: Output += FString::Printf(TEXT("ThreeMidNot ([%d]:%d, [%d]:%d, [%d]:%d)"), m_iRow, P.m_Solution[m_iRow][m_iCol], m_iRow2, m_iNotCell, m_iRow3, P.m_Solution[m_iRow3][m_iCol]);	break;
-				case eVerticalType::ThreeBotNot: Output += FString::Printf(TEXT("ThreeBotNot ([%d]:%d, [%d]:%d, [%d]:%d)"), m_iRow, P.m_Solution[m_iRow][m_iCol], m_iRow2, P.m_Solution[m_iRow2][m_iCol], m_iRow3, m_iNotCell); break;
+				case eVerticalType::Two: Output += FString::Printf(TEXT("Two ([%d]:%d, [%d]:%d)"), m_iRow, P.m_Solution[(m_iRow * P.m_iSize) + m_iCol],	m_iRow2, P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol]); break;
+				case eVerticalType::Three: Output += FString::Printf(TEXT("Three ([%d]:%d, [%d]:%d, [%d]:%d)"), m_iRow, P.m_Solution[(m_iRow * P.m_iSize) + m_iCol], m_iRow2, P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol], m_iRow3, P.m_Solution[(m_iRow3 * P.m_iSize) + m_iCol]); break;
+				case eVerticalType::EitherOr: Output += FString::Printf(TEXT("EitherOr ([%d]:%d, [%d]:%d, [%d]:%d)"), m_iRow, P.m_Solution[(m_iRow * P.m_iSize) + m_iCol], m_iRow2, (m_iRow2 == m_iNotCell) ? m_iHorizontal1 : P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol], m_iRow3, (m_iRow3 == m_iNotCell) ? m_iHorizontal1 : P.m_Solution[(m_iRow3 * P.m_iSize) + m_iCol]); break;
+				case eVerticalType::TwoNot: Output += FString::Printf(TEXT("TwoNot ([%d]:%d, [%d]:%d)"), m_iRow, P.m_Solution[(m_iRow * P.m_iSize) + m_iCol], m_iRow2, m_iNotCell); break;
+				case eVerticalType::ThreeTopNot: Output += FString::Printf(TEXT("ThreeTopNot ([%d]:%d, [%d]:%d, [%d]:%d)"), m_iRow, m_iNotCell, m_iRow2, P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol], m_iRow3, P.m_Solution[(m_iRow3 * P.m_iSize) + m_iCol]); break;
+				case eVerticalType::ThreeMidNot: Output += FString::Printf(TEXT("ThreeMidNot ([%d]:%d, [%d]:%d, [%d]:%d)"), m_iRow, P.m_Solution[(m_iRow * P.m_iSize) + m_iCol], m_iRow2, m_iNotCell, m_iRow3, P.m_Solution[(m_iRow3 * P.m_iSize) + m_iCol]);	break;
+				case eVerticalType::ThreeBotNot: Output += FString::Printf(TEXT("ThreeBotNot ([%d]:%d, [%d]:%d, [%d]:%d)"), m_iRow, P.m_Solution[(m_iRow * P.m_iSize) + m_iCol], m_iRow2, P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol], m_iRow3, m_iNotCell); break;
 			}
 			break;
 
@@ -1473,14 +1472,14 @@ void Clue::Dump(int32 iIndex, Puzzle& P)
 			Output += TEXT("Type: Horizontal  HType: ");
 			switch (m_HorizontalType)
 			{
-				case eHorizontalType::NextTo: Output += FString::Printf(TEXT("NextTo ([%d]:%d, [%d]:%d)"), m_iRow, P.m_Solution[m_iRow][m_iCol], m_iRow2, P.m_Solution[m_iRow2][m_iCol2]); break;
-				case eHorizontalType::NotNextTo: Output += FString::Printf(TEXT("NotNextTo ([%d]:%d, [%d]:%d)"), m_iRow, P.m_Solution[m_iRow][m_iCol], m_iRow2, m_iHorizontal1); break;
-				case eHorizontalType::LeftOf: Output += FString::Printf(TEXT("LeftOf ([%d]:%d, [%d]:%d)"), m_iRow, P.m_Solution[m_iRow][m_iCol], m_iRow2, P.m_Solution[m_iRow2][m_iCol2]); break;
-				case eHorizontalType::NotLeftOf: Output += FString::Printf(TEXT("NotLeftOf ([%d]:%d, [%d]:%d)"), m_iRow, P.m_Solution[m_iRow][m_iCol], m_iRow2, P.m_Solution[m_iRow2][m_iCol2]); break;
-				case eHorizontalType::Span: Output += FString::Printf(TEXT("Span ([%d]:%d, [%d]:%d, [%d]:%d)"), m_iRow, P.m_Solution[m_iRow][m_iCol], m_iRow2, P.m_Solution[m_iRow2][m_iCol2], m_iRow3, P.m_Solution[m_iRow3][m_iCol3]); break;
-				case eHorizontalType::SpanNotLeft: Output += FString::Printf(TEXT("SpanNotLeft ([%d]:%d, [%d]:%d, [%d]:%d)"), m_iRow, m_iHorizontal1, m_iRow2, P.m_Solution[m_iRow2][m_iCol2], m_iRow3, P.m_Solution[m_iRow3][m_iCol3]); break;
-				case eHorizontalType::SpanNotMid: Output += FString::Printf(TEXT("SpanNotMid ([%d]:%d, [%d]:%d, [%d]:%d)"), m_iRow, P.m_Solution[m_iRow][m_iCol], m_iRow2, m_iHorizontal1, m_iRow3, P.m_Solution[m_iRow3][m_iCol3]); break;
-				case eHorizontalType::SpanNotRight:	Output += FString::Printf(TEXT("SpanNotRight ([%d]:%d, [%d]:%d, [%d]:%d)"),	m_iRow, P.m_Solution[m_iRow][m_iCol], m_iRow2, P.m_Solution[m_iRow2][m_iCol2], m_iRow3, m_iHorizontal1); break;
+				case eHorizontalType::NextTo: Output += FString::Printf(TEXT("NextTo ([%d]:%d, [%d]:%d)"), m_iRow, P.m_Solution[(m_iRow * P.m_iSize) + m_iCol], m_iRow2, P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol2]); break;
+				case eHorizontalType::NotNextTo: Output += FString::Printf(TEXT("NotNextTo ([%d]:%d, [%d]:%d)"), m_iRow, P.m_Solution[(m_iRow * P.m_iSize) + m_iCol], m_iRow2, m_iHorizontal1); break;
+				case eHorizontalType::LeftOf: Output += FString::Printf(TEXT("LeftOf ([%d]:%d, [%d]:%d)"), m_iRow, P.m_Solution[(m_iRow * P.m_iSize) + m_iCol], m_iRow2, P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol2]); break;
+				case eHorizontalType::NotLeftOf: Output += FString::Printf(TEXT("NotLeftOf ([%d]:%d, [%d]:%d)"), m_iRow, P.m_Solution[(m_iRow * P.m_iSize) + m_iCol], m_iRow2, P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol2]); break;
+				case eHorizontalType::Span: Output += FString::Printf(TEXT("Span ([%d]:%d, [%d]:%d, [%d]:%d)"), m_iRow, P.m_Solution[(m_iRow * P.m_iSize) + m_iCol], m_iRow2, P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol2], m_iRow3, P.m_Solution[(m_iRow3 * P.m_iSize) + m_iCol3]); break;
+				case eHorizontalType::SpanNotLeft: Output += FString::Printf(TEXT("SpanNotLeft ([%d]:%d, [%d]:%d, [%d]:%d)"), m_iRow, m_iHorizontal1, m_iRow2, P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol2], m_iRow3, P.m_Solution[(m_iRow3 * P.m_iSize) + m_iCol3]); break;
+				case eHorizontalType::SpanNotMid: Output += FString::Printf(TEXT("SpanNotMid ([%d]:%d, [%d]:%d, [%d]:%d)"), m_iRow, P.m_Solution[(m_iRow * P.m_iSize) + m_iCol], m_iRow2, m_iHorizontal1, m_iRow3, P.m_Solution[(m_iRow3 * P.m_iSize) + m_iCol3]); break;
+				case eHorizontalType::SpanNotRight:	Output += FString::Printf(TEXT("SpanNotRight ([%d]:%d, [%d]:%d, [%d]:%d)"),	m_iRow, P.m_Solution[(m_iRow * P.m_iSize) + m_iCol], m_iRow2, P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol2], m_iRow3, m_iHorizontal1); break;
 			}
 			break;
 	}
@@ -1488,7 +1487,7 @@ void Clue::Dump(int32 iIndex, Puzzle& P)
 	UE_LOG(LogTemp, Log, TEXT("%s"), *Output);
 }
 
-bool Clue::GetHintAction(Puzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol, int& iIcon)
+bool UClue::GetHintAction(UPuzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol, int& iIcon)
 {
 	bSetFinalIcon = false;
 	iRow = -1;
@@ -1543,10 +1542,10 @@ bool Clue::GetHintAction(Puzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol, i
 	}
 }
 
-bool Clue::GetHintActionVerticalTwo(Puzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol, int& iIcon)
+bool UClue::GetHintActionVerticalTwo(UPuzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol, int& iIcon)
 {
-	int iIcon1 = P.m_Solution[m_iRow][m_iCol];
-	int iIcon2 = P.m_Solution[m_iRow2][m_iCol];
+	int iIcon1 = P.m_Solution[(m_iRow * P.m_iSize) + m_iCol];
+	int iIcon2 = P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol];
 	for (int i = 0; i < P.m_iSize; i++)
 	{
 		if (!P.m_Rows[m_iRow].m_Cells[i].m_bValues[iIcon1])
@@ -1603,11 +1602,11 @@ bool Clue::GetHintActionVerticalTwo(Puzzle& P, bool& bSetFinalIcon, int& iRow, i
 	return false;
 }
 
-bool Clue::GetHintActionVerticalThree(Puzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol, int& iIcon)
+bool UClue::GetHintActionVerticalThree(UPuzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol, int& iIcon)
 {
-	int iIcon1 = P.m_Solution[m_iRow][m_iCol];
-	int iIcon2 = P.m_Solution[m_iRow2][m_iCol];
-	int iIcon3 = P.m_Solution[m_iRow3][m_iCol];
+	int iIcon1 = P.m_Solution[(m_iRow * P.m_iSize) + m_iCol];
+	int iIcon2 = P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol];
+	int iIcon3 = P.m_Solution[(m_iRow3 * P.m_iSize) + m_iCol];
 	for (int i = 0; i < P.m_iSize; i++)
 	{
 		if (P.m_Rows[m_iRow].m_Cells[i].m_iFinalIcon == iIcon1)
@@ -1734,11 +1733,11 @@ bool Clue::GetHintActionVerticalThree(Puzzle& P, bool& bSetFinalIcon, int& iRow,
 	return false;
 }
 
-bool Clue::GetHintActionVerticalEitherOr(Puzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol, int& iIcon)
+bool UClue::GetHintActionVerticalEitherOr(UPuzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol, int& iIcon)
 {
-	int iIcon1 = P.m_Solution[m_iRow][m_iCol];
-	int iIcon2 = (m_iRow2 == m_iNotCell) ? m_iHorizontal1 : P.m_Solution[m_iRow2][m_iCol];
-	int iIcon3 = (m_iRow3 == m_iNotCell) ? m_iHorizontal1 : P.m_Solution[m_iRow3][m_iCol];
+	int iIcon1 = P.m_Solution[(m_iRow * P.m_iSize) + m_iCol];
+	int iIcon2 = (m_iRow2 == m_iNotCell) ? m_iHorizontal1 : P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol];
+	int iIcon3 = (m_iRow3 == m_iNotCell) ? m_iHorizontal1 : P.m_Solution[(m_iRow3 * P.m_iSize) + m_iCol];
 
 	int iIcon2Col = -1;
 	int iIcon3Col = -1;
@@ -1840,9 +1839,9 @@ bool Clue::GetHintActionVerticalEitherOr(Puzzle& P, bool& bSetFinalIcon, int& iR
 	return false;
 }
 
-bool Clue::GetHintActionVerticalTwoNot(Puzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol, int& iIcon)
+bool UClue::GetHintActionVerticalTwoNot(UPuzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol, int& iIcon)
 {
-	int iIcon1 = P.m_Solution[m_iRow][m_iCol];
+	int iIcon1 = P.m_Solution[(m_iRow * P.m_iSize) + m_iCol];
 	int iIcon2 = m_iNotCell;
 
 	for (int i = 0; i < P.m_iSize; i++)
@@ -1878,11 +1877,11 @@ bool Clue::GetHintActionVerticalTwoNot(Puzzle& P, bool& bSetFinalIcon, int& iRow
 	return false;
 }
 
-bool Clue::GetHintActionVerticalThreeTopNot(Puzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol, int& iIcon)
+bool UClue::GetHintActionVerticalThreeTopNot(UPuzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol, int& iIcon)
 {
 	int iIcon1 = m_iNotCell;
-	int iIcon2 = P.m_Solution[m_iRow2][m_iCol];
-	int iIcon3 = P.m_Solution[m_iRow3][m_iCol];
+	int iIcon2 = P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol];
+	int iIcon3 = P.m_Solution[(m_iRow3 * P.m_iSize) + m_iCol];
 
 	for (int i = 0; i < P.m_iSize; i++)
 	{
@@ -1975,11 +1974,11 @@ bool Clue::GetHintActionVerticalThreeTopNot(Puzzle& P, bool& bSetFinalIcon, int&
 	return false;
 }
 
-bool Clue::GetHintActionVerticalThreeMidNot(Puzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol, int& iIcon)
+bool UClue::GetHintActionVerticalThreeMidNot(UPuzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol, int& iIcon)
 {
-	int iIcon1 = P.m_Solution[m_iRow][m_iCol];
+	int iIcon1 = P.m_Solution[(m_iRow * P.m_iSize) + m_iCol];
 	int iIcon2 = m_iNotCell;
-	int iIcon3 = P.m_Solution[m_iRow3][m_iCol];
+	int iIcon3 = P.m_Solution[(m_iRow3 * P.m_iSize) + m_iCol];
 
 	for (int i = 0; i < P.m_iSize; i++)
 	{
@@ -2071,10 +2070,10 @@ bool Clue::GetHintActionVerticalThreeMidNot(Puzzle& P, bool& bSetFinalIcon, int&
 	return false;
 }
 
-bool Clue::GetHintActionVerticalThreeBotNot(Puzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol, int& iIcon)
+bool UClue::GetHintActionVerticalThreeBotNot(UPuzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol, int& iIcon)
 {
-	int iIcon1 = P.m_Solution[m_iRow][m_iCol];
-	int iIcon2 = P.m_Solution[m_iRow2][m_iCol];
+	int iIcon1 = P.m_Solution[(m_iRow * P.m_iSize) + m_iCol];
+	int iIcon2 = P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol];
 	int iIcon3 = m_iNotCell;
 
 	for (int i = 0; i < P.m_iSize; i++)
@@ -2167,10 +2166,10 @@ bool Clue::GetHintActionVerticalThreeBotNot(Puzzle& P, bool& bSetFinalIcon, int&
 	return false;
 }
 
-bool Clue::GetHintActionHorizontalNextTo(Puzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol, int& iIcon)
+bool UClue::GetHintActionHorizontalNextTo(UPuzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol, int& iIcon)
 {
-	int iIcon1 = P.m_Solution[m_iRow][m_iCol];
-	int iIcon2 = P.m_Solution[m_iRow2][m_iCol2];
+	int iIcon1 = P.m_Solution[(m_iRow * P.m_iSize) + m_iCol];
+	int iIcon2 = P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol2];
 
 	for (int i = 0; i < P.m_iSize; i++)
 	{
@@ -2348,9 +2347,9 @@ bool Clue::GetHintActionHorizontalNextTo(Puzzle& P, bool& bSetFinalIcon, int& iR
 	return false;
 }
 
-bool Clue::GetHintActionHorizontalNotNextTo(Puzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol, int& iIcon)
+bool UClue::GetHintActionHorizontalNotNextTo(UPuzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol, int& iIcon)
 {
-	int iIcon1 = P.m_Solution[m_iRow][m_iCol];
+	int iIcon1 = P.m_Solution[(m_iRow * P.m_iSize) + m_iCol];
 	int iIcon2 = m_iHorizontal1;
 
 	for (int i = 0; i < P.m_iSize; i++)
@@ -2454,10 +2453,10 @@ bool Clue::GetHintActionHorizontalNotNextTo(Puzzle& P, bool& bSetFinalIcon, int&
 	return false;
 }
 
-bool Clue::GetHintActionHorizontalLeftOf(Puzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol, int& iIcon)
+bool UClue::GetHintActionHorizontalLeftOf(UPuzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol, int& iIcon)
 {
-	int iIcon1 = P.m_Solution[m_iRow][m_iCol];
-	int iIcon2 = P.m_Solution[m_iRow2][m_iCol2];
+	int iIcon1 = P.m_Solution[(m_iRow * P.m_iSize) + m_iCol];
+	int iIcon2 = P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol2];
 
 	int iFirstPossibleLeft = 0;
 	for (iFirstPossibleLeft = 0; iFirstPossibleLeft < P.m_iSize; iFirstPossibleLeft++)
@@ -2529,10 +2528,10 @@ bool Clue::GetHintActionHorizontalLeftOf(Puzzle& P, bool& bSetFinalIcon, int& iR
 	return false;
 }
 
-bool Clue::GetHintActionHorizontalNotLeftOf(Puzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol, int& iIcon)
+bool UClue::GetHintActionHorizontalNotLeftOf(UPuzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol, int& iIcon)
 {
-	int iIcon1 = P.m_Solution[m_iRow][m_iCol];
-	int iIcon2 = P.m_Solution[m_iRow2][m_iCol2];
+	int iIcon1 = P.m_Solution[(m_iRow * P.m_iSize) + m_iCol];
+	int iIcon2 = P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol2];
 
 	// If both icons are on the same row
 	if (m_iRow == m_iRow2)
@@ -2599,11 +2598,11 @@ bool Clue::GetHintActionHorizontalNotLeftOf(Puzzle& P, bool& bSetFinalIcon, int&
 	return false;
 }
 
-bool Clue::GetHintActionHorizontalSpan(Puzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol, int& iIcon)
+bool UClue::GetHintActionHorizontalSpan(UPuzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol, int& iIcon)
 {
-	int iIcon1 = P.m_Solution[m_iRow][m_iCol];
-	int iIcon2 = P.m_Solution[m_iRow2][m_iCol2];
-	int iIcon3 = P.m_Solution[m_iRow3][m_iCol3];
+	int iIcon1 = P.m_Solution[(m_iRow * P.m_iSize) + m_iCol];
+	int iIcon2 = P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol2];
+	int iIcon3 = P.m_Solution[(m_iRow3 * P.m_iSize) + m_iCol3];
 
 	// Icon2 cant be on either end
 	if (P.m_Rows[m_iRow2].m_Cells[0].m_bValues[iIcon2])
@@ -2639,7 +2638,7 @@ bool Clue::GetHintActionHorizontalSpan(Puzzle& P, bool& bSetFinalIcon, int& iRow
 	return false;
 }
 
-bool Clue::GetHintActionSpan(int iCol, int iRow1, int iIcon1, bool bNot1, int iRow2, int iIcon2, bool bNot2, int iRow3, int iIcon3, bool bNot3, Puzzle P, bool bSetFinalIcon, int iOutRow, int iOutCol, int iOutIcon)
+bool UClue::GetHintActionSpan(int iCol, int iRow1, int iIcon1, bool bNot1, int iRow2, int iIcon2, bool bNot2, int iRow3, int iIcon3, bool bNot3, UPuzzle& P, bool bSetFinalIcon, int iOutRow, int iOutCol, int iOutIcon)
 {
 	int iFinal1 = P.m_Rows[iRow1].m_Cells[iCol].m_iFinalIcon;
 	if (iFinal1 == iIcon1)
@@ -3297,11 +3296,11 @@ bool Clue::GetHintActionSpan(int iCol, int iRow1, int iIcon1, bool bNot1, int iR
 	return false;
 }
 
-bool Clue::GetHintActionHorizontalSpanNotLeft(Puzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol, int& iIcon)
+bool UClue::GetHintActionHorizontalSpanNotLeft(UPuzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol, int& iIcon)
 {
 	int iIcon1 = m_iHorizontal1;
-	int iIcon2 = P.m_Solution[m_iRow2][m_iCol2];
-	int iIcon3 = P.m_Solution[m_iRow3][m_iCol3];
+	int iIcon2 = P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol2];
+	int iIcon3 = P.m_Solution[(m_iRow3 * P.m_iSize) + m_iCol3];
 
 	// Icon2 cant be on either end
 	if (P.m_Rows[m_iRow2].m_Cells[0].m_bValues[iIcon2])
@@ -3337,11 +3336,11 @@ bool Clue::GetHintActionHorizontalSpanNotLeft(Puzzle& P, bool& bSetFinalIcon, in
 	return false;
 }
 
-bool Clue::GetHintActionHorizontalSpanNotMid(Puzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol, int& iIcon)
+bool UClue::GetHintActionHorizontalSpanNotMid(UPuzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol, int& iIcon)
 {
-	int iIcon1 = P.m_Solution[m_iRow][m_iCol];
+	int iIcon1 = P.m_Solution[(m_iRow * P.m_iSize) + m_iCol];
 	int iIcon2 = m_iHorizontal1;
-	int iIcon3 = P.m_Solution[m_iRow3][m_iCol3];
+	int iIcon3 = P.m_Solution[(m_iRow3 * P.m_iSize) + m_iCol3];
 
 	for (int i = 0; i < P.m_iSize; i++)
 	{
@@ -3358,10 +3357,10 @@ bool Clue::GetHintActionHorizontalSpanNotMid(Puzzle& P, bool& bSetFinalIcon, int
 	return false;
 }
 
-bool Clue::GetHintActionHorizontalSpanNotRight(Puzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol, int& iIcon)
+bool UClue::GetHintActionHorizontalSpanNotRight(UPuzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol, int& iIcon)
 {
-	int iIcon1 = P.m_Solution[m_iRow][m_iCol];
-	int iIcon2 = P.m_Solution[m_iRow2][m_iCol2];
+	int iIcon1 = P.m_Solution[(m_iRow * P.m_iSize) + m_iCol];
+	int iIcon2 = P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol2];
 	int iIcon3 = m_iHorizontal1;
 
 	// Icon2 cant be on either end
@@ -3395,4 +3394,167 @@ bool Clue::GetHintActionHorizontalSpanNotRight(Puzzle& P, bool& bSetFinalIcon, i
 	iCol = -1;
 	iIcon = -1;
 	return false;
+}
+
+FString UClue::ToString() const
+{
+	FString ClueString;
+
+	switch (m_Type) 
+	{
+		case eClueType::Given:		return FString::Printf(TEXT("Given: (%d, %d)"), m_iRow, m_iCol);
+		case eClueType::Horizontal: return HorizontalToString();
+		case eClueType::Vertical:	return VerticalToString();
+	}
+
+	return ClueString;
+}
+
+FString UClue::HorizontalToString() const
+{
+	FString ClueString = "Horizontal: ";
+
+	switch (m_HorizontalType)
+	{
+		case eHorizontalType::NextTo:		ClueString += FString::Printf(TEXT("Next To: (%d, %d) <-> (%d, %d)"), m_iRow, m_iCol, m_iRow2, m_iCol2); break;
+		case eHorizontalType::LeftOf:		ClueString += FString::Printf(TEXT("LeftOf: (%d, %d) <-- (%d, %d)"), m_iRow, m_iCol, m_iRow2, m_iCol2); break;
+		case eHorizontalType::NotLeftOf:	ClueString += FString::Printf(TEXT("NotLeftOf: (%d, %d) !<-- (%d, %d)"), m_iRow, m_iCol, m_iRow2, m_iCol2); break;
+		case eHorizontalType::NotNextTo:	ClueString += FString::Printf(TEXT("NotNtextTo: (%d, %d) !<-> (%d, %d)"), m_iRow, m_iCol, m_iRow2, m_iHorizontal1); break;
+		case eHorizontalType::Span:			ClueString += FString::Printf(TEXT("Span: (%d, %d) < (%d, %d) > (%d, %d)"), m_iRow, m_iCol, m_iRow2, m_iCol2, m_iRow3, m_iCol3); break;
+		case eHorizontalType::SpanNotLeft:	ClueString += FString::Printf(TEXT("SpanNotLeft: !(%d, %d) < (%d, %d) > (%d, %d) %d"), m_iRow, m_iCol, m_iRow2, m_iCol2, m_iRow3, m_iRow3, m_iHorizontal1); break;
+		case eHorizontalType::SpanNotMid:	ClueString += FString::Printf(TEXT("SpanNotMid: (%d, %d) < !(%d, %d) > (%d, %d) %d"), m_iRow, m_iCol, m_iRow2, m_iCol2, m_iRow3, m_iRow3, m_iHorizontal1); break;
+		case eHorizontalType::SpanNotRight: ClueString += FString::Printf(TEXT("SpanNotRight: (%d, %d) < (%d, %d) > !(%d, %d) %d)"), m_iRow, m_iCol, m_iRow2, m_iCol2, m_iRow3, m_iRow3, m_iHorizontal1); break;
+	}
+	return ClueString;
+}
+
+FString UClue::VerticalToString() const
+{
+	FString ClueString = "Vertical: ";
+
+	switch (m_VerticalType)
+	{
+		case eVerticalType::Two:			ClueString += FString::Printf(TEXT("Two: (%d) (%d)"), m_iRow, m_iRow2); break;
+		case eVerticalType::Three:			ClueString += FString::Printf(TEXT("Three: (%d) (%d) (%d)"), m_iRow, m_iRow2, m_iRow3); break;
+		case eVerticalType::TwoNot:			ClueString += FString::Printf(TEXT("TwoNot: (%d) (%d) Not: (%d)"), m_iRow, m_iRow2, m_iNotCell); break;
+		case eVerticalType::EitherOr:		ClueString += FString::Printf(TEXT("EitherOr: (%d) (%d) (%d) (%d)"), m_iRow, m_iRow2, m_iRow3, m_iNotCell); break;
+		case eVerticalType::ThreeTopNot:	ClueString += FString::Printf(TEXT("ThreeTopNot: (%d) (%d) (%d) (%d)"), m_iRow, m_iRow2, m_iRow3, m_iNotCell); break;
+		case eVerticalType::ThreeMidNot:	ClueString += FString::Printf(TEXT("ThreeMidNot: (%d) (%d) (%d) (%d)"), m_iRow, m_iRow2, m_iRow3, m_iNotCell); break;
+		case eVerticalType::ThreeBotNot:	ClueString += FString::Printf(TEXT("ThreeBotNot: (%d) (%d) (%d) (%d)"), m_iRow, m_iRow2, m_iRow3, m_iNotCell); break;
+	}
+	return ClueString;
+}
+
+void UClue::GetRows(TArray<int>& Rows)
+{
+	Rows.Add(m_iRow);
+	Rows.Add(m_iRow2);
+	Rows.Add(m_iRow3);
+}
+
+void UClue::GetIcons(UPuzzle* P, TArray<int32>& Icons)
+{
+	Icons.Reset();
+
+	switch (m_Type)
+	{
+		case eClueType::Given:
+			break;
+
+		case eClueType::Vertical:
+		{
+			switch (m_VerticalType)
+			{
+				case eVerticalType::Two:
+					Icons.Add(P->m_Solution[(m_iRow * P->m_iSize) + m_iCol]);
+					Icons.Add(P->m_Solution[(m_iRow2 * P->m_iSize) + m_iCol]);
+					break;
+
+				case eVerticalType::Three:
+					Icons.Add(P->m_Solution[(m_iRow * P->m_iSize) + m_iCol]);
+					Icons.Add(P->m_Solution[(m_iRow2 * P->m_iSize) + m_iCol]);
+					Icons.Add(P->m_Solution[(m_iRow3 * P->m_iSize) + m_iCol]);
+					break;
+
+				case eVerticalType::EitherOr:
+					Icons.Add(P->m_Solution[(m_iRow * P->m_iSize) + m_iCol]);
+					Icons.Add((m_iRow2 == m_iNotCell) ? m_iHorizontal1 : P->m_Solution[(m_iRow2 * P->m_iSize) + m_iCol]);
+					Icons.Add((m_iRow3 == m_iNotCell) ? m_iHorizontal1 : P->m_Solution[(m_iRow3 * P->m_iSize) + m_iCol]);
+					break;
+
+				case eVerticalType::TwoNot:
+					Icons.Add(P->m_Solution[(m_iRow * P->m_iSize) + m_iCol]);
+					Icons.Add(m_iNotCell);
+					break;
+
+				case eVerticalType::ThreeTopNot:
+					Icons.Add(m_iNotCell);
+					Icons.Add(P->m_Solution[(m_iRow2 * P->m_iSize) + m_iCol]);
+					Icons.Add(P->m_Solution[(m_iRow3 * P->m_iSize) + m_iCol]);
+					break;
+
+				case eVerticalType::ThreeMidNot:
+					Icons.Add(P->m_Solution[(m_iRow * P->m_iSize) + m_iCol]);
+					Icons.Add(m_iNotCell);
+					Icons.Add(P->m_Solution[(m_iRow3 * P->m_iSize) + m_iCol]);
+					break;
+
+				case eVerticalType::ThreeBotNot:
+					Icons.Add(P->m_Solution[(m_iRow * P->m_iSize) + m_iCol]);
+					Icons.Add(P->m_Solution[(m_iRow2 * P->m_iSize) + m_iCol]);
+					Icons.Add(m_iNotCell);
+					break;
+			}
+		}
+		break;
+
+		case eClueType::Horizontal:
+		{
+			switch (m_HorizontalType)
+			{
+			case eHorizontalType::NextTo:
+				Icons.Add(P->m_Solution[(m_iRow * P->m_iSize) + m_iCol]);
+				Icons.Add(P->m_Solution[(m_iRow2 * P->m_iSize) + m_iCol2]);
+				Icons.Add(P->m_Solution[(m_iRow * P->m_iSize) + m_iCol]);
+				break;
+
+			case eHorizontalType::NotNextTo:
+				Icons.Add(P->m_Solution[(m_iRow * P->m_iSize) + m_iCol]);
+				Icons.Add(m_iHorizontal1);
+				Icons.Add(P->m_Solution[(m_iRow * P->m_iSize) + m_iCol]);
+				break;
+
+			case eHorizontalType::LeftOf:
+			case eHorizontalType::NotLeftOf:
+				Icons.Add(P->m_Solution[(m_iRow * P->m_iSize) + m_iCol]);
+				Icons.Add(P->m_Solution[(m_iRow2 * P->m_iSize) + m_iCol2]);
+				break;
+
+			case eHorizontalType::Span:
+				Icons.Add(P->m_Solution[(m_iRow * P->m_iSize) + m_iCol]);
+				Icons.Add(P->m_Solution[(m_iRow2 * P->m_iSize) + m_iCol2]);
+				Icons.Add(P->m_Solution[(m_iRow3 * P->m_iSize) + m_iCol3]);
+				break;
+
+			case eHorizontalType::SpanNotLeft:
+				Icons.Add(m_iHorizontal1);
+				Icons.Add(P->m_Solution[(m_iRow2 * P->m_iSize) + m_iCol2]);
+				Icons.Add(P->m_Solution[(m_iRow3 * P->m_iSize) + m_iCol3]);
+				break;
+
+			case eHorizontalType::SpanNotMid:
+				Icons.Add(P->m_Solution[(m_iRow * P->m_iSize) + m_iCol]);
+				Icons.Add(m_iHorizontal1);
+				Icons.Add(P->m_Solution[(m_iRow3 * P->m_iSize) + m_iCol3]);
+				break;
+
+			case eHorizontalType::SpanNotRight:
+				Icons.Add(P->m_Solution[(m_iRow * P->m_iSize) + m_iCol]);
+				Icons.Add(P->m_Solution[(m_iRow2 * P->m_iSize) + m_iCol2]);
+				Icons.Add(m_iHorizontal1);
+				break;
+			}
+		}
+		break;
+	}
 }

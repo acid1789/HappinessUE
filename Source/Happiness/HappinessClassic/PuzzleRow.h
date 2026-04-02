@@ -2,18 +2,23 @@
 
 #include "CoreMinimal.h"
 #include "PuzzleCell.h"
+#include "PuzzleRow.generated.h"
 
-class PuzzleRow
+USTRUCT(BlueprintType)
+struct FPuzzleRow
 {
-public:
-
-	TArray<PuzzleCell> m_Cells;
+	GENERATED_BODY()
 
 public:
 
-	PuzzleRow() {}          // required by TArray
+	UPROPERTY(BlueprintReadWrite)
+	TArray<FPuzzleCell> m_Cells;
 
-	PuzzleRow(int iSize)
+public:
+
+	FPuzzleRow() {}          // required by TArray
+
+	FPuzzleRow(int iSize)
 	{
 		m_Cells.Reserve(iSize);
 
@@ -23,7 +28,7 @@ public:
 		}
 	}
 
-	PuzzleRow(const PuzzleRow& Other)
+	FPuzzleRow(const FPuzzleRow& Other)
 	{
 		m_Cells = Other.m_Cells;
 	}

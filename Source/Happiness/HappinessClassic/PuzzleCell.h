@@ -1,25 +1,32 @@
 #pragma once
 
-#include "CoreMinimal.h"
+#include <CoreMinimal.h>
+#include "PuzzleCell.generated.h"
 
-class PuzzleCell
+USTRUCT(BlueprintType)
+struct FPuzzleCell
 {
+	GENERATED_BODY()
+
 public:
 
 	// True if the icon is still in the cell
+	UPROPERTY(BlueprintReadWrite)
 	TArray<bool> m_bValues;
 
-	int m_iFinalIcon;
+	UPROPERTY(BlueprintReadWrite)
+	int32 m_iFinalIcon = -1;
 
 public:
 
-	PuzzleCell(int iSize)
+	FPuzzleCell() {}          // required by TArray
+	FPuzzleCell(int iSize)
 	{
 		m_bValues.SetNum(iSize);
 		Reset();
 	}
 
-	PuzzleCell(const PuzzleCell& Other)
+	FPuzzleCell(const FPuzzleCell& Other)
 	{
 		m_bValues = Other.m_bValues;
 		m_iFinalIcon = Other.m_iFinalIcon;
@@ -54,4 +61,6 @@ public:
 
 		m_iFinalIcon = -1;
 	}
+
+private:
 };

@@ -1,15 +1,17 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Hint.generated.h"
 
-class Clue;
-class Puzzle;
+class UPuzzle;
+class UClue;
 
-class Hint
+UCLASS(BlueprintType)
+class HAPPINESS_API UHint : public UObject
 {
-private:
+	GENERATED_BODY()
 
-	Clue* TheClue = nullptr;
+	UClue* TheClue = nullptr;
 
 	bool bSetFinalIcon = false;
 
@@ -19,13 +21,13 @@ private:
 
 public:
 
-	Hint() = default;
+	UHint() = default;
 
-	bool Init(Puzzle& P, Clue& C);
+	bool Init(UPuzzle& P, UClue& C);
 
-	bool ShouldHide(Puzzle& P) const;
+	bool ShouldHide(UPuzzle& P) const;
 
 	bool ShouldDraw(int InRow, int InCol, int InIcon) const;
 
-	bool ShouldDraw(const Clue& C) const;
+	bool ShouldDraw(const UClue& C) const;
 };

@@ -1,65 +1,107 @@
 #pragma once
 
 #include <CoreMinimal.h>
+#include <UObject/Object.h>
 #include "Clue.h"
 #include "PuzzleRow.h"
 #include "Hint.h"
+#include "Puzzle.generated.h"
 
-class Puzzle
+UCLASS(BlueprintType)
+class HAPPINESS_API UPuzzle : public UObject
 {
+	GENERATED_BODY()
+
 public:
 
-	int m_iSeed;
-	int m_iSize;
-	int m_iDifficulty;
+	UPROPERTY(BlueprintReadOnly)
+	int32 m_iSeed;
 
-	TArray<TArray<int>> m_Solution;
+	UPROPERTY(BlueprintReadOnly)
+	int32 m_iSize;
 
-	TArray<PuzzleRow> m_Rows;
-	TArray<PuzzleRow> m_MarkerRows;
+	UPROPERTY(BlueprintReadOnly)
+	int32 m_iDifficulty;
+
+	UPROPERTY(BlueprintReadOnly)
+	TArray<int> m_Solution;
+
+	UPROPERTY(BlueprintReadOnly)
+	TArray<FPuzzleRow> m_Rows;
+
+	UPROPERTY(BlueprintReadOnly)
+	TArray<FPuzzleRow> m_MarkerRows;
+
+	UPROPERTY(BlueprintReadOnly)
+	TArray<UClue*> m_Clues;
+
+	UPROPERTY(BlueprintReadOnly)
+	TArray<UClue*> m_GivenClues;
+
+	UPROPERTY(BlueprintReadOnly)
+	TArray<UClue*> m_HorizontalClues;
+
+	UPROPERTY(BlueprintReadOnly)
+	TArray<UClue*> m_VeritcalClues;
 
 	FRandomStream m_Rand;
 
-	TArray<Clue*> m_Clues;
-	TArray<Clue*> m_GivenClues;
-	TArray<Clue*> m_VeritcalClues;
-	TArray<Clue*> m_HorizontalClues;
-
 public:
+	UPuzzle() {}
 
-	Puzzle(int Seed, int Size, int Difficulty);
+	UFUNCTION(BlueprintCallable)
+	void Init(int Seed, int Size, int Difficulty);
 
+	UFUNCTION(BlueprintCallable, BlueprintPure)
 	int GetNumGivenClues();
 
 	static void RandomDistribution(FRandomStream& Rand, TArray<int>& Rands);
 
+	UFUNCTION(BlueprintCallable)
 	void Reset();
+
+	UFUNCTION(BlueprintCallable)
 	void ResetRow(int Row);
 
+	UFUNCTION(BlueprintCallable, BlueprintPure)
 	bool IsSolved();
+
+	UFUNCTION(BlueprintCallable, BlueprintPure)
 	bool IsCompleted();
 
+	UFUNCTION(BlueprintCallable, BlueprintPure)
 	bool IsCorrect(int Row, int Col);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure)
 	int SolutionIcon(int Row, int Col);
 
+	UFUNCTION(BlueprintCallable)
 	void SetFinalIcon(int Row, int Col, int Icon);
-	void SetFinalIcon(Clue* Clue, int Row, int Col, int Icon);
 
+	UFUNCTION(BlueprintCallable)
+	void SetFinalIconWithClue(UClue* clue, int Row, int Col, int Icon);
+
+	UFUNCTION(BlueprintCallable)
 	void EliminateIcon(int Row, int Col, int Icon);
-	void EliminateIcon(Clue* Clue, int Row, int Col, int Icon);
 
-	Hint* GenerateHint(TArray<Clue*>& VisibleClues);
+	UFUNCTION(BlueprintCallable)
+	void EliminateIconWithClue(UClue* clue, int Row, int Col, int Icon);
 
-	const TArray<Clue*>& HorizontalClues() const { return m_HorizontalClues; }
-	const TArray<Clue*>& VerticalClues() const { return m_VeritcalClues; }
+	UHint* GenerateHint(TArray<UClue*>& VisibleClues);
+
+	const TArray<UClue*>& HorizontalClues() const { return m_HorizontalClues; }
+	const TArray<UClue*>& VerticalClues() const { return m_VeritcalClues; }
+
+	UFUNCTION(BlueprintCallable, BlueprintPure)
+	FPuzzleCell GetCell(int Row, int Col) { return m_Rows[Row].m_Cells[Col]; }
 
 private:
 
 	void GenerateSolution();
 	void GenerateClues();
 
-	bool ValidateClue(Clue& C);
-	bool IsDuplicateClue(Clue& C);
+	bool ValidateClue(UClue& C);
+	bool IsDuplicateClue(UClue& C);
 
 	void AnalyzeAllClues();
 

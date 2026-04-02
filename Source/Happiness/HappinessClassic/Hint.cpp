@@ -3,7 +3,7 @@
 #include "PuzzleRow.h"
 #include "Clue.h"
 
-bool Hint::Init(Puzzle& P, Clue& C)
+bool UHint::Init(UPuzzle& P, UClue& C)
 {
 	TheClue = &C;
 	if (!C.GetHintAction(P, bSetFinalIcon, Row, Col, Icon))
@@ -14,7 +14,7 @@ bool Hint::Init(Puzzle& P, Clue& C)
 	return true;
 }
 
-bool Hint::ShouldHide(Puzzle& P) const
+bool UHint::ShouldHide(UPuzzle& P) const
 {
 	const auto& Cell = P.m_Rows[Row].m_Cells[Col];
 
@@ -27,13 +27,13 @@ bool Hint::ShouldHide(Puzzle& P) const
 	return false;
 }
 
-bool Hint::ShouldDraw(int InRow, int InCol, int InIcon) const
+bool UHint::ShouldDraw(int InRow, int InCol, int InIcon) const
 {
 	return (InRow == Row && InCol == Col && InIcon == Icon);
 }
 
-bool Hint::ShouldDraw(const Clue& C) const
+bool UHint::ShouldDraw(const UClue& C) const
 {
-	const Clue* Ptr = &C;
+	const UClue* Ptr = &C;
 	return (Ptr == TheClue);
 }

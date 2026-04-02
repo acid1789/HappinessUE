@@ -1,17 +1,21 @@
 #pragma once
 
 #include <CoreMinimal.h>
+#include "UObject/Object.h"
+#include "Clue.generated.h"
 
-class Puzzle;
+class UPuzzle;
 
-enum class eClueType
+UENUM(BlueprintType)
+enum class eClueType : uint8
 {
 	Given,
 	Vertical,
 	Horizontal
 };
 
-enum class eVerticalType
+UENUM(BlueprintType)
+enum class eVerticalType : uint8
 {
 	Two,
 	Three,
@@ -22,7 +26,8 @@ enum class eVerticalType
 	ThreeBotNot
 };
 
-enum class eHorizontalType
+UENUM(BlueprintType)
+enum class eHorizontalType : uint8
 {
 	NextTo,
 	NotNextTo,
@@ -34,98 +39,130 @@ enum class eHorizontalType
 	SpanNotRight
 };
 
-class Clue
+UCLASS(BlueprintType)
+class HAPPINESS_API UClue : public UObject
 {
+	GENERATED_BODY()
+
 public:
 
+	UPROPERTY(BlueprintReadOnly)
 	eClueType m_Type;
 
+	UPROPERTY(BlueprintReadOnly)
 	int m_iUseCount = 0;
 
+	UPROPERTY(BlueprintReadOnly)
 	int m_iRow = 0;
+
+	UPROPERTY(BlueprintReadOnly)
 	int m_iRow2 = 0;
+
+	UPROPERTY(BlueprintReadOnly)
 	int m_iRow3 = 0;
 
+	UPROPERTY(BlueprintReadOnly)
 	int m_iCol = 0;
+
+	UPROPERTY(BlueprintReadOnly)
 	int m_iCol2 = 0;
+
+	UPROPERTY(BlueprintReadOnly)
 	int m_iCol3 = 0;
 
+	UPROPERTY(BlueprintReadOnly)
 	int m_iHorizontal1 = 0;
+
+	UPROPERTY(BlueprintReadOnly)
 	int m_iNotCell = 0;
 
+	UPROPERTY(BlueprintReadOnly)
 	eVerticalType m_VerticalType;
+
+	UPROPERTY(BlueprintReadOnly)
 	eHorizontalType m_HorizontalType;
 
 public:
 
-	Clue(Puzzle& P, FRandomStream& Rand);
+	UFUNCTION(BlueprintCallable)
+	void GetRows(TArray<int>& Rows);
 
-	bool operator<(const Clue& Other) const
+	UFUNCTION(BlueprintCallable)
+	void GetIcons(UPuzzle* Puzzle, TArray<int>& Icons);
+
+	void Init(UPuzzle& UPuzzle, FRandomStream& Rand);
+
+	bool operator<(const UClue& Other) const
 	{
 		return m_iUseCount > Other.m_iUseCount;
 	}
 
-	void Analyze(Puzzle& P);
+	void Analyze(UPuzzle& P);
 
-	void Dump(int Index, Puzzle& P);
+	void Dump(int Index, UPuzzle& P);
 
-	bool GetHintAction(Puzzle& P, bool& bSetFinalIcon, int& Row, int& Col, int& Icon);
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Clue")
+	FString ToString() const;
 
-private:
-
-	void GenerateClue(Puzzle& P, FRandomStream& Rand);
-	void PickClueType(Puzzle& P, FRandomStream& Rand);
-
-	void GenerateGiven(Puzzle& P, FRandomStream& Rand);
-
-	void GenerateVertical(Puzzle& P, FRandomStream& Rand);
-	void GenerateTwoRowColumn(Puzzle& P, FRandomStream& Rand);
-	void GenerateThreeRowColumn(Puzzle& P, FRandomStream& Rand);
-
-	void GenerateHorizontal(Puzzle& P, FRandomStream& Rand);
-	void GenerateHorizontalSpan(Puzzle& P, FRandomStream& Rand);
+	bool GetHintAction(UPuzzle& P, bool& bSetFinalIcon, int& Row, int& Col, int& Icon);
 
 private:
 
-	void AnalyzeGiven(Puzzle& P);
+	void GenerateClue(UPuzzle& P, FRandomStream& Rand);
+	void PickClueType(UPuzzle& P, FRandomStream& Rand);
 
-	void AnalyzeVertical(Puzzle& P);
-	void AnalyzeVerticalTwo(Puzzle& P);
-	void AnalyzeVerticalThree(Puzzle& P);
-	void AnalyzeVerticalEitherOr(Puzzle& P);
-	void AnalyzeVerticalTwoNot(Puzzle& P);
-	void AnalyzeVerticalThreeTopNot(Puzzle& P);
-	void AnalyzeVerticalThreeMidNot(Puzzle& P);
-	void AnalyzeVerticalThreeBotNot(Puzzle& P);
+	void GenerateGiven(UPuzzle& P, FRandomStream& Rand);
 
-	void AnalyzeHorizontal(Puzzle& P);
-	void AnalyzeHorizontalNextTo(Puzzle& P);
-	void AnalyzeHorizontalNotNextTo(Puzzle& P);
-	void AnalyzeHorizontalLeftOf(Puzzle& P);
-	void AnalyzeHorizontalNotLeftOf(Puzzle& P);
-	void AnalyzeHorizontalSpan(Puzzle& P);
-	void AnalyzeHorizontalSpanNotLeft(Puzzle& P);
-	void AnalyzeHorizontalSpanNotMid(Puzzle& P);
-	void AnalyzeHorizontalSpanNotRight(Puzzle& P);
+	void GenerateVertical(UPuzzle& P, FRandomStream& Rand);
+	void GenerateTwoRowColumn(UPuzzle& P, FRandomStream& Rand);
+	void GenerateThreeRowColumn(UPuzzle& P, FRandomStream& Rand);
 
-	bool SolveSpan(int iCol, int iRow1, int iIcon1, bool bNot1, int iRow2, int iIcon2, bool bNot2, int iRow3, int iIcon3, bool bNot3, Puzzle& P);
-	bool GetHintActionSpan(int iCol, int iRow1, int iIcon1, bool bNot1, int iRow2, int iIcon2, bool bNot2, int iRow3, int iIcon3, bool bNot3, Puzzle P, bool bSetFinalIcon, int iOutRow, int iOutCol, int iOutIcon);
+	void GenerateHorizontal(UPuzzle& P, FRandomStream& Rand);
+	void GenerateHorizontalSpan(UPuzzle& P, FRandomStream& Rand);
 
-	bool GetHintActionHorizontalNextTo(Puzzle& P, bool& bSetFinalIcon, int& Row, int& Col, int& Icon);
-	bool GetHintActionHorizontalNotNextTo(Puzzle& P, bool& bSetFinalIcon, int& Row, int& Col, int& Icon);
-	bool GetHintActionHorizontalLeftOf(Puzzle& P, bool& bSetFinalIcon, int& Row, int& Col, int& Icon);
-	bool GetHintActionHorizontalNotLeftOf(Puzzle& P, bool& bSetFinalIcon, int& Row, int& Col, int& Icon);
-	bool GetHintActionHorizontalSpan(Puzzle& P, bool& bSetFinalIcon, int& Row, int& Col, int& Icon);
-	bool GetHintActionHorizontalSpanNotLeft(Puzzle& P, bool& bSetFinalIcon, int& Row, int& Col, int& Icon);
-	bool GetHintActionHorizontalSpanNotMid(Puzzle& P, bool& bSetFinalIcon, int& Row, int& Col, int& Icon);
-	bool GetHintActionHorizontalSpanNotRight(Puzzle& P, bool& bSetFinalIcon, int& Row, int& Col, int& Icon);
+private:
 
-	bool GetHintActionVerticalTwo(Puzzle& P, bool& bSetFinalIcon, int& Row, int& Col, int& Icon);
-	bool GetHintActionVerticalThree(Puzzle& P, bool& bSetFinalIcon, int& Row, int& Col, int& Icon);
-	bool GetHintActionVerticalEitherOr(Puzzle& P, bool& bSetFinalIcon, int& Row, int& Col, int& Icon);
-	bool GetHintActionVerticalTwoNot(Puzzle& P, bool& bSetFinalIcon, int& Row, int& Col, int& Icon);
-	bool GetHintActionVerticalThreeTopNot(Puzzle& P, bool& bSetFinalIcon, int& Row, int& Col, int& Icon);
-	bool GetHintActionVerticalThreeMidNot(Puzzle& P, bool& bSetFinalIcon, int& Row, int& Col, int& Icon);
-	bool GetHintActionVerticalThreeBotNot(Puzzle& P, bool& bSetFinalIcon, int& Row, int& Col, int& Icon);
+	void AnalyzeGiven(UPuzzle& P);
 
+	void AnalyzeVertical(UPuzzle& P);
+	void AnalyzeVerticalTwo(UPuzzle& P);
+	void AnalyzeVerticalThree(UPuzzle& P);
+	void AnalyzeVerticalEitherOr(UPuzzle& P);
+	void AnalyzeVerticalTwoNot(UPuzzle& P);
+	void AnalyzeVerticalThreeTopNot(UPuzzle& P);
+	void AnalyzeVerticalThreeMidNot(UPuzzle& P);
+	void AnalyzeVerticalThreeBotNot(UPuzzle& P);
+
+	void AnalyzeHorizontal(UPuzzle& P);
+	void AnalyzeHorizontalNextTo(UPuzzle& P);
+	void AnalyzeHorizontalNotNextTo(UPuzzle& P);
+	void AnalyzeHorizontalLeftOf(UPuzzle& P);
+	void AnalyzeHorizontalNotLeftOf(UPuzzle& P);
+	void AnalyzeHorizontalSpan(UPuzzle& P);
+	void AnalyzeHorizontalSpanNotLeft(UPuzzle& P);
+	void AnalyzeHorizontalSpanNotMid(UPuzzle& P);
+	void AnalyzeHorizontalSpanNotRight(UPuzzle& P);
+
+	bool SolveSpan(int iCol, int iRow1, int iIcon1, bool bNot1, int iRow2, int iIcon2, bool bNot2, int iRow3, int iIcon3, bool bNot3, UPuzzle& P);
+	bool GetHintActionSpan(int iCol, int iRow1, int iIcon1, bool bNot1, int iRow2, int iIcon2, bool bNot2, int iRow3, int iIcon3, bool bNot3, UPuzzle& P, bool bSetFinalIcon, int iOutRow, int iOutCol, int iOutIcon);
+
+	bool GetHintActionHorizontalNextTo(UPuzzle& P, bool& bSetFinalIcon, int& Row, int& Col, int& Icon);
+	bool GetHintActionHorizontalNotNextTo(UPuzzle& P, bool& bSetFinalIcon, int& Row, int& Col, int& Icon);
+	bool GetHintActionHorizontalLeftOf(UPuzzle& P, bool& bSetFinalIcon, int& Row, int& Col, int& Icon);
+	bool GetHintActionHorizontalNotLeftOf(UPuzzle& P, bool& bSetFinalIcon, int& Row, int& Col, int& Icon);
+	bool GetHintActionHorizontalSpan(UPuzzle& P, bool& bSetFinalIcon, int& Row, int& Col, int& Icon);
+	bool GetHintActionHorizontalSpanNotLeft(UPuzzle& P, bool& bSetFinalIcon, int& Row, int& Col, int& Icon);
+	bool GetHintActionHorizontalSpanNotMid(UPuzzle& P, bool& bSetFinalIcon, int& Row, int& Col, int& Icon);
+	bool GetHintActionHorizontalSpanNotRight(UPuzzle& P, bool& bSetFinalIcon, int& Row, int& Col, int& Icon);
+
+	bool GetHintActionVerticalTwo(UPuzzle& P, bool& bSetFinalIcon, int& Row, int& Col, int& Icon);
+	bool GetHintActionVerticalThree(UPuzzle& P, bool& bSetFinalIcon, int& Row, int& Col, int& Icon);
+	bool GetHintActionVerticalEitherOr(UPuzzle& P, bool& bSetFinalIcon, int& Row, int& Col, int& Icon);
+	bool GetHintActionVerticalTwoNot(UPuzzle& P, bool& bSetFinalIcon, int& Row, int& Col, int& Icon);
+	bool GetHintActionVerticalThreeTopNot(UPuzzle& P, bool& bSetFinalIcon, int& Row, int& Col, int& Icon);
+	bool GetHintActionVerticalThreeMidNot(UPuzzle& P, bool& bSetFinalIcon, int& Row, int& Col, int& Icon);
+	bool GetHintActionVerticalThreeBotNot(UPuzzle& P, bool& bSetFinalIcon, int& Row, int& Col, int& Icon);
+
+	FString HorizontalToString() const;
+	FString VerticalToString() const;
 };

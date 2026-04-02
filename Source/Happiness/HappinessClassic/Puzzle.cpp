@@ -3,7 +3,9 @@
 #include "PuzzleRow.h"
 #include "Hint.h"
 
-Puzzle::Puzzle(int Seed, int Size, int Difficulty)
+#pragma optimize("", off)
+
+void UPuzzle::Init(int Seed, int Size, int Difficulty)
 {
 	m_iSeed = Seed;
 	m_iSize = Size;
@@ -22,11 +24,11 @@ Puzzle::Puzzle(int Seed, int Size, int Difficulty)
 	GenerateClues();
 }
 
-int Puzzle::GetNumGivenClues()
+int UPuzzle::GetNumGivenClues()
 {
 	int Count = 0;
 
-	for (Clue* C : m_Clues)
+	for (UClue* C : m_Clues)
 	{
 		if (C->m_Type == eClueType::Given)
 			Count++;
@@ -35,7 +37,7 @@ int Puzzle::GetNumGivenClues()
 	return Count;
 }
 
-void Puzzle::RandomDistribution(FRandomStream& Rand, TArray<int>& Rands)
+void UPuzzle::RandomDistribution(FRandomStream& Rand, TArray<int>& Rands)
 {
 	for (int i = 0; i < Rands.Num(); i++)
 	{
@@ -59,12 +61,9 @@ void Puzzle::RandomDistribution(FRandomStream& Rand, TArray<int>& Rands)
 	}
 }
 
-void Puzzle::GenerateSolution()
+void UPuzzle::GenerateSolution()
 {
-	m_Solution.SetNum(m_iSize);
-
-	for (int i = 0; i < m_iSize; i++)
-		m_Solution[i].SetNum(m_iSize);
+	m_Solution.SetNum(m_iSize * m_iSize);
 
 	TArray<int> Rands;
 	Rands.SetNum(m_iSize);
@@ -75,47 +74,57 @@ void Puzzle::GenerateSolution()
 
 		for (int j = 0; j < m_iSize; j++)
 		{
-			m_Solution[i][j] = Rands[j];
+			m_Solution[(i * m_iSize) + j] = Rands[j];
 		}
 	}
 }
 
-void Puzzle::GenerateClues()
+void UPuzzle::GenerateClues()
 {
+	UE_LOG(LogTemp, Log, TEXT("-- Generating Clues --"));
 	m_Clues.Empty();
 	while (!IsSolved())
 	{
-		Clue C(*this, m_Rand);
+		UClue* C = NewObject<UClue>(this);
+		UE_LOG(LogTemp, Log, TEXT("Initializing Clue"));
+		C->Init(*this, m_Rand);
 
-		if (ValidateClue(C))
+		UE_LOG(LogTemp, Log, TEXT("Validating Clue: %s"), *C->ToString());
+
+		if (ValidateClue(*C))
 		{
 			// Add to front of array
-			m_Clues.Insert(&C, 0);
+			m_Clues.Insert(C, 0);
 			AnalyzeAllClues();
+			UE_LOG(LogTemp, Log, TEXT("UClue Added: %d"), m_Clues.Num());
+		}
+		else
+		{
+			UE_LOG(LogTemp, Log, TEXT("Generated Invalid Clue"));
 		}
 	}
 
 	Reset();
 
-	UE_LOG(LogTemp, Log, TEXT("Clue Count after initial generation: %d"), m_Clues.Num());
+	UE_LOG(LogTemp, Log, TEXT("UClue Count after initial generation: %d"), m_Clues.Num());
 
 	// Optimize the clues
 	OptimizeClues();
 
-	UE_LOG(LogTemp, Log, TEXT("Clue Count after optimization: %d"), m_Clues.Num());
+	UE_LOG(LogTemp, Log, TEXT("UClue Count after optimization: %d"), m_Clues.Num());
 
 	// Scramble all the clues
 	ScrambleClues();
 
-	// Reset the puzzle for actual play
+	// Reset the UPuzzle for actual play
 	Reset();
 }
 
-bool Puzzle::IsDuplicateClue(Clue& testClue)
+bool UPuzzle::IsDuplicateClue(UClue& testClue)
 {
 	for (int i = 0; i < m_Clues.Num(); i++)
 	{
-		Clue& C = *m_Clues[i];
+		UClue& C = *m_Clues[i];
 		if (testClue.m_Type == C.m_Type)
 		{
 			if (C.m_Type == eClueType::Vertical)
@@ -188,7 +197,7 @@ bool Puzzle::IsDuplicateClue(Clue& testClue)
 	return false;
 }
 
-bool Puzzle::ValidateClue(Clue& C)
+bool UPuzzle::ValidateClue(UClue& C)
 {
 	if (IsDuplicateClue(C))
 		return false;
@@ -218,7 +227,7 @@ bool Puzzle::ValidateClue(Clue& C)
 		{
 			for (int i = 0; i < m_Clues.Num(); i++)
 			{
-				Clue& cTest = *m_Clues[i];
+				UClue& cTest = *m_Clues[i];
 				if (cTest.m_Type == eClueType::Vertical)
 				{
 					switch (cTest.m_VerticalType)
@@ -244,22 +253,22 @@ bool Puzzle::ValidateClue(Clue& C)
 	return true;
 }
 
-void Puzzle::AnalyzeAllClues()
+void UPuzzle::AnalyzeAllClues()
 {
-	for (Clue* C : m_Clues)
+	for (UClue* C : m_Clues)
 	{
 		C->Analyze(*this);
 	}
 }
 
-void Puzzle::Reset()
+void UPuzzle::Reset()
 {
-	for (PuzzleRow& Row : m_Rows)
+	for (FPuzzleRow& Row : m_Rows)
 	{
 		Row.Reset();
 	}
 
-	for (Clue* C : m_Clues)
+	for (UClue* C : m_Clues)
 	{
 		C->m_iUseCount = 0;
 	}
@@ -267,7 +276,7 @@ void Puzzle::Reset()
 	ApplyAllGiven();
 }
 
-void Puzzle::ResetRow(int Row)
+void UPuzzle::ResetRow(int Row)
 {
 	for (int i = 0; i < m_iSize; i++)
 	{
@@ -277,11 +286,11 @@ void Puzzle::ResetRow(int Row)
 	ApplyAllGiven();
 }
 
-bool Puzzle::IsCompleted()
+bool UPuzzle::IsCompleted()
 {
 	ReEnforceFinalIcons();
 
-	for (PuzzleRow& Row : m_Rows)
+	for (FPuzzleRow& Row : m_Rows)
 	{
 		if (!Row.IsCompleted())
 			return false;
@@ -290,7 +299,7 @@ bool Puzzle::IsCompleted()
 	return true;
 }
 
-bool Puzzle::IsSolved()
+bool UPuzzle::IsSolved()
 {
 	if (!IsCompleted())
 		return false;
@@ -301,7 +310,7 @@ bool Puzzle::IsSolved()
 		{
 			int Final = m_Rows[i].m_Cells[j].m_iFinalIcon;
 
-			if (Final != m_Solution[i][j])
+			if (Final != m_Solution[(i * m_iSize) + j])
 				return false;
 		}
 	}
@@ -309,23 +318,23 @@ bool Puzzle::IsSolved()
 	return true;
 }
 
-bool Puzzle::IsCorrect(int Row, int Col)
+bool UPuzzle::IsCorrect(int Row, int Col)
 {
 	int Final = m_Rows[Row].m_Cells[Col].m_iFinalIcon;
-	return Final >= 0 && Final == m_Solution[Row][Col];
+	return Final >= 0 && Final == m_Solution[(Row * m_iSize) + Col];
 }
 
-int Puzzle::SolutionIcon(int Row, int Col)
+int UPuzzle::SolutionIcon(int Row, int Col)
 {
-	return m_Solution[Row][Col];
+	return m_Solution[(Row * m_iSize) + Col];
 }
 
-void Puzzle::SetFinalIcon(int Row, int Col, int Icon)
+void UPuzzle::SetFinalIcon(int Row, int Col, int Icon)
 {
-	SetFinalIcon(nullptr, Row, Col, Icon);
+	SetFinalIconWithClue(nullptr, Row, Col, Icon);
 }
 
-void Puzzle::SetFinalIcon(Clue* TheClue, int Row, int Col, int Icon)
+void UPuzzle::SetFinalIconWithClue(UClue* TheClue, int Row, int Col, int Icon)
 {
 	int Final = m_Rows[Row].m_Cells[Col].m_iFinalIcon;
 
@@ -351,23 +360,23 @@ void Puzzle::SetFinalIcon(Clue* TheClue, int Row, int Col, int Icon)
 		for (int i = 0; i < m_iSize; i++)
 		{
 			if (i != Icon)
-				EliminateIcon(TheClue, Row, Col, i);
+				EliminateIconWithClue(TheClue, Row, Col, i);
 		}
 
 		for (int i = 0; i < m_iSize; i++)
 		{
 			if (i != Col)
-				EliminateIcon(TheClue, Row, i, Icon);
+				EliminateIconWithClue(TheClue, Row, i, Icon);
 		}
 	}
 }
 
-void Puzzle::EliminateIcon(int Row, int Col, int Icon)
+void UPuzzle::EliminateIcon(int Row, int Col, int Icon)
 {
-	EliminateIcon(nullptr, Row, Col, Icon);
+	EliminateIconWithClue(nullptr, Row, Col, Icon);
 }
 
-void Puzzle::EliminateIcon(Clue* TheClue, int Row, int Col, int Icon)
+void UPuzzle::EliminateIconWithClue(UClue* TheClue, int Row, int Col, int Icon)
 {
 	auto& Cell = m_Rows[Row].m_Cells[Col];
 
@@ -390,13 +399,13 @@ void Puzzle::EliminateIcon(Clue* TheClue, int Row, int Col, int Icon)
 
 			if (Remaining >= 0)
 			{
-				SetFinalIcon(TheClue, Row, Col, Remaining);
+				SetFinalIconWithClue(TheClue, Row, Col, Remaining);
 			}
 		}
 	}
 }
 
-void Puzzle::ReEnforceFinalIcons()
+void UPuzzle::ReEnforceFinalIcons()
 {
 	for (int iRow = 0; iRow < m_iSize; iRow++)
 	{
@@ -415,9 +424,9 @@ void Puzzle::ReEnforceFinalIcons()
 	}
 }
 
-Hint* Puzzle::GenerateHint(TArray<Clue*>& VisibleClues)
+UHint* UPuzzle::GenerateHint(TArray<UClue*>& VisibleClues)
 {
-	Hint* hRet = nullptr;
+	UHint* hRet = nullptr;
 
 	// Pick a clue that we could use for a hint
 	for (int i = 0; i < VisibleClues.Num(); i++)
@@ -432,7 +441,7 @@ Hint* Puzzle::GenerateHint(TArray<Clue*>& VisibleClues)
 			if (VisibleClues[i]->m_iUseCount > iUseCount)
 			{
 				// This clue can do something, use it for the hint
-				hRet = new Hint();
+				hRet = NewObject<UHint>(this);
 				if (!hRet->Init(*this, *VisibleClues[i]))
 				{
 					continue;
@@ -445,14 +454,14 @@ Hint* Puzzle::GenerateHint(TArray<Clue*>& VisibleClues)
 	return hRet;
 }
 
-void Puzzle::BuildClueLists()
+void UPuzzle::BuildClueLists()
 {
 	m_GivenClues.Empty();
 	m_VeritcalClues.Empty();
 	m_HorizontalClues.Empty();
 	for (int i = 0; i < m_Clues.Num(); i++)
 	{
-		Clue* c = m_Clues[i];
+		UClue* c = m_Clues[i];
 		switch (c->m_Type)
 		{
 			case eClueType::Given:
@@ -468,11 +477,11 @@ void Puzzle::BuildClueLists()
 	}
 }
 
-void Puzzle::ScrambleClues()
+void UPuzzle::ScrambleClues()
 {
 	int32 NumClues = m_Clues.Num();
 
-	TArray<Clue*> Copy = m_Clues;
+	TArray<UClue*> Copy = m_Clues;
 	TArray<int32> Scramble;
 	Scramble.SetNum(NumClues);
 	RandomDistribution(m_Rand, Scramble);
@@ -485,21 +494,21 @@ void Puzzle::ScrambleClues()
 	BuildClueLists();
 }
 
-void Puzzle::ApplyAllGiven()
+void UPuzzle::ApplyAllGiven()
 {
 	for (int i = 0; i < m_GivenClues.Num(); i++)
 	{
-		Clue* c = m_GivenClues[i];
+		UClue* c = m_GivenClues[i];
 		c->Analyze(*this);	
 	}
 }
 
-void Puzzle::OptimizeClues()
+void UPuzzle::OptimizeClues()
 {
 	// Build the separate clue lists
 	BuildClueLists();
 
-	// Reset the puzzle & apply all the givens
+	// Reset the UPuzzle & apply all the givens
 	Reset();
 
 	// Solve again with the new clue order
@@ -509,13 +518,13 @@ void Puzzle::OptimizeClues()
 	{
 		for (int32 i = 0; i < m_VeritcalClues.Num(); i++)
 		{
-			Clue& C = *m_VeritcalClues[i];
+			UClue& C = *m_VeritcalClues[i];
 			C.Analyze(*this);
 		}
 
 		for (int32 i = 0; i < m_HorizontalClues.Num(); i++)
 		{
-			Clue& C = *m_HorizontalClues[i];
+			UClue& C = *m_HorizontalClues[i];
 			C.Analyze(*this);
 		}
 
@@ -538,7 +547,7 @@ void Puzzle::OptimizeClues()
 	// Remove any zero use count clues
 	for (int32 i = m_Clues.Num() - 1; i > 0; i--)
 	{
-		Clue& C = *m_Clues[i];
+		UClue& C = *m_Clues[i];
 
 		if (C.m_iUseCount > 0)
 			break;
@@ -547,7 +556,7 @@ void Puzzle::OptimizeClues()
 	}
 
 	// Resolve sorted
-	UE_LOG(LogTemp, Log, TEXT("Clue Count Before 2nd stage optimization: %d"), m_Clues.Num());
+	UE_LOG(LogTemp, Log, TEXT("UClue Count Before 2nd stage optimization: %d"), m_Clues.Num());
 
 	BuildClueLists();
 	Reset();
@@ -558,13 +567,13 @@ void Puzzle::OptimizeClues()
 	{
 		for (int32 i = 0; i < m_VeritcalClues.Num(); i++)
 		{
-			Clue& C = *m_VeritcalClues[i];
+			UClue& C = *m_VeritcalClues[i];
 			C.Analyze(*this);
 		}
 
 		for (int32 i = 0; i < m_HorizontalClues.Num(); i++)
 		{
-			Clue& C = *m_HorizontalClues[i];
+			UClue& C = *m_HorizontalClues[i];
 			C.Analyze(*this);
 		}
 
@@ -587,7 +596,7 @@ void Puzzle::OptimizeClues()
 	// Remove any zero use count clues
 	for (int32 i = m_Clues.Num() - 1; i > 0; i--)
 	{
-		Clue& C = *m_Clues[i];
+		UClue& C = *m_Clues[i];
 
 		if (C.m_iUseCount > 0)
 			break;
@@ -606,7 +615,8 @@ void Puzzle::OptimizeClues()
 
 		while (m_Clues.Num() < iNewClueCount)
 		{
-			Clue* C = new Clue(*this, m_Rand);
+			UClue* C = NewObject<UClue>(this);
+			C->Init(*this, m_Rand);
 
 			if (ValidateClue(*C))
 			{
@@ -626,7 +636,7 @@ void Puzzle::OptimizeClues()
 
 			for (int32 i = 0; i < m_Clues.Num(); i++)
 			{
-				Clue& C = *m_Clues[i];
+				UClue& C = *m_Clues[i];
 
 				if (C.m_iUseCount <= iUseCount)
 				{
@@ -644,11 +654,11 @@ void Puzzle::OptimizeClues()
 	// Rebuild the clues list
 	BuildClueLists();
 
-	// Reset the puzzle again
+	// Reset the UPuzzle again
 	Reset();
 }
 
-void Puzzle::DumpPuzzle()
+void UPuzzle::DumpPuzzle()
 {
 	FString Output;
 
@@ -685,7 +695,7 @@ void Puzzle::DumpPuzzle()
 	UE_LOG(LogTemp, Log, TEXT(""));
 }
 
-void Puzzle::DumpSolution()
+void UPuzzle::DumpSolution()
 {
 	FString Output;
 
@@ -694,7 +704,7 @@ void Puzzle::DumpSolution()
 		for (int32 j = 0; j < m_iSize; j++)
 		{
 			Output += TEXT("[");
-			Output += FString::FromInt(m_Solution[i][j]);
+			Output += FString::FromInt(m_Solution[(i * m_iSize) + j]);
 
 			if (j < m_iSize - 1)
 			{
@@ -712,16 +722,16 @@ void Puzzle::DumpSolution()
 	UE_LOG(LogTemp, Log, TEXT(""));
 }
 
-void Puzzle::DumpClues()
+void UPuzzle::DumpClues()
 {
 	for (int32 i = 0; i < m_Clues.Num(); i++)
 	{
-		Clue* C = m_Clues[i];
+		UClue* C = m_Clues[i];
 		C->Dump(i, *this);
 	}
 }
 
-void Puzzle::DebugError()
+void UPuzzle::DebugError()
 {
 	Reset();
 	DumpSolution();
@@ -729,20 +739,20 @@ void Puzzle::DebugError()
 	DumpClues();
 }
 
-void Puzzle::SetMarker()
+void UPuzzle::SetMarker()
 {
 	m_MarkerRows.SetNum(m_Rows.Num());
 	for (int32 i = 0; i < m_MarkerRows.Num(); i++)
 	{
-		m_MarkerRows[i] = PuzzleRow(m_Rows[i]);
+		m_MarkerRows[i] = FPuzzleRow(m_Rows[i]);
 	}
 }
 
-void Puzzle::RestoreMarker()
+void UPuzzle::RestoreMarker()
 {
 	m_Rows.SetNum(m_MarkerRows.Num());
 	for (int32 i = 0; i < m_Rows.Num(); i++)
 	{
-		m_Rows[i] = PuzzleRow(m_MarkerRows[i]);
+		m_Rows[i] = FPuzzleRow(m_MarkerRows[i]);
 	}
 }
