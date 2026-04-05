@@ -1,0 +1,29 @@
+--- Alpha ---
+Complete Puzzle
+Difficulty Select
+Adjust Difficulty
+Balance Exp
+Player Levels
+Average Puzzle Time
+Next Puzzle
+Sound Effects
+Music
+Hide Clues
+Undo
+Hints
+New Icons
+Mobile
+Save/Continue
+Timer
+
+--- Beta ---
+PC Mode
+Google Play
+Steam
+Friends
+Daily Competition
+Ads & Payment
+
+--- Release 1 ---
+Tutorial
+iOS

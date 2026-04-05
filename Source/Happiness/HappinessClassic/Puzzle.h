@@ -95,6 +95,9 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure)
 	FPuzzleCell GetCell(int Row, int Col) { return m_Rows[Row].m_Cells[Col]; }
 
+	UFUNCTION(BlueprintCallable, BlueprintPure)
+	FString FormatTimeString(float Seconds) const;
+
 private:
 
 	void GenerateSolution();

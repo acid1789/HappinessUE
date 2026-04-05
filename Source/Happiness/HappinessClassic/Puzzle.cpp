@@ -756,3 +756,16 @@ void UPuzzle::RestoreMarker()
 		m_Rows[i] = FPuzzleRow(m_MarkerRows[i]);
 	}
 }
+
+FString UPuzzle::FormatTimeString(float Seconds) const
+{
+	int32 Hours = (int32)(Seconds / 3600.0f);
+	Seconds -= Hours * 3600;
+
+	int32 Minutes = (int32)(Seconds / 60.0f);
+	Seconds -= Minutes * 60;
+
+	int32 Secs = (int32)Seconds;
+
+	return FString::Printf(TEXT("%02d:%02d:%02d"), Hours, Minutes, Secs);
+}
