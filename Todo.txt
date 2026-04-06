@@ -3,7 +3,6 @@ Difficulty Select
 Adjust Difficulty
 Balance Exp
 Player Levels
-Average Puzzle Time
 Sound Effects
 Music
 Hide Clues
@@ -16,9 +15,12 @@ Mobile
 Save/Continue
 Cell Dialog Buttons
 Pause/Options
+Back End DB / Server
+Sign In
+Puzzle Reporting
+Average Puzzle Time
 
 --- Beta ---
-PC Mode
 Google Play
 Steam
 Friends
