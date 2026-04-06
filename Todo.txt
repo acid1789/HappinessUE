@@ -1,20 +1,21 @@
 --- Alpha ---
-Complete Puzzle
 Difficulty Select
 Adjust Difficulty
 Balance Exp
 Player Levels
 Average Puzzle Time
-Next Puzzle
 Sound Effects
 Music
 Hide Clues
 Undo
 Hints
+ResetPuzzle
+Fix Puzzle
 New Icons
 Mobile
 Save/Continue
-Timer
+Cell Dialog Buttons
+Pause/Options
 
 --- Beta ---
 PC Mode
