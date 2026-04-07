@@ -479,14 +479,14 @@ void UPuzzle::BuildClueLists()
 
 void UPuzzle::ScrambleClues()
 {
-	int32 NumClues = m_Clues.Num();
+	int NumClues = m_Clues.Num();
 
 	TArray<UClue*> Copy = m_Clues;
-	TArray<int32> Scramble;
+	TArray<int> Scramble;
 	Scramble.SetNum(NumClues);
 	RandomDistribution(m_Rand, Scramble);
 
-	for (int32 i = 0; i < NumClues; i++)
+	for (int i = 0; i < NumClues; i++)
 	{
 		m_Clues[i] = Copy[Scramble[i]];
 	}
@@ -512,17 +512,17 @@ void UPuzzle::OptimizeClues()
 	Reset();
 
 	// Solve again with the new clue order
-	int32 iPass = 0;
+	int iPass = 0;
 
 	while (!IsSolved())
 	{
-		for (int32 i = 0; i < m_VeritcalClues.Num(); i++)
+		for (int i = 0; i < m_VeritcalClues.Num(); i++)
 		{
 			UClue& C = *m_VeritcalClues[i];
 			C.Analyze(*this);
 		}
 
-		for (int32 i = 0; i < m_HorizontalClues.Num(); i++)
+		for (int i = 0; i < m_HorizontalClues.Num(); i++)
 		{
 			UClue& C = *m_HorizontalClues[i];
 			C.Analyze(*this);
@@ -545,7 +545,7 @@ void UPuzzle::OptimizeClues()
 	m_Clues.Sort();
 
 	// Remove any zero use count clues
-	for (int32 i = m_Clues.Num() - 1; i > 0; i--)
+	for (int i = m_Clues.Num() - 1; i > 0; i--)
 	{
 		UClue& C = *m_Clues[i];
 
@@ -565,13 +565,13 @@ void UPuzzle::OptimizeClues()
 
 	while (!IsSolved())
 	{
-		for (int32 i = 0; i < m_VeritcalClues.Num(); i++)
+		for (int i = 0; i < m_VeritcalClues.Num(); i++)
 		{
 			UClue& C = *m_VeritcalClues[i];
 			C.Analyze(*this);
 		}
 
-		for (int32 i = 0; i < m_HorizontalClues.Num(); i++)
+		for (int i = 0; i < m_HorizontalClues.Num(); i++)
 		{
 			UClue& C = *m_HorizontalClues[i];
 			C.Analyze(*this);
@@ -594,7 +594,7 @@ void UPuzzle::OptimizeClues()
 	m_Clues.Sort();
 
 	// Remove any zero use count clues
-	for (int32 i = m_Clues.Num() - 1; i > 0; i--)
+	for (int i = m_Clues.Num() - 1; i > 0; i--)
 	{
 		UClue& C = *m_Clues[i];
 
@@ -607,12 +607,12 @@ void UPuzzle::OptimizeClues()
 	// Add/Remove clues for difficulty
 	Reset();
 
+	int iUsableClueCount = m_HorizontalClues.Num() + m_VeritcalClues.Num();
 	if (m_iDifficulty == 0)
 	{
-		// Add some clues
-		int32 iCluesToAdd = FMath::RandRange(1, 4);
-		int32 iNewClueCount = m_Clues.Num() + iCluesToAdd;
-
+		// Add some clues		
+		int iCluesToAdd = FMath::Max((int)(iUsableClueCount * 0.1f), 1);
+		int iNewClueCount = m_Clues.Num() + iCluesToAdd;
 		while (m_Clues.Num() < iNewClueCount)
 		{
 			UClue* C = NewObject<UClue>(this);
@@ -627,14 +627,14 @@ void UPuzzle::OptimizeClues()
 	else if (m_iDifficulty == 2)
 	{
 		// Remove some clues
-		int32 iCluesToRemove = FMath::RandRange(2, (m_iSize / 3) + 1);
-		int32 iUseCount = 1;
+		int iCluesToRemove = FMath::Max((int)(iUsableClueCount * 0.1f), 1);
+		int iUseCount = 1;
 
 		while (iCluesToRemove > 0)
 		{
-			int32 iClueCount = m_Clues.Num();
+			int iClueCount = m_Clues.Num();
 
-			for (int32 i = 0; i < m_Clues.Num(); i++)
+			for (int i = 0; i < m_Clues.Num(); i++)
 			{
 				UClue& C = *m_Clues[i];
 
@@ -662,13 +662,13 @@ void UPuzzle::DumpPuzzle()
 {
 	FString Output;
 
-	for (int32 i = 0; i < m_iSize; i++)
+	for (int i = 0; i < m_iSize; i++)
 	{
-		for (int32 j = 0; j < m_iSize; j++)
+		for (int j = 0; j < m_iSize; j++)
 		{
 			Output += TEXT("[");
 
-			for (int32 k = 0; k < m_iSize; k++)
+			for (int k = 0; k < m_iSize; k++)
 			{
 				if (!m_Rows[i].m_Cells[j].m_bValues[k])
 					Output += TEXT(" ");
@@ -699,9 +699,9 @@ void UPuzzle::DumpSolution()
 {
 	FString Output;
 
-	for (int32 i = 0; i < m_iSize; i++)
+	for (int i = 0; i < m_iSize; i++)
 	{
-		for (int32 j = 0; j < m_iSize; j++)
+		for (int j = 0; j < m_iSize; j++)
 		{
 			Output += TEXT("[");
 			Output += FString::FromInt(m_Solution[(i * m_iSize) + j]);
@@ -724,7 +724,7 @@ void UPuzzle::DumpSolution()
 
 void UPuzzle::DumpClues()
 {
-	for (int32 i = 0; i < m_Clues.Num(); i++)
+	for (int i = 0; i < m_Clues.Num(); i++)
 	{
 		UClue* C = m_Clues[i];
 		C->Dump(i, *this);
@@ -742,7 +742,7 @@ void UPuzzle::DebugError()
 void UPuzzle::SetMarker()
 {
 	m_MarkerRows.SetNum(m_Rows.Num());
-	for (int32 i = 0; i < m_MarkerRows.Num(); i++)
+	for (int i = 0; i < m_MarkerRows.Num(); i++)
 	{
 		m_MarkerRows[i] = FPuzzleRow(m_Rows[i]);
 	}
@@ -751,7 +751,7 @@ void UPuzzle::SetMarker()
 void UPuzzle::RestoreMarker()
 {
 	m_Rows.SetNum(m_MarkerRows.Num());
-	for (int32 i = 0; i < m_Rows.Num(); i++)
+	for (int i = 0; i < m_Rows.Num(); i++)
 	{
 		m_Rows[i] = FPuzzleRow(m_MarkerRows[i]);
 	}
@@ -759,13 +759,13 @@ void UPuzzle::RestoreMarker()
 
 FString UPuzzle::FormatTimeString(float Seconds) const
 {
-	int32 Hours = (int32)(Seconds / 3600.0f);
+	int Hours = (int)(Seconds / 3600.0f);
 	Seconds -= Hours * 3600;
 
-	int32 Minutes = (int32)(Seconds / 60.0f);
+	int Minutes = (int)(Seconds / 60.0f);
 	Seconds -= Minutes * 60;
 
-	int32 Secs = (int32)Seconds;
+	int Secs = (int)Seconds;
 
 	return FString::Printf(TEXT("%02d:%02d:%02d"), Hours, Minutes, Secs);
 }

@@ -1,6 +1,6 @@
 --- Alpha ---
-Difficulty Select
 Adjust Difficulty
+Left Of Icon
 Balance Exp
 Player Levels
 Sound Effects
