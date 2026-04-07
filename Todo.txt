@@ -1,7 +1,4 @@
 --- Alpha ---
-Adjust Difficulty
-Left Of Icon
-Balance Exp
 Player Levels
 Sound Effects
 Music
@@ -19,6 +16,8 @@ Back End DB / Server
 Sign In
 Puzzle Reporting
 Average Puzzle Time
+Confirm Dialog
+
 
 --- Beta ---
 Google Play
@@ -26,6 +25,9 @@ Steam
 Friends
 Daily Competition
 Ads & Payment
+8x8
+Hard Difficulty is not solvable
+Clue Optimization
 
 --- Release 1 ---
 Tutorial
