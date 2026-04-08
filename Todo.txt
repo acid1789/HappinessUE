@@ -1,5 +1,4 @@
 --- Alpha ---
-Givens dont set properly
 Hide Clues
 Undo
 Hints
@@ -14,7 +13,7 @@ Sign In
 Puzzle Reporting
 Average Puzzle Time
 End Screen Main Menu Button
-
+Unlocked Message Remains Forever
 
 
 --- Beta ---
