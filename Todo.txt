@@ -1,6 +1,7 @@
 --- Alpha ---
 Sound Effects
 Music
+Givens dont set properly
 Hide Clues
 Undo
 Hints
