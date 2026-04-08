@@ -1,6 +1,5 @@
 --- Alpha ---
 Hide Clues
-Undo
 Hints
 Fix Puzzle
 New Icons
@@ -13,7 +12,6 @@ Sign In
 Puzzle Reporting
 Average Puzzle Time
 End Screen Main Menu Button
-Unlocked Message Remains Forever
 
 
 --- Beta ---
