@@ -1,11 +1,9 @@
 --- Alpha ---
-Player Levels
 Sound Effects
 Music
 Hide Clues
 Undo
 Hints
-ResetPuzzle
 Fix Puzzle
 New Icons
 Mobile
@@ -16,7 +14,8 @@ Back End DB / Server
 Sign In
 Puzzle Reporting
 Average Puzzle Time
-Confirm Dialog
+End Screen Main Menu Button
+
 
 
 --- Beta ---
