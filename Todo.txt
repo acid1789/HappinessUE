@@ -1,5 +1,4 @@
 --- Alpha ---
-Hide Clues
 Hints
 Fix Puzzle
 New Icons
@@ -7,6 +6,7 @@ Mobile
 Save/Continue
 Cell Dialog Buttons
 Pause/Options
+Unhide Clues
 Back End DB / Server
 Sign In
 Puzzle Reporting
