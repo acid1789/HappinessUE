@@ -1,9 +1,7 @@
 --- Alpha ---
-Fix Puzzle
 Save/Continue
 Cell Dialog Buttons
 End Screen Main Menu Button
-Unhide Clues
 Pause/Options
 New Icons
 Mobile
