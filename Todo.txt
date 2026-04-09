@@ -1,16 +1,16 @@
 --- Alpha ---
 Fix Puzzle
-New Icons
-Mobile
 Save/Continue
 Cell Dialog Buttons
-Pause/Options
+End Screen Main Menu Button
 Unhide Clues
+Pause/Options
+New Icons
+Mobile
 Back End DB / Server
 Sign In
 Puzzle Reporting
 Average Puzzle Time
-End Screen Main Menu Button
 
 
 --- Beta ---
@@ -23,6 +23,7 @@ Ads & Payment
 Hard Difficulty is not solvable
 Clue Optimization
 More Useful Hints
+Add Time Penalty for Hints and Fix
 
 --- Release 1 ---
 Tutorial

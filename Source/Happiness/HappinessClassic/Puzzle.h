@@ -99,6 +99,9 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure)
 	FString FormatTimeString(float Seconds) const;
 
+	UFUNCTION(BlueprintCallable)
+	void FixPuzzle();
+
 private:
 
 	void GenerateSolution();

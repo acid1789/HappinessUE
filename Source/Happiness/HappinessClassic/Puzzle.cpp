@@ -769,3 +769,32 @@ FString UPuzzle::FormatTimeString(float Seconds) const
 
 	return FString::Printf(TEXT("%02d:%02d:%02d"), Hours, Minutes, Secs);
 }
+
+void UPuzzle::FixPuzzle()
+{
+	for (int i = 0; i < m_Rows.Num(); i++)
+	{
+		FPuzzleRow& Row = m_Rows[i];
+		for (int j = 0; j < Row.m_Cells.Num(); j++) {
+			FPuzzleCell& Cell = Row.m_Cells[j];
+
+			int iFinalIcon = m_Solution[(i * m_iSize) + j];
+			if (Cell.m_iFinalIcon >= 0 && Cell.m_iFinalIcon != iFinalIcon) 
+			{
+				// This one is wrong, undo it
+				Cell.m_iFinalIcon = -1;
+
+				// Set all small icons to visible for this cell
+				for (int k = 0; k < m_iSize; k++)
+				{
+					Cell.m_bValues[k] = true;
+				}
+			}
+			else if (Cell.m_iFinalIcon < 0)
+			{
+				// Restore missing icon
+				Cell.m_bValues[iFinalIcon] = true;
+			}
+		}
+	}
+}
