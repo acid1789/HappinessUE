@@ -424,7 +424,7 @@ void UPuzzle::ReEnforceFinalIcons()
 	}
 }
 
-UHint* UPuzzle::GenerateHint(TArray<UClue*>& VisibleClues)
+UHint* UPuzzle::GenerateHint(const TArray<UClue*>& VisibleClues)
 {
 	UHint* hRet = nullptr;
 

@@ -87,7 +87,8 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void EliminateIconWithClue(UClue* clue, int Row, int Col, int Icon);
 
-	UHint* GenerateHint(TArray<UClue*>& VisibleClues);
+	UFUNCTION(BlueprintCallable)
+	UHint* GenerateHint(const TArray<UClue*>& VisibleClues);
 
 	const TArray<UClue*>& HorizontalClues() const { return m_HorizontalClues; }
 	const TArray<UClue*>& VerticalClues() const { return m_VeritcalClues; }

@@ -10,16 +10,23 @@ UCLASS(BlueprintType)
 class HAPPINESS_API UHint : public UObject
 {
 	GENERATED_BODY()
+public:
 
+	UPROPERTY(BlueprintReadOnly)
 	UClue* TheClue = nullptr;
 
+	UPROPERTY(BlueprintReadOnly)
 	bool bSetFinalIcon = false;
-
+	
+	UPROPERTY(BlueprintReadOnly)
 	int Row = 0;
+
+	UPROPERTY(BlueprintReadOnly)
 	int Col = 0;
+
+	UPROPERTY(BlueprintReadOnly)
 	int Icon = 0;
 
-public:
 
 	UHint() = default;
 
