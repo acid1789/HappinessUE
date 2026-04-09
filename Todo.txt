@@ -1,7 +1,5 @@
 --- Alpha ---
 Save/Continue
-Cell Dialog Buttons
-End Screen Main Menu Button
 Pause/Options
 New Icons
 Mobile
