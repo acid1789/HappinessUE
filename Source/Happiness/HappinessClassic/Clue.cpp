@@ -3681,3 +3681,74 @@ void UClue::GenerateClueHelp(UPuzzle& P)
 			break;
 	}
 }
+
+int64 UClue::GetId() const
+{
+	uint64 id = 0;
+
+	// Helper to pack value: 0-7 → 3 bits, -1 becomes 0b1000 (flag)
+	auto PackValue = [](int32 val) -> uint64
+		{
+			if (val == -1)
+				return 0b1000ULL;                    // flag = 1, value = 0
+			else
+				return static_cast<uint64>(val & 0b0111); // 3 bits value + flag 0
+		};
+
+	// Helper to pack enum (0-7) → 3 bits, no flag needed
+	auto PackEnum = [](uint8 enumVal) -> uint64
+		{
+			return static_cast<uint64>(enumVal & 0b0111);
+		};
+
+	// Pack the 8 integer fields (4 bits each)
+	id |= PackValue(m_iRow) << 0;
+	id |= PackValue(m_iRow2) << 4;
+	id |= PackValue(m_iRow3) << 8;
+	id |= PackValue(m_iCol) << 12;
+	id |= PackValue(m_iCol2) << 16;
+	id |= PackValue(m_iCol3) << 20;
+	id |= PackValue(m_iHorizontal1) << 24;
+	id |= PackValue(m_iNotCell) << 28;
+
+	// Pack the 3 enums (3 bits each) starting at bit 32
+	id |= PackEnum(static_cast<uint8>(m_Type)) << 32;
+	id |= PackEnum(static_cast<uint8>(m_VerticalType)) << 35;
+	id |= PackEnum(static_cast<uint8>(m_HorizontalType)) << 38;
+
+	return static_cast<int64>(id);
+}
+
+void UClue::SetFromId(int64 sid)
+{
+	uint64 id = static_cast<uint64>(sid);
+	// Helper to unpack the value fields (4 bits)
+	auto UnpackValue = [](uint64 packed) -> int32
+		{
+			if (packed & 0b1000)           // flag bit set
+				return -1;
+			else
+				return static_cast<int32>(packed & 0b0111);
+		};
+
+	// Helper to unpack enum (3 bits)
+	auto UnpackEnum = [](uint64 packed) -> uint8
+		{
+			return static_cast<uint8>(packed & 0b0111);
+		};
+
+	// Unpack the 8 integer fields
+	m_iRow = UnpackValue((id >> 0) & 0xF);
+	m_iRow2 = UnpackValue((id >> 4) & 0xF);
+	m_iRow3 = UnpackValue((id >> 8) & 0xF);
+	m_iCol = UnpackValue((id >> 12) & 0xF);
+	m_iCol2 = UnpackValue((id >> 16) & 0xF);
+	m_iCol3 = UnpackValue((id >> 20) & 0xF);
+	m_iHorizontal1 = UnpackValue((id >> 24) & 0xF);
+	m_iNotCell = UnpackValue((id >> 28) & 0xF);
+
+	// Unpack the 3 enums
+	m_Type = static_cast<eClueType>(UnpackEnum((id >> 32) & 0x7));
+	m_VerticalType = static_cast<eVerticalType>(UnpackEnum((id >> 35) & 0x7));
+	m_HorizontalType = static_cast<eHorizontalType>(UnpackEnum((id >> 38) & 0x7));
+}

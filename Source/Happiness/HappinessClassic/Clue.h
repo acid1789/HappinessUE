@@ -110,6 +110,12 @@ public:
 
 	bool GetHintAction(UPuzzle& P, bool& bSetFinalIcon, int& Row, int& Col, int& Icon);
 
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Clue")
+	int64 GetId() const;
+
+	UFUNCTION(BlueprintCallable)
+	void SetFromId(int64 Id);
+
 private:
 
 	void GenerateClue(UPuzzle& P, FRandomStream& Rand);
