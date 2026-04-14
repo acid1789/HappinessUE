@@ -1,8 +1,11 @@
---- Alpha ---
-Mobile
-
-
 --- Beta ---
+New Icons
+Add Time Penalty for Hints and Fix
+Pause Help
+
+Back End DB / Server / Sign In
+Puzzle Reporting
+Average Puzzle Time
 Google Play
 Steam
 Friends
@@ -12,15 +15,9 @@ Ads & Payment
 Hard Difficulty is not solvable
 Clue Optimization
 More Useful Hints
-Add Time Penalty for Hints and Fix
-Save Time Additions
-Par Time
-Back End DB / Server
-Sign In
-Puzzle Reporting
-Average Puzzle Time
-Pause/Options
-New Icons
+Show Puzzle Number
+End Screen - Show Wrong Cells
+
 
 --- Release 1 ---
 Tutorial
