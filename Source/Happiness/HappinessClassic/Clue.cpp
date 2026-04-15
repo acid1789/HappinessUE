@@ -3619,7 +3619,7 @@ void UClue::GenerateClueHelp(UPuzzle& P)
 				case eHorizontalType::SpanNotRight:
 					ClueHelp.AddIcon(Rows[1], Icons[1]);
 					ClueHelp.AddText(TEXT("has"));
-					ClueHelp.AddIcon(Rows[0], Rows[1]);
+					ClueHelp.AddIcon(Rows[0], Icons[0]);
 					ClueHelp.AddText(TEXT("on one side, and not"));
 					ClueHelp.AddIcon(Rows[2], Icons[2]);
 					ClueHelp.AddText(TEXT("on the other"));
