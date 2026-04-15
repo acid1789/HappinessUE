@@ -1,5 +1,4 @@
 --- Beta ---
-New Icons
 Add Time Penalty for Hints and Fix
 Pause Help
 
