@@ -1,5 +1,4 @@
 --- Beta ---
-Add Time Penalty for Hints and Fix
 Pause Help
 
 Back End DB / Server / Sign In
@@ -16,8 +15,20 @@ Clue Optimization
 More Useful Hints
 Show Puzzle Number
 End Screen - Show Wrong Cells
+End Screen - Readability
+
 
 
 --- Release 1 ---
 Tutorial
 iOS
+
+
+
+
+Set Final Icon (2,0) = 2
+Eliminate Icon (1,0) = 2
+Set Final Icon (0,0) = 2
+Eliminate Icon (1,1) = 1
+Set Final Icon (1,2) = 0
+Set Final Icon (0,1) = 0
