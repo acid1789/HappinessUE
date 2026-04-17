@@ -1,5 +1,13 @@
 --- Beta ---
 Pause Help
+	- Vertical - Two / Three
+	- Vertical - Either Or
+	- Vertical - Two Not
+	- Vertical - Three Not
+	- Horizontal - Next To / Not Next To
+	- Horizontal - Left Of / Not Left Of
+	- Horizontal - Spans
+	- Hints / Fix Puzzle
 
 Back End DB / Server / Sign In
 Puzzle Reporting
@@ -22,13 +30,3 @@ End Screen - Readability
 --- Release 1 ---
 Tutorial
 iOS
-
-
-
-
-Set Final Icon (2,0) = 2
-Eliminate Icon (1,0) = 2
-Set Final Icon (0,0) = 2
-Eliminate Icon (1,1) = 1
-Set Final Icon (1,2) = 0
-Set Final Icon (0,1) = 0
