@@ -1,9 +1,5 @@
 --- Beta ---
 Pause Help
-	- Vertical - Two / Three
-	- Vertical - Either Or
-	- Vertical - Two Not
-	- Vertical - Three Not
 	- Horizontal - Next To / Not Next To
 	- Horizontal - Left Of / Not Left Of
 	- Horizontal - Spans
