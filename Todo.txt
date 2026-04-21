@@ -1,8 +1,5 @@
 --- Beta ---
 Pause Help
-	- Horizontal - Next To / Not Next To
-	- Horizontal - Left Of / Not Left Of
-	- Horizontal - Spans
 	- Hints / Fix Puzzle
 
 Back End DB / Server / Sign In
