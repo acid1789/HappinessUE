@@ -16,6 +16,7 @@ End Screen - Show Wrong Cells
 End Screen - Readability
 Failing a puzzle, then succeeding you get no points
 Restoring Multiple Icons in mouse mode breaks something
+Help stuff coordinates on mobile
 
 
 
