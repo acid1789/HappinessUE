@@ -1,7 +1,4 @@
 --- Beta ---
-Pause Help
-	- Hints / Fix Puzzle
-
 Back End DB / Server / Sign In
 Puzzle Reporting
 Average Puzzle Time
@@ -17,6 +14,9 @@ More Useful Hints
 Show Puzzle Number
 End Screen - Show Wrong Cells
 End Screen - Readability
+Failing a puzzle, then succeeding you get no points
+Restoring Multiple Icons in mouse mode breaks something
+
 
 
 
