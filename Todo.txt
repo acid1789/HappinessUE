@@ -1,22 +1,12 @@
 --- Beta ---
-Back End DB / Server / Sign In
-Puzzle Reporting
-Average Puzzle Time
 Google Play
-Steam
-Friends
-Daily Competition
 Ads & Payment
-8x8
+
 Hard Difficulty is not solvable
-Clue Optimization
-More Useful Hints
 Show Puzzle Number
 End Screen - Show Wrong Cells
 End Screen - Readability
 Failing a puzzle, then succeeding you get no points
-Restoring Multiple Icons in mouse mode breaks something
-Help stuff coordinates on mobile
 
 
 
@@ -24,3 +14,13 @@ Help stuff coordinates on mobile
 --- Release 1 ---
 Tutorial
 iOS
+Steam
+Restoring Multiple Icons in mouse mode breaks something
+Clue Optimization
+More Useful Hints
+
+Back End DB / Server / Sign In
+Puzzle Reporting
+Average Puzzle Time
+Friends
+Daily Competition
