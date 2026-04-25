@@ -76,3 +76,5 @@ DerivedDataCache/*
 
 # Ignore the engine folder
 Engine/*
+
+Config/Windows/WindowsEngine.ini

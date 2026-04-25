@@ -7,6 +7,9 @@ Show Puzzle Number
 End Screen - Show Wrong Cells
 End Screen - Readability
 Failing a puzzle, then succeeding you get no points
+Confirming an eliminated icon resets the puzzle
+Make dialogs modal
+Adjust par time for 5x5
 
 
 
