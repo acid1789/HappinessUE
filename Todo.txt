@@ -5,11 +5,7 @@ Ads & Payment
 Hard Difficulty is not solvable
 Show Puzzle Number
 End Screen - Show Wrong Cells
-End Screen - Readability
 Failing a puzzle, then succeeding you get no points
-Confirming an eliminated icon resets the puzzle
-
-
 
 
 
