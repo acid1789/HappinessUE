@@ -393,37 +393,40 @@ void UPuzzle::EliminateIconWithClue(UClue* TheClue, int Row, int Col, int Icon)
 
 		Cell.m_bValues[Icon] = false;
 
-		if (Cell.m_iFinalIcon < 0)
+		if (AutoSetIcons)
 		{
-			int Remaining = Cell.GetRemainingIcon();
-
-			if (Remaining >= 0)
+			if (Cell.m_iFinalIcon < 0)
 			{
-				SetFinalIconWithClue(TheClue, Row, Col, Remaining);
-			}
-		}
+				int Remaining = Cell.GetRemainingIcon();
 
-		// Check to see if there is only one remaining in the row
-		int iFound = -1;
-		for (int i = 0; i < m_iSize; i++)
-		{
-			if (m_Rows[Row].m_Cells[i].m_bValues[Icon]) {
-				if (iFound >= 0)
+				if (Remaining >= 0)
 				{
-					// We found a second one, no need to set a final ion here
-					iFound = -1;
-					break;
-				}
-				else
-				{
-					// Haven't found one yet, this is the first one
-					iFound = i;
+					SetFinalIconWithClue(TheClue, Row, Col, Remaining);
 				}
 			}
-		}
-		if (iFound >= 0)
-		{
-			SetFinalIconWithClue(TheClue, Row, iFound, Icon);
+
+			// Check to see if there is only one remaining in the row
+			int iFound = -1;
+			for (int i = 0; i < m_iSize; i++)
+			{
+				if (m_Rows[Row].m_Cells[i].m_bValues[Icon]) {
+					if (iFound >= 0)
+					{
+						// We found a second one, no need to set a final ion here
+						iFound = -1;
+						break;
+					}
+					else
+					{
+						// Haven't found one yet, this is the first one
+						iFound = i;
+					}
+				}
+			}
+			if (iFound >= 0)
+			{
+				SetFinalIconWithClue(TheClue, Row, iFound, Icon);
+			}
 		}
 	}
 }

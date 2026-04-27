@@ -44,6 +44,9 @@ public:
 	UPROPERTY(BlueprintReadOnly)
 	TArray<UClue*> m_VeritcalClues;
 
+	UPROPERTY(BlueprintReadWrite)
+	bool AutoSetIcons = true;
+
 	FRandomStream m_Rand;
 
 public:
