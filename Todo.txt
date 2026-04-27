@@ -2,12 +2,7 @@
 Google Play
 Ads & Payment
 
-Hard Difficulty is not solvable
-Show Puzzle Number
-End Screen - Show Wrong Cells
 Screen Sleep
-Scramble Icons
-Auto Set Remaining Icons
 Realtime Error Detection
 
 --- Release 1 ---
@@ -23,3 +18,6 @@ Puzzle Reporting
 Average Puzzle Time
 Friends
 Daily Competition
+
+Hard Difficulty is not solvable
+Show Puzzle Number
