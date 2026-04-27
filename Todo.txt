@@ -5,9 +5,10 @@ Ads & Payment
 Hard Difficulty is not solvable
 Show Puzzle Number
 End Screen - Show Wrong Cells
-Failing a puzzle, then succeeding you get no points
-
-
+Screen Sleep
+Scramble Icons
+Auto Set Remaining Icons
+Realtime Error Detection
 
 --- Release 1 ---
 Tutorial
