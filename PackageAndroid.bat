@@ -56,7 +56,7 @@ cmd /c ""%UE_PATH%\Engine\Build\BatchFiles\Build.bat" HappinessEditor Win64 Deve
 REM -----------------------------
 REM BUILD ANDROID (SHIPPING)
 REM -----------------------------
-cmd /c ""%UE_PATH%\Engine\Build\BatchFiles\RunUAT.bat" BuildCookRun -nop4 -utf8output -nocompileeditor -skipbuildeditor -cook -project="%PROJECT_DIR%%PROJECT%" -target=Happiness -platform=Android -cookflavor=Multi -installed -SkipCookingErrorSummary -stage -archive -package -pak -iostore -compressed -prereqs -distribution -nodebuginfo -archivedirectory="%BUILD_OUTPUT%" -clientconfig=Shipping"
+cmd /c ""%UE_PATH%\Engine\Build\BatchFiles\RunUAT.bat" BuildCookRun -nop4 -utf8output -build -cook -project="%PROJECT_DIR%%PROJECT%" -target=Happiness -platform=Android -cookflavor=Multi -installed -SkipCookingErrorSummary -stage -archive -package -pak -iostore -compressed -prereqs -distribution -nodebuginfo -archivedirectory="%BUILD_OUTPUT%" -clientconfig=Shipping"
 
 
 echo.
