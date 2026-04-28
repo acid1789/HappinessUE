@@ -48,6 +48,12 @@ REM -----------------------------
 REM powershell -Command "(Get-Content '%CONFIG_FILE%') -replace 'StoreVersion=%VERSION%', 'StoreVersion=%NEW_VERSION%' | Set-Content '%CONFIG_FILE%'"
 
 REM -----------------------------
+REM BUILD WIN64
+REM -----------------------------
+cmd /c ""%UE_PATH%\Engine\Build\BatchFiles\Build.bat" Happiness Win64 Development "%PROJECT_DIR%%PROJECT%""
+
+
+REM -----------------------------
 REM BUILD ANDROID (SHIPPING)
 REM -----------------------------
 cmd /c ""%UE_PATH%\Engine\Build\BatchFiles\RunUAT.bat" BuildCookRun -nop4 -utf8output -nocompileeditor -skipbuildeditor -cook -project="%PROJECT_DIR%%PROJECT%" -target=Happiness -platform=Android -cookflavor=Multi -installed -SkipCookingErrorSummary -stage -archive -package -pak -iostore -compressed -prereqs -distribution -nodebuginfo -archivedirectory="%BUILD_OUTPUT%" -clientconfig=Shipping"
