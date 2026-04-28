@@ -50,7 +50,7 @@ REM powershell -Command "(Get-Content '%CONFIG_FILE%') -replace 'StoreVersion=%V
 REM -----------------------------
 REM BUILD WIN64
 REM -----------------------------
-cmd /c ""%UE_PATH%\Engine\Build\BatchFiles\Build.bat" Happiness Win64 Development "%PROJECT_DIR%%PROJECT%""
+cmd /c ""%UE_PATH%\Engine\Build\BatchFiles\Build.bat" HappinessEditor Win64 Development "%PROJECT_DIR%%PROJECT%""
 
 
 REM -----------------------------
