@@ -1,4 +1,4 @@
-REM @echo off
+@echo off
 setlocal enabledelayedexpansion
 
 REM -----------------------------
@@ -8,7 +8,7 @@ REM -----------------------------
 set UE_PATH=E:\UE\UE_5.7
 set PROJECT_DIR=%~dp0
 set PROJECT=Happiness.uproject
-set CONFIG_FILE=%PROJECT_DIR%Config\DefaultEngine.local.ini
+set CONFIG_FILE=%PROJECT_DIR%Config\Custom\AndroidBuild\DefaultEngine.ini
 set BUILD_OUTPUT=%PROJECT_DIR%Builds\AndroidShipping
 
 
@@ -45,7 +45,7 @@ REM -----------------------------
 REM UPDATE INI
 REM -----------------------------
 
-REM powershell -Command "(Get-Content '%CONFIG_FILE%') -replace 'StoreVersion=%VERSION%', 'StoreVersion=%NEW_VERSION%' | Set-Content '%CONFIG_FILE%'"
+powershell -Command "(Get-Content '%CONFIG_FILE%') -replace 'StoreVersion=%VERSION%', 'StoreVersion=%NEW_VERSION%' | Set-Content '%CONFIG_FILE%'"
 
 REM -----------------------------
 REM BUILD WIN64
@@ -56,10 +56,11 @@ cmd /c ""%UE_PATH%\Engine\Build\BatchFiles\Build.bat" HappinessEditor Win64 Deve
 REM -----------------------------
 REM BUILD ANDROID (SHIPPING)
 REM -----------------------------
-cmd /c ""%UE_PATH%\Engine\Build\BatchFiles\RunUAT.bat" BuildCookRun -nop4 -utf8output -build -cook -project="%PROJECT_DIR%%PROJECT%" -target=Happiness -platform=Android -cookflavor=Multi -installed -SkipCookingErrorSummary -stage -archive -package -pak -iostore -compressed -prereqs -distribution -nodebuginfo -archivedirectory="%BUILD_OUTPUT%" -clientconfig=Shipping"
+cmd /c ""%UE_PATH%\Engine\Build\BatchFiles\RunUAT.bat" BuildCookRun -nop4 -utf8output -build -cook -project="%PROJECT_DIR%%PROJECT%" -target=Happiness -platform=Android -cookflavor=Multi -installed -SkipCookingErrorSummary -stage -archive -package -pak -iostore -compressed -prereqs -distribution -nodebuginfo -archivedirectory="%BUILD_OUTPUT%" -clientconfig=Shipping -CustomConfig=AndroidBuild"
 
 
 echo.
 echo Build complete. Output in:
 echo %BUILD_OUTPUT%
+echo Version: %NEW_VERSION%
 pause
