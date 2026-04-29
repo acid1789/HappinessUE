@@ -2,8 +2,6 @@
 Google Play
 Ads & Payment
 
-Screen Sleep
-Realtime Error Detection
 
 --- Release 1 ---
 Tutorial
