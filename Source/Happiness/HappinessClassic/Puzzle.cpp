@@ -184,8 +184,24 @@ bool UPuzzle::IsDuplicateClue(UClue& testClue)
 						if (C.m_iRow == testClue.m_iRow && C.m_iCol == testClue.m_iCol && C.m_iRow2 == testClue.m_iRow2 && C.m_iCol2 == testClue.m_iCol2 && C.m_iRow3 == testClue.m_iRow3 && C.m_iCol3 == testClue.m_iCol3 && C.m_iHorizontal1 == testClue.m_iHorizontal1)
 							return true;
 						break;
+					case eHorizontalType::Edge:
+					case eHorizontalType::NotEdge:
+					case eHorizontalType::DirectlyLeftOf:
+					case eHorizontalType::Gap:
+					case eHorizontalType::Between:
+					case eHorizontalType::Chain:
+					case eHorizontalType::NextToEitherOr:
+					case eHorizontalType::AllApart:
+						if (C.IsSameClue(testClue))
+							return true;
+						break;
 					}
 				}
+			}
+			else if (C.m_Type == eClueType::NotHere)
+			{
+				if (C.IsSameClue(testClue))
+					return true;
 			}
 			else // Given
 			{
@@ -467,12 +483,12 @@ UHint* UPuzzle::GenerateHint(const TArray<UClue*>& VisibleClues)
 			if (VisibleClues[i]->m_iUseCount > iUseCount)
 			{
 				// This clue can do something, use it for the hint
-				hRet = NewObject<UHint>(this);
-				if (!hRet->Init(*this, *VisibleClues[i]))
+				UHint* Hint = NewObject<UHint>(this);
+				if (Hint->Init(*this, *VisibleClues[i]))
 				{
-					continue;
+					hRet = Hint;
+					break;
 				}
-				break;
 			}
 		}
 	}
@@ -491,6 +507,7 @@ void UPuzzle::BuildClueLists()
 		switch (c->m_Type)
 		{
 			case eClueType::Given:
+			case eClueType::NotHere:
 				m_GivenClues.Add(c);
 				break;
 			case eClueType::Vertical:

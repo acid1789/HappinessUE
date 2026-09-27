@@ -5,7 +5,7 @@ REM -----------------------------
 REM CONFIG
 REM -----------------------------
 
-set UE_PATH=E:\UE\UE_5.7
+set UE_PATH=E:\UE4\UE_5.8
 set PROJECT_DIR=%~dp0
 set PROJECT=Happiness.uproject
 set CONFIG_FILE=%PROJECT_DIR%Config\Custom\AndroidBuild\DefaultEngine.ini

@@ -1,5 +1,6 @@
 # Visual Studio 2015 user specific files
 .vs/
+.codex/
 
 # Compiled Object files
 *.slo
@@ -53,6 +54,7 @@ Plugins/**/Binaries/*
 
 # Builds
 Build/*
+Builds/
 
 # Whitelist PakBlacklist-<BuildConfiguration>.txt files
 !Build/*/
@@ -77,5 +79,8 @@ DerivedDataCache/*
 
 # Ignore the engine folder
 Engine/*
+Tools/
+
+enc_temp_folder/
 
 Config/Windows/WindowsEngine.ini

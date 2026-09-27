@@ -2,6 +2,7 @@
 #include "Puzzle.h"
 #include "PuzzleRow.h"
 #include "PuzzleCell.h"
+#include "Algo/Sort.h"
 
 #pragma optimize("", off)
 
@@ -18,6 +19,10 @@ void UClue::GenerateClue(UPuzzle& P, FRandomStream& Rand)
 	{
 	case eClueType::Given:
 		GenerateGiven(P, Rand);
+		break;
+
+	case eClueType::NotHere:
+		GenerateNotHere(P, Rand);
 		break;
 
 	case eClueType::Vertical:
@@ -37,7 +42,7 @@ void UClue::PickClueType(UPuzzle& P, FRandomStream& Rand)
 	float Val = Rand.FRand();
 
 	if (Val < 0.1f && P.GetNumGivenClues() < 5)
-		m_Type = eClueType::Given;
+		m_Type = (Rand.FRand() < 0.3f) ? eClueType::NotHere : eClueType::Given;
 	else if (Val < 0.35f)
 		m_Type = eClueType::Vertical;
 	else
@@ -79,7 +84,7 @@ void UClue::GenerateVertical(UPuzzle& P, FRandomStream& Rand)
 	}
 
 	int iSize = P.m_iSize;
-	int Type = Rand.RandRange(0, 6);
+	int Type = Rand.RandRange(0, (int)eVerticalType::ThreeBotNot);
 	m_VerticalType = (eVerticalType)Type;
 	switch (m_VerticalType)
 	{
@@ -249,11 +254,25 @@ void UClue::GenerateThreeRowColumn(UPuzzle& P, FRandomStream& Rand)
 void UClue::GenerateHorizontal(UPuzzle& P, FRandomStream& Rand)
 {
 	int iSize = P.m_iSize;
-	int Type = Rand.RandRange(0, 7);
+	int Type = Rand.RandRange(0, (int)eHorizontalType::AllApart);
 
 	m_HorizontalType = (eHorizontalType)Type;
-	switch (m_HorizontalType) 
+	switch (m_HorizontalType)
 	{
+		case eHorizontalType::Edge:
+		case eHorizontalType::NotEdge:
+		case eHorizontalType::DirectlyLeftOf:
+		case eHorizontalType::Gap:
+		case eHorizontalType::Between:
+		case eHorizontalType::Chain:
+		case eHorizontalType::NextToEitherOr:
+		case eHorizontalType::AllApart:
+		{
+			if (!GenerateHorizontalExtended(P, Rand))
+				GenerateClue(P, Rand);
+			return;
+		}
+
 		case eHorizontalType::NextTo:
 		{
 			while (true)
@@ -475,6 +494,10 @@ void UClue::Analyze(UPuzzle& P)
 		AnalyzeGiven(P);
 		break;
 
+	case eClueType::NotHere:
+		AnalyzeNotHere(P);
+		break;
+
 	case eClueType::Vertical:
 		AnalyzeVertical(P);
 		break;
@@ -562,6 +585,17 @@ void UClue::AnalyzeHorizontal(UPuzzle& P)
 
 	case eHorizontalType::SpanNotRight:
 		AnalyzeHorizontalSpanNotRight(P);
+		break;
+
+	case eHorizontalType::Edge:
+	case eHorizontalType::NotEdge:
+	case eHorizontalType::DirectlyLeftOf:
+	case eHorizontalType::Gap:
+	case eHorizontalType::Between:
+	case eHorizontalType::Chain:
+	case eHorizontalType::NextToEitherOr:
+	case eHorizontalType::AllApart:
+		AnalyzeConstraint(P);
 		break;
 	}
 }
@@ -1456,6 +1490,10 @@ void UClue::Dump(int32 iIndex, UPuzzle& P)
 			Output += FString::Printf(TEXT("Type: Given (%d, %d, %d)"), m_iRow, m_iCol, P.m_Solution[(m_iRow * P.m_iSize) + m_iCol]);
 			break;
 
+		case eClueType::NotHere:
+			Output += FString::Printf(TEXT("Type: NotHere (%d, %d, not %d)"), m_iRow, m_iCol, m_iHorizontal1);
+			break;
+
 		case eClueType::Vertical:
 			Output += TEXT("Type: Vertical  VType: ");
 			switch (m_VerticalType)
@@ -1482,6 +1520,22 @@ void UClue::Dump(int32 iIndex, UPuzzle& P)
 				case eHorizontalType::SpanNotLeft: Output += FString::Printf(TEXT("SpanNotLeft ([%d]:%d, [%d]:%d, [%d]:%d)"), m_iRow, m_iHorizontal1, m_iRow2, P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol2], m_iRow3, P.m_Solution[(m_iRow3 * P.m_iSize) + m_iCol3]); break;
 				case eHorizontalType::SpanNotMid: Output += FString::Printf(TEXT("SpanNotMid ([%d]:%d, [%d]:%d, [%d]:%d)"), m_iRow, P.m_Solution[(m_iRow * P.m_iSize) + m_iCol], m_iRow2, m_iHorizontal1, m_iRow3, P.m_Solution[(m_iRow3 * P.m_iSize) + m_iCol3]); break;
 				case eHorizontalType::SpanNotRight:	Output += FString::Printf(TEXT("SpanNotRight ([%d]:%d, [%d]:%d, [%d]:%d)"),	m_iRow, P.m_Solution[(m_iRow * P.m_iSize) + m_iCol], m_iRow2, P.m_Solution[(m_iRow2 * P.m_iSize) + m_iCol2], m_iRow3, m_iHorizontal1); break;
+				case eHorizontalType::Edge:
+				case eHorizontalType::NotEdge:
+				case eHorizontalType::DirectlyLeftOf:
+				case eHorizontalType::Gap:
+				case eHorizontalType::Between:
+				case eHorizontalType::Chain:
+				case eHorizontalType::NextToEitherOr:
+				case eHorizontalType::AllApart:
+				{
+					// Slot icons, -1 for unused slots
+					int SlotRows[3], SlotIcons[3];
+					GetSlots(P, SlotRows, SlotIcons);
+					Output += FString::Printf(TEXT("%s ([%d]:%d, [%d]:%d, [%d]:%d)"), *StaticEnum<eHorizontalType>()->GetNameStringByValue((int64)m_HorizontalType),
+						SlotRows[0], SlotIcons[0], SlotRows[1], SlotIcons[1], SlotRows[2], SlotIcons[2]);
+					break;
+				}
 			}
 			break;
 	}
@@ -1495,6 +1549,7 @@ bool UClue::GetHintAction(UPuzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol,
 	iRow = -1;
 	iCol = -1;
 	iIcon = -1;
+
 	switch (m_Type)
 	{
 		case eClueType::Horizontal:
@@ -1516,6 +1571,15 @@ bool UClue::GetHintAction(UPuzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol,
 					return GetHintActionHorizontalSpanNotMid(P, bSetFinalIcon, iRow, iCol, iIcon);
 				case eHorizontalType::SpanNotRight:
 					return GetHintActionHorizontalSpanNotRight(P, bSetFinalIcon, iRow, iCol, iIcon);
+				case eHorizontalType::Edge:
+				case eHorizontalType::NotEdge:
+				case eHorizontalType::DirectlyLeftOf:
+				case eHorizontalType::Gap:
+				case eHorizontalType::Between:
+				case eHorizontalType::Chain:
+				case eHorizontalType::NextToEitherOr:
+				case eHorizontalType::AllApart:
+					return GetHintActionConstraint(P, bSetFinalIcon, iRow, iCol, iIcon);
 				default:
 					return false;
 			}
@@ -2205,11 +2269,11 @@ bool UClue::GetHintActionHorizontalNextTo(UPuzzle& P, bool& bSetFinalIcon, int& 
 				{
 					if (j == (i - 1) || j == (i + 1))
 						continue;
-					if (P.m_Rows[m_iRow2].m_Cells[i].m_bValues[iIcon2])
+					if (P.m_Rows[m_iRow2].m_Cells[j].m_bValues[iIcon2])
 					{
 						bSetFinalIcon = false;
 						iRow = m_iRow2;
-						iCol = i;
+						iCol = j;
 						iIcon = iIcon2;
 						return true;
 					}
@@ -2248,11 +2312,11 @@ bool UClue::GetHintActionHorizontalNextTo(UPuzzle& P, bool& bSetFinalIcon, int& 
 				{
 					if (j == (i - 1) || j == (i + 1))
 						continue;
-					if (P.m_Rows[m_iRow].m_Cells[i].m_bValues[iIcon1])
+					if (P.m_Rows[m_iRow].m_Cells[j].m_bValues[iIcon1])
 					{
 						bSetFinalIcon = false;
 						iRow = m_iRow;
-						iCol = i;
+						iCol = j;
 						iIcon = iIcon1;
 						return true;
 					}
@@ -2640,7 +2704,7 @@ bool UClue::GetHintActionHorizontalSpan(UPuzzle& P, bool& bSetFinalIcon, int& iR
 	return false;
 }
 
-bool UClue::GetHintActionSpan(int iCol, int iRow1, int iIcon1, bool bNot1, int iRow2, int iIcon2, bool bNot2, int iRow3, int iIcon3, bool bNot3, UPuzzle& P, bool bSetFinalIcon, int iOutRow, int iOutCol, int iOutIcon)
+bool UClue::GetHintActionSpan(int iCol, int iRow1, int iIcon1, bool bNot1, int iRow2, int iIcon2, bool bNot2, int iRow3, int iIcon3, bool bNot3, UPuzzle& P, bool& bSetFinalIcon, int& iOutRow, int& iOutCol, int& iOutIcon)
 {
 	int iFinal1 = P.m_Rows[iRow1].m_Cells[iCol].m_iFinalIcon;
 	if (iFinal1 == iIcon1)
@@ -3405,6 +3469,7 @@ FString UClue::ToString() const
 	switch (m_Type) 
 	{
 		case eClueType::Given:		return FString::Printf(TEXT("Given: (%d, %d)"), m_iRow, m_iCol);
+		case eClueType::NotHere:	return FString::Printf(TEXT("NotHere: (%d, %d) not %d"), m_iRow, m_iCol, m_iHorizontal1);
 		case eClueType::Horizontal: return HorizontalToString();
 		case eClueType::Vertical:	return VerticalToString();
 	}
@@ -3426,6 +3491,15 @@ FString UClue::HorizontalToString() const
 		case eHorizontalType::SpanNotLeft:	ClueString += FString::Printf(TEXT("SpanNotLeft: !(%d, %d) < (%d, %d) > (%d, %d) %d"), m_iRow, m_iCol, m_iRow2, m_iCol2, m_iRow3, m_iRow3, m_iHorizontal1); break;
 		case eHorizontalType::SpanNotMid:	ClueString += FString::Printf(TEXT("SpanNotMid: (%d, %d) < !(%d, %d) > (%d, %d) %d"), m_iRow, m_iCol, m_iRow2, m_iCol2, m_iRow3, m_iRow3, m_iHorizontal1); break;
 		case eHorizontalType::SpanNotRight: ClueString += FString::Printf(TEXT("SpanNotRight: (%d, %d) < (%d, %d) > !(%d, %d) %d)"), m_iRow, m_iCol, m_iRow2, m_iCol2, m_iRow3, m_iRow3, m_iHorizontal1); break;
+		case eHorizontalType::Edge:
+		case eHorizontalType::NotEdge:
+		case eHorizontalType::DirectlyLeftOf:
+		case eHorizontalType::Gap:
+		case eHorizontalType::Between:
+		case eHorizontalType::Chain:
+		case eHorizontalType::NextToEitherOr:
+		case eHorizontalType::AllApart:
+			return ExtendedToString();
 	}
 	return ClueString;
 }
@@ -3461,6 +3535,10 @@ void UClue::GetIcons(UPuzzle* P, TArray<int32>& Icons)
 	switch (m_Type)
 	{
 		case eClueType::Given:
+			break;
+
+		case eClueType::NotHere:
+			Icons.Add(m_iHorizontal1);
 			break;
 
 		case eClueType::Vertical:
@@ -3555,6 +3633,37 @@ void UClue::GetIcons(UPuzzle* P, TArray<int32>& Icons)
 				Icons.Add(P->m_Solution[(m_iRow2 * P->m_iSize) + m_iCol2]);
 				Icons.Add(m_iHorizontal1);
 				break;
+
+
+			case eHorizontalType::Edge:
+			case eHorizontalType::NotEdge:
+				Icons.Add(P->m_Solution[(m_iRow * P->m_iSize) + m_iCol]);
+				break;
+
+			case eHorizontalType::DirectlyLeftOf:
+				Icons.Add(P->m_Solution[(m_iRow * P->m_iSize) + m_iCol]);
+				Icons.Add(P->m_Solution[(m_iRow2 * P->m_iSize) + m_iCol2]);
+				break;
+
+			case eHorizontalType::Gap:
+				Icons.Add(P->m_Solution[(m_iRow * P->m_iSize) + m_iCol]);
+				Icons.Add(P->m_Solution[(m_iRow2 * P->m_iSize) + m_iCol2]);
+				break;
+
+			case eHorizontalType::Between:
+			case eHorizontalType::Chain:
+			case eHorizontalType::AllApart:
+				Icons.Add(P->m_Solution[(m_iRow * P->m_iSize) + m_iCol]);
+				Icons.Add(P->m_Solution[(m_iRow2 * P->m_iSize) + m_iCol2]);
+				Icons.Add(P->m_Solution[(m_iRow3 * P->m_iSize) + m_iCol3]);
+				break;
+
+			case eHorizontalType::NextToEitherOr:
+				// Slot 1 is the subject; slot m_iNotCell (0 or 2) is the false option, shown as icon m_iHorizontal1
+				Icons.Add((m_iNotCell == 0) ? m_iHorizontal1 : P->m_Solution[(m_iRow * P->m_iSize) + m_iCol]);
+				Icons.Add(P->m_Solution[(m_iRow2 * P->m_iSize) + m_iCol2]);
+				Icons.Add((m_iNotCell == 2) ? m_iHorizontal1 : P->m_Solution[(m_iRow3 * P->m_iSize) + m_iCol3]);
+				break;
 			}
 		}
 		break;
@@ -3570,9 +3679,62 @@ void UClue::GenerateClueHelp(UPuzzle& P)
 	ClueHelp.Segments.Empty();
 	switch (m_Type)
 	{
+		case eClueType::NotHere:
+			ClueHelp.AddIcon(m_iRow, m_iHorizontal1);
+			ClueHelp.AddText(TEXT("is not in this cell"));
+			break;
 		case eClueType::Horizontal:
 			switch (m_HorizontalType)
 			{
+				case eHorizontalType::Edge:
+					ClueHelp.AddIcon(Rows[0], Icons[0]);
+					ClueHelp.AddText(TEXT("is in the first or last column"));
+					break;
+				case eHorizontalType::NotEdge:
+					ClueHelp.AddIcon(Rows[0], Icons[0]);
+					ClueHelp.AddText(TEXT("is not in the first or last column"));
+					break;
+				case eHorizontalType::DirectlyLeftOf:
+					ClueHelp.AddIcon(Rows[0], Icons[0]);
+					ClueHelp.AddText(TEXT("is directly left of"));
+					ClueHelp.AddIcon(Rows[1], Icons[1]);
+					break;
+				case eHorizontalType::Gap:
+					ClueHelp.AddIcon(Rows[0], Icons[0]);
+					ClueHelp.AddText(TEXT("and"));
+					ClueHelp.AddIcon(Rows[1], Icons[1]);
+					ClueHelp.AddText(TEXT("have exactly one column between them"));
+					break;
+				case eHorizontalType::Between:
+					ClueHelp.AddIcon(Rows[1], Icons[1]);
+					ClueHelp.AddText(TEXT("is somewhere between"));
+					ClueHelp.AddIcon(Rows[0], Icons[0]);
+					ClueHelp.AddText(TEXT("and"));
+					ClueHelp.AddIcon(Rows[2], Icons[2]);
+					break;
+				case eHorizontalType::Chain:
+					ClueHelp.AddIcon(Rows[0], Icons[0]);
+					ClueHelp.AddText(TEXT("is left of"));
+					ClueHelp.AddIcon(Rows[1], Icons[1]);
+					ClueHelp.AddText(TEXT(", which is left of"));
+					ClueHelp.AddIcon(Rows[2], Icons[2]);
+					break;
+				case eHorizontalType::NextToEitherOr:
+					ClueHelp.AddIcon(Rows[1], Icons[1]);
+					ClueHelp.AddText(TEXT("is next to either"));
+					ClueHelp.AddIcon(Rows[0], Icons[0]);
+					ClueHelp.AddText(TEXT("or"));
+					ClueHelp.AddIcon(Rows[2], Icons[2]);
+					ClueHelp.AddText(TEXT(", but not both"));
+					break;
+				case eHorizontalType::AllApart:
+					ClueHelp.AddIcon(Rows[0], Icons[0]);
+					ClueHelp.AddText(TEXT(","));
+					ClueHelp.AddIcon(Rows[1], Icons[1]);
+					ClueHelp.AddText(TEXT("and"));
+					ClueHelp.AddIcon(Rows[2], Icons[2]);
+					ClueHelp.AddText(TEXT("are all in different columns"));
+					break;
 				case eHorizontalType::NextTo:					
 					ClueHelp.AddIcon(Rows[0], Icons[0]);
 					ClueHelp.AddText(TEXT("is next to"));
@@ -3716,6 +3878,9 @@ int64 UClue::GetId() const
 	id |= PackEnum(static_cast<uint8>(m_VerticalType)) << 35;
 	id |= PackEnum(static_cast<uint8>(m_HorizontalType)) << 38;
 
+	// Horizontal types above 7 need a 4th bit; it lives at bit 41 so IDs saved before it existed decode unchanged
+	id |= static_cast<uint64>((static_cast<uint8>(m_HorizontalType) >> 3) & 0b1) << 41;
+
 	return static_cast<int64>(id);
 }
 
@@ -3750,5 +3915,414 @@ void UClue::SetFromId(int64 sid)
 	// Unpack the 3 enums
 	m_Type = static_cast<eClueType>(UnpackEnum((id >> 32) & 0x7));
 	m_VerticalType = static_cast<eVerticalType>(UnpackEnum((id >> 35) & 0x7));
-	m_HorizontalType = static_cast<eHorizontalType>(UnpackEnum((id >> 38) & 0x7));
+	m_HorizontalType = static_cast<eHorizontalType>(UnpackEnum((id >> 38) & 0x7) | (((id >> 41) & 0x1) << 3));
+}
+ECampaignLesson UClue::GetCampaignLesson() const
+{
+	switch (m_Type)
+	{
+		case eClueType::Vertical:
+			switch (m_VerticalType)
+			{
+				case eVerticalType::Two:			return ECampaignLesson::VerticalTwo;
+				case eVerticalType::Three:			return ECampaignLesson::VerticalThree;
+				case eVerticalType::TwoNot:			return ECampaignLesson::TwoNot;
+				case eVerticalType::ThreeTopNot:
+				case eVerticalType::ThreeMidNot:
+				case eVerticalType::ThreeBotNot:	return ECampaignLesson::ThreeNot;
+				case eVerticalType::EitherOr:		return ECampaignLesson::EitherOr;
+			}
+			break;
+
+		case eClueType::Horizontal:
+			switch (m_HorizontalType)
+			{
+				case eHorizontalType::NextTo:		return ECampaignLesson::NextTo;
+				case eHorizontalType::Span:			return ECampaignLesson::Span;
+				case eHorizontalType::NotNextTo:	return ECampaignLesson::NotNextTo;
+				case eHorizontalType::SpanNotLeft:
+				case eHorizontalType::SpanNotRight:	return ECampaignLesson::SpanNotSide;
+				case eHorizontalType::SpanNotMid:	return ECampaignLesson::SpanNotMid;
+				case eHorizontalType::LeftOf:		return ECampaignLesson::LeftOf;
+				case eHorizontalType::NotLeftOf:	return ECampaignLesson::NotLeftOf;
+				case eHorizontalType::Edge:
+				case eHorizontalType::NotEdge:		return ECampaignLesson::Edge;
+				case eHorizontalType::DirectlyLeftOf:	return ECampaignLesson::DirectlyLeftOf;
+				case eHorizontalType::Gap:			return ECampaignLesson::Gap;
+				case eHorizontalType::Between:		return ECampaignLesson::Between;
+				case eHorizontalType::Chain:		return ECampaignLesson::Chain;
+				case eHorizontalType::NextToEitherOr:	return ECampaignLesson::NextToEitherOr;
+				case eHorizontalType::AllApart:		return ECampaignLesson::AllApart;
+			}
+			break;
+	}
+
+	return ECampaignLesson::Given;
+}
+
+bool UClue::IsConstraintClue() const
+{
+	if (m_Type == eClueType::Horizontal)
+		return m_HorizontalType >= eHorizontalType::Edge;
+
+	return false;
+}
+
+void UClue::GetSlots(const UPuzzle& P, int Rows[3], int Icons[3]) const
+{
+	const int SlotRows[3] = { m_iRow, m_iRow2, m_iRow3 };
+	const int SlotCols[3] = { m_iCol, m_iCol2, m_iCol3 };
+
+	for (int i = 0; i < 3; i++)
+	{
+		Rows[i] = SlotRows[i];
+
+		if (SlotRows[i] < 0)
+			Icons[i] = -1;
+		else if (m_Type == eClueType::Horizontal && m_HorizontalType == eHorizontalType::NextToEitherOr && m_iNotCell == i)
+			Icons[i] = m_iHorizontal1;
+		else
+			Icons[i] = P.m_Solution[(SlotRows[i] * P.m_iSize) + SlotCols[i]];
+	}
+}
+
+bool UClue::IsSameClue(const UClue& Other) const
+{
+	if (m_Type != Other.m_Type)
+		return false;
+	if (m_Type == eClueType::Vertical && m_VerticalType != Other.m_VerticalType)
+		return false;
+	if (m_Type == eClueType::Horizontal && m_HorizontalType != Other.m_HorizontalType)
+		return false;
+
+	return m_iRow == Other.m_iRow && m_iRow2 == Other.m_iRow2 && m_iRow3 == Other.m_iRow3 &&
+		m_iCol == Other.m_iCol && m_iCol2 == Other.m_iCol2 && m_iCol3 == Other.m_iCol3 &&
+		m_iHorizontal1 == Other.m_iHorizontal1 && m_iNotCell == Other.m_iNotCell;
+}
+
+void UClue::GenerateNotHere(UPuzzle& P, FRandomStream& Rand)
+{
+	int iSize = P.m_iSize;
+
+	for (int iTries = 0; iTries < 50; iTries++)
+	{
+		m_iRow = Rand.RandRange(0, iSize - 1);
+		m_iCol = Rand.RandRange(0, iSize - 1);
+		m_iHorizontal1 = Rand.RandRange(0, iSize - 1);
+
+		// Must be a wrong icon that is still possible in the cell, otherwise it tells the player nothing
+		if (m_iHorizontal1 != P.m_Solution[(m_iRow * iSize) + m_iCol] && P.m_Rows[m_iRow].m_Cells[m_iCol].m_bValues[m_iHorizontal1])
+			return;
+	}
+
+	m_Type = eClueType::Given;
+	GenerateGiven(P, Rand);
+}
+
+bool UClue::GenerateHorizontalExtended(UPuzzle& P, FRandomStream& Rand)
+{
+	const int iSize = P.m_iSize;
+	if (iSize < 3 && m_HorizontalType != eHorizontalType::Edge && m_HorizontalType != eHorizontalType::DirectlyLeftOf)
+		return false;
+
+	// On a 3 wide board Between and Chain can only use columns 0, 1 and 2, so they are just a Span
+	if (iSize < 4 && (m_HorizontalType == eHorizontalType::Between || m_HorizontalType == eHorizontalType::Chain))
+		return false;
+
+	auto Sol = [&P, iSize](int Row, int Col) { return P.m_Solution[(Row * iSize) + Col]; };
+
+	for (int iTries = 0; iTries < 25; iTries++)
+	{
+		int Rows[3] = { Rand.RandRange(0, iSize - 1), -1, -1 };
+		int Cols[3] = { -1, -1, -1 };
+		m_iHorizontal1 = -1;
+		m_iNotCell = -1;
+
+		switch (m_HorizontalType)
+		{
+			case eHorizontalType::Edge:
+				Cols[0] = (Rand.FRand() < 0.5f) ? 0 : iSize - 1;
+				break;
+
+			case eHorizontalType::NotEdge:
+				Cols[0] = Rand.RandRange(1, iSize - 2);
+				break;
+
+			case eHorizontalType::DirectlyLeftOf:
+				Cols[0] = Rand.RandRange(0, iSize - 2);
+				Cols[1] = Cols[0] + 1;
+				Rows[1] = Rand.RandRange(0, iSize - 1);
+				break;
+
+			case eHorizontalType::Gap:
+			{
+				Cols[0] = Rand.RandRange(0, iSize - 1);
+				bool bCanLeft = Cols[0] - 2 >= 0;
+				bool bCanRight = Cols[0] + 2 < iSize;
+				if (!bCanLeft && !bCanRight)
+					continue;
+				Cols[1] = (bCanLeft && (!bCanRight || Rand.FRand() < 0.5f)) ? Cols[0] - 2 : Cols[0] + 2;
+				Rows[1] = Rand.RandRange(0, iSize - 1);
+				break;
+			}
+
+			case eHorizontalType::Between:
+			case eHorizontalType::Chain:
+			{
+				// 3 different columns, left to right
+				int Sorted[3] = { Rand.RandRange(0, iSize - 1), 0, 0 };
+				do { Sorted[1] = Rand.RandRange(0, iSize - 1); } while (Sorted[1] == Sorted[0]);
+				do { Sorted[2] = Rand.RandRange(0, iSize - 1); } while (Sorted[2] == Sorted[0] || Sorted[2] == Sorted[1]);
+				Algo::Sort(Sorted);
+
+				Cols[1] = Sorted[1];
+				bool bFlip = m_HorizontalType == eHorizontalType::Between && Rand.FRand() < 0.5f;
+				Cols[0] = bFlip ? Sorted[2] : Sorted[0];
+				Cols[2] = bFlip ? Sorted[0] : Sorted[2];
+				Rows[1] = Rand.RandRange(0, iSize - 1);
+				Rows[2] = Rand.RandRange(0, iSize - 1);
+				break;
+			}
+
+			case eHorizontalType::NextToEitherOr:
+			{
+				// The subject icon is the middle slot, the options are slots 0 and 2
+				Rows[1] = Rows[0];
+				Cols[1] = Rand.RandRange(0, iSize - 1);
+				int iNeighbor = (Cols[1] == 0) ? 1 : (Cols[1] == iSize - 1) ? Cols[1] - 1 : (Rand.FRand() < 0.5f ? Cols[1] - 1 : Cols[1] + 1);
+
+				int iTrue = (Rand.FRand() < 0.5f) ? 0 : 2;
+				int iFalse = 2 - iTrue;
+				Rows[iTrue] = Rand.RandRange(0, iSize - 1);
+				Cols[iTrue] = iNeighbor;
+
+				// The false option is a real icon that is not next to the subject and isn't one of the other icons
+				Rows[iFalse] = Rand.RandRange(0, iSize - 1);
+				Cols[iFalse] = -1;
+				int iIcon = Rand.RandRange(0, iSize - 1);
+				int iIconCol = 0;
+				while (Sol(Rows[iFalse], iIconCol) != iIcon)
+					iIconCol++;
+
+				if (FMath::Abs(iIconCol - Cols[1]) == 1 ||
+					(Rows[iFalse] == Rows[1] && iIcon == Sol(Rows[1], Cols[1])) ||
+					(Rows[iFalse] == Rows[iTrue] && iIcon == Sol(Rows[iTrue], Cols[iTrue])))
+					continue;
+
+				m_iNotCell = iFalse;
+				m_iHorizontal1 = iIcon;
+				break;
+			}
+
+			case eHorizontalType::AllApart:
+			{
+				// 3 different rows and 3 different columns
+				do { Rows[1] = Rand.RandRange(0, iSize - 1); } while (Rows[1] == Rows[0]);
+				do { Rows[2] = Rand.RandRange(0, iSize - 1); } while (Rows[2] == Rows[0] || Rows[2] == Rows[1]);
+
+				Cols[0] = Rand.RandRange(0, iSize - 1);
+				do { Cols[1] = Rand.RandRange(0, iSize - 1); } while (Cols[1] == Cols[0]);
+				do { Cols[2] = Rand.RandRange(0, iSize - 1); } while (Cols[2] == Cols[0] || Cols[2] == Cols[1]);
+				break;
+			}
+
+			default:
+				return false;
+		}
+
+		m_iRow = Rows[0]; m_iRow2 = Rows[1]; m_iRow3 = Rows[2];
+		m_iCol = Cols[0]; m_iCol2 = Cols[1]; m_iCol3 = Cols[2];
+
+		// Make sure the clue is useful: at least one of its real icons isn't placed yet
+		for (int i = 0; i < 3; i++)
+		{
+			if (Cols[i] >= 0 && P.m_Rows[Rows[i]].m_Cells[Cols[i]].m_iFinalIcon < 0)
+				return true;
+		}
+	}
+
+	return false;
+}
+
+void UClue::AnalyzeNotHere(UPuzzle& P)
+{
+	// Skip if the player has wrongly placed this icon here; eliminating a final icon is an error
+	if (P.m_Rows[m_iRow].m_Cells[m_iCol].m_iFinalIcon != m_iHorizontal1)
+		P.EliminateIconWithClue(this, m_iRow, m_iCol, m_iHorizontal1);
+}
+
+bool UClue::ConstraintHolds(const int Cols[3], int Size) const
+{
+	const int C0 = Cols[0], C1 = Cols[1], C2 = Cols[2];
+
+	switch (m_HorizontalType)
+	{
+		case eHorizontalType::AllApart:			return C0 != C1 && C1 != C2 && C0 != C2;
+		case eHorizontalType::Edge:				return C0 == 0 || C0 == Size - 1;
+		case eHorizontalType::NotEdge:			return C0 > 0 && C0 < Size - 1;
+		case eHorizontalType::DirectlyLeftOf:	return C1 == C0 + 1;
+		case eHorizontalType::Gap:				return FMath::Abs(C0 - C1) == 2;
+		case eHorizontalType::Between:			return (C0 < C1 && C1 < C2) || (C2 < C1 && C1 < C0);
+		case eHorizontalType::Chain:			return C0 < C1 && C1 < C2;
+		case eHorizontalType::NextToEitherOr:	return (FMath::Abs(C1 - C0) == 1) != (FMath::Abs(C1 - C2) == 1);
+		default:								return true;
+	}
+}
+
+bool UClue::HasSupport(UPuzzle& P, const int Rows[3], const int Icons[3], int Slot, int Col) const
+{
+	const int iSize = P.m_iSize;
+	check(iSize <= 16);
+
+	// Candidate columns for each slot: the fixed column for Slot, every still-possible column for the others,
+	// and a single dummy entry for unused slots
+	int Cand[3][16];
+	int NumCand[3];
+	for (int s = 0; s < 3; s++)
+	{
+		NumCand[s] = 0;
+		if (Rows[s] < 0)
+			Cand[s][NumCand[s]++] = -1;
+		else if (s == Slot)
+			Cand[s][NumCand[s]++] = Col;
+		else
+		{
+			for (int c = 0; c < iSize; c++)
+			{
+				if (P.m_Rows[Rows[s]].m_Cells[c].m_bValues[Icons[s]])
+					Cand[s][NumCand[s]++] = c;
+			}
+		}
+	}
+
+	// Two icons in the same row can't occupy the same cell
+	auto SharesCell = [&Rows](int A, int B, const int Cols[3])
+	{
+		return Rows[A] >= 0 && Rows[A] == Rows[B] && Cols[A] == Cols[B];
+	};
+
+	int Cols[3];
+	for (int a = 0; a < NumCand[0]; a++)
+	{
+		Cols[0] = Cand[0][a];
+		for (int b = 0; b < NumCand[1]; b++)
+		{
+			Cols[1] = Cand[1][b];
+			if (SharesCell(0, 1, Cols))
+				continue;
+
+			for (int c = 0; c < NumCand[2]; c++)
+			{
+				Cols[2] = Cand[2][c];
+				if (SharesCell(0, 2, Cols) || SharesCell(1, 2, Cols))
+					continue;
+
+				if (ConstraintHolds(Cols, iSize))
+					return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+void UClue::AnalyzeConstraint(UPuzzle& P)
+{
+	int Rows[3], Icons[3];
+	GetSlots(P, Rows, Icons);
+
+	for (int s = 0; s < 3; s++)
+	{
+		if (Rows[s] < 0)
+			continue;
+
+		for (int c = 0; c < P.m_iSize; c++)
+		{
+			const FPuzzleCell& Cell = P.m_Rows[Rows[s]].m_Cells[c];
+			if (Cell.m_bValues[Icons[s]] && Cell.m_iFinalIcon != Icons[s] && !HasSupport(P, Rows, Icons, s, c))
+				P.EliminateIconWithClue(this, Rows[s], c, Icons[s]);
+		}
+	}
+}
+
+bool UClue::GetHintActionConstraint(UPuzzle& P, bool& bSetFinalIcon, int& iRow, int& iCol, int& iIcon)
+{
+	int Rows[3], Icons[3];
+	GetSlots(P, Rows, Icons);
+
+	// Prefer placing an icon when the clue leaves it only one column
+	for (int s = 0; s < 3; s++)
+	{
+		if (Rows[s] < 0)
+			continue;
+
+		int iPossible = 0;
+		int iSupported = 0;
+		int iOnlyCol = -1;
+		for (int c = 0; c < P.m_iSize; c++)
+		{
+			if (!P.m_Rows[Rows[s]].m_Cells[c].m_bValues[Icons[s]])
+				continue;
+
+			iPossible++;
+			if (HasSupport(P, Rows, Icons, s, c))
+			{
+				iSupported++;
+				iOnlyCol = c;
+			}
+		}
+
+		if (iSupported == 1 && iPossible > 1 && P.m_Rows[Rows[s]].m_Cells[iOnlyCol].m_iFinalIcon != Icons[s])
+		{
+			bSetFinalIcon = true;
+			iRow = Rows[s];
+			iCol = iOnlyCol;
+			iIcon = Icons[s];
+			return true;
+		}
+	}
+
+	// Otherwise eliminate the first position the clue rules out (same order as AnalyzeConstraint)
+	for (int s = 0; s < 3; s++)
+	{
+		if (Rows[s] < 0)
+			continue;
+
+		for (int c = 0; c < P.m_iSize; c++)
+		{
+			const FPuzzleCell& Cell = P.m_Rows[Rows[s]].m_Cells[c];
+			if (Cell.m_bValues[Icons[s]] && Cell.m_iFinalIcon != Icons[s] && !HasSupport(P, Rows, Icons, s, c))
+			{
+				bSetFinalIcon = false;
+				iRow = Rows[s];
+				iCol = c;
+				iIcon = Icons[s];
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+FString UClue::ExtendedToString() const
+{
+	FString ClueString = (m_Type == eClueType::Vertical)
+		? TEXT("Vertical: ") + StaticEnum<eVerticalType>()->GetNameStringByValue((int64)m_VerticalType)
+		: TEXT("Horizontal: ") + StaticEnum<eHorizontalType>()->GetNameStringByValue((int64)m_HorizontalType);
+	ClueString += TEXT(":");
+
+	const int Rows[3] = { m_iRow, m_iRow2, m_iRow3 };
+	const int Cols[3] = { m_iCol, m_iCol2, m_iCol3 };
+	for (int i = 0; i < 3; i++)
+	{
+		if (Rows[i] < 0)
+			ClueString += TEXT(" (-)");
+		else if (m_Type == eClueType::Horizontal && m_HorizontalType == eHorizontalType::NextToEitherOr && m_iNotCell == i)
+			ClueString += FString::Printf(TEXT(" (%d, icon %d false)"), Rows[i], m_iHorizontal1);
+		else
+			ClueString += FString::Printf(TEXT(" (%d, %d)"), Rows[i], Cols[i]);
+	}
+
+	return ClueString;
 }
