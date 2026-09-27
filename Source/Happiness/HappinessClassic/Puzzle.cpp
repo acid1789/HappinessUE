@@ -24,6 +24,23 @@ void UPuzzle::Init(int Seed, int Size, int Difficulty)
 	GenerateClues();
 }
 
+void UPuzzle::GetGivenRangeForDifficulty(int Size, int Difficulty, int& Min, int& Max)
+{
+	switch (Difficulty)
+	{
+		case 0:		// Easy
+			Min = Max = FMath::Max(Size - 2, 0);
+			break;
+		case 1:		// Normal
+			Min = 1;
+			Max = FMath::Max(Size - 3, 1);
+			break;
+		default:	// Hard
+			Min = Max = 0;
+			break;
+	}
+}
+
 int UPuzzle::GetNumGivenClues()
 {
 	int Count = 0;
@@ -83,6 +100,19 @@ void UPuzzle::GenerateClues()
 {
 	UE_LOG(LogTemp, Log, TEXT("-- Generating Clues --"));
 	m_Clues.Empty();
+
+	// Givens are placed up front, a count within GetGivenRangeForDifficulty(); the random clues below never pick Given
+	int MinGivens, MaxGivens;
+	GetGivenRangeForDifficulty(m_iSize, m_iDifficulty, MinGivens, MaxGivens);
+	const int NumGivens = m_Rand.RandRange(MinGivens, MaxGivens);
+	for (int i = 0; i < NumGivens; i++)
+	{
+		UClue* C = NewObject<UClue>(this);
+		C->InitGiven(*this, m_Rand);
+		m_Clues.Add(C);
+		C->Analyze(*this);
+	}
+
 	while (!IsSolved())
 	{
 		UClue* C = NewObject<UClue>(this);
@@ -647,7 +677,7 @@ void UPuzzle::OptimizeClues()
 		m_Clues.RemoveAt(i);
 	}
 
-	// Add/Remove clues for difficulty
+	// Easy gets some extra clues; normal and hard use exactly the clues needed (they differ only in givens)
 	Reset();
 
 	int iUsableClueCount = m_HorizontalClues.Num() + m_VeritcalClues.Num();
@@ -665,32 +695,6 @@ void UPuzzle::OptimizeClues()
 			{
 				m_Clues.Add(C);
 			}
-		}
-	}
-	else if (m_iDifficulty == 2)
-	{
-		// Remove some clues
-		int iCluesToRemove = FMath::Max((int)(iUsableClueCount * 0.1f), 1);
-		int iUseCount = 1;
-
-		while (iCluesToRemove > 0)
-		{
-			int iClueCount = m_Clues.Num();
-
-			for (int i = 0; i < m_Clues.Num(); i++)
-			{
-				UClue& C = *m_Clues[i];
-
-				if (C.m_iUseCount <= iUseCount)
-				{
-					iCluesToRemove--;
-					m_Clues.RemoveAt(i);
-					break;
-				}
-			}
-
-			if (iClueCount == m_Clues.Num())
-				iUseCount++;
 		}
 	}
 

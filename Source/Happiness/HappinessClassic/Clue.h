@@ -110,6 +110,9 @@ public:
 	
 	void Init(UPuzzle& UPuzzle, FRandomStream& Rand);
 
+	// Make this a Given on a random cell that isn't placed yet
+	void InitGiven(UPuzzle& P, FRandomStream& Rand);
+
 	bool operator<(const UClue& Other) const
 	{
 		return m_iUseCount > Other.m_iUseCount;

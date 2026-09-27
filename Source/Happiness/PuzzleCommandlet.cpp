@@ -255,6 +255,7 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 
 	int32 Total = 0, AnalyzeFails = 0, HintFails = 0, ErrorPuzzles = 0;
 	int32 CluesByLesson[256] = {}, HintsByLesson[256] = {}, NotHereClues = 0;
+	int32 GivenCounts[16] = {};
 	int64 ClueSum = 0, HintStepSum = 0;
 	double GenTime = 0.0;
 	const double StartTime = FPlatformTime::Seconds();
@@ -282,6 +283,13 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 
 		Total++;
 		ClueSum += P.m_Clues.Num();
+		int32 MinGivens, MaxGivens;
+		UPuzzle::GetGivenRangeForDifficulty(Size, Diff, MinGivens, MaxGivens);
+		const int32 NumGivens = P.GetNumGivenClues();
+		GivenCounts[FMath::Clamp(NumGivens, 0, 15)]++;
+		if (NumGivens < MinGivens || NumGivens > MaxGivens)
+			UE_LOG(LogTemp, Error, TEXT("Given count %d, expected %d-%d"), NumGivens, MinGivens, MaxGivens);
+
 		for (UClue* C : P.m_Clues)
 		{
 			// Saved games store clues by id; every clue must survive the round trip
@@ -346,6 +354,15 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 			Out += FString::Printf(TEXT(" %s=%d/%d"), *LessonEnum->GetNameStringByIndex(i), CluesByLesson[Value], HintsByLesson[Value]);
 	}
 	Out += FString::Printf(TEXT(" (NotHere clues=%d)\n"), NotHereClues);
+
+	// How many puzzles got each number of givens
+	Out += TEXT("GIVENS count:puzzles");
+	for (int32 i = 0; i < 16; i++)
+	{
+		if (GivenCounts[i])
+			Out += FString::Printf(TEXT(" %d:%d"), i, GivenCounts[i]);
+	}
+	Out += TEXT("\n");
 
 	FFileHelper::SaveStringToFile(Out, *OutPath);
 	return 0;

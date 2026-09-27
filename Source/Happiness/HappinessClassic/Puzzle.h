@@ -58,6 +58,10 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure)
 	int GetNumGivenClues();
 
+	// Range of Given clues a puzzle gets: easy exactly size-2, normal 1 to size-3 (at least 1), hard 0
+	UFUNCTION(BlueprintCallable, BlueprintPure)
+	static void GetGivenRangeForDifficulty(int Size, int Difficulty, int& Min, int& Max);
+
 	static void RandomDistribution(FRandomStream& Rand, TArray<int>& Rands);
 
 	UFUNCTION(BlueprintCallable)

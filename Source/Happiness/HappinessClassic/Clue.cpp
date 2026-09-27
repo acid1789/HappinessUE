@@ -41,8 +41,9 @@ void UClue::PickClueType(UPuzzle& P, FRandomStream& Rand)
 {
 	float Val = Rand.FRand();
 
-	if (Val < 0.1f && P.GetNumGivenClues() < 5)
-		m_Type = (Rand.FRand() < 0.3f) ? eClueType::NotHere : eClueType::Given;
+	// Givens are placed up front by UPuzzle::GenerateClues, never picked here
+	if (Val < 0.03f)
+		m_Type = eClueType::NotHere;
 	else if (Val < 0.35f)
 		m_Type = eClueType::Vertical;
 	else
@@ -4015,8 +4016,15 @@ void UClue::GenerateNotHere(UPuzzle& P, FRandomStream& Rand)
 			return;
 	}
 
+	// No useful NotHere found; pick a different clue instead
+	GenerateClue(P, Rand);
+}
+
+void UClue::InitGiven(UPuzzle& P, FRandomStream& Rand)
+{
 	m_Type = eClueType::Given;
 	GenerateGiven(P, Rand);
+	GenerateClueHelp(P);
 }
 
 bool UClue::GenerateHorizontalExtended(UPuzzle& P, FRandomStream& Rand)
