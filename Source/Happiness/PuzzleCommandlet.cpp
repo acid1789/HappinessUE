@@ -244,6 +244,67 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 	const bool bShow = Mode == TEXT("show") || Mode == TEXT("trace");
 	const bool bTrace = Mode == TEXT("trace");
 
+	// -lesson=Name generates campaign puzzles for that lesson
+	FString LessonName;
+	int64 LessonValue = INDEX_NONE;
+	if (FParse::Value(Cmd, TEXT("lesson="), LessonName) && LessonName == TEXT("all"))
+	{
+		// Run every lesson in this one process (engine startup dominates), one summary line per lesson
+		const UEnum* LessonEnum = StaticEnum<ECampaignLesson>();
+		const FString TempOut = FPaths::ProjectSavedDir() / TEXT("PuzzleCLI_lesson.txt");
+		FString AllOut;
+		for (int32 i = 0; i < LessonEnum->NumEnums() - 1; i++)
+		{
+			const ECampaignLesson ThisLesson = (ECampaignLesson)LessonEnum->GetValueByIndex(i);
+			if (ThisLesson == ECampaignLesson::Given)
+				continue;	// Not a playable lesson
+
+			const FString Name = LessonEnum->GetNameStringByIndex(i);
+			if (!UPuzzle::IsLessonAvailable(ThisLesson, Size))
+			{
+				AllOut += FString::Printf(TEXT("%-15s not available at size %d\n"), *Name, Size);
+				continue;
+			}
+			FString SubParams = Params.Replace(TEXT("-lesson=all"), *(TEXT("-lesson=") + Name));
+			SubParams = SubParams.Replace(*(TEXT("-out=") + OutPath), TEXT("")) + TEXT(" -out=") + TempOut;
+			Main(SubParams);
+
+			FString Result;
+			FFileHelper::LoadFileToString(Result, *TempOut);
+			FString Summary, Campaign;
+			TArray<FString> Lines;
+			Result.ParseIntoArrayLines(Lines);
+			for (const FString& Line : Lines)
+			{
+				if (Line.StartsWith(TEXT("SUMMARY")))
+					Summary = Line;
+				else if (Line.StartsWith(TEXT("CAMPAIGN")))
+					Campaign = Line;
+			}
+			AllOut += FString::Printf(TEXT("%-15s %s | %s\n"), *Name, *Summary.Replace(TEXT("SUMMARY "), TEXT("")), *Campaign.Replace(TEXT("CAMPAIGN "), TEXT("")));
+		}
+		FFileHelper::SaveStringToFile(AllOut, *OutPath);
+		return 0;
+	}
+	else if (!LessonName.IsEmpty())
+	{
+		LessonValue = StaticEnum<ECampaignLesson>()->GetValueByNameString(LessonName);
+		if (LessonValue == INDEX_NONE)
+		{
+			FFileHelper::SaveStringToFile(FString::Printf(TEXT("Unknown lesson '%s'\n"), *LessonName), *OutPath);
+			return 1;
+		}
+	}
+	const bool bCampaign = LessonValue != INDEX_NONE;
+	const ECampaignLesson Lesson = bCampaign ? (ECampaignLesson)LessonValue : ECampaignLesson::Given;
+	int32 CampaignFails = 0;
+
+	if (bCampaign && !UPuzzle::IsLessonAvailable(Lesson, Size))
+	{
+		FFileHelper::SaveStringToFile(FString::Printf(TEXT("Lesson %s is not available at size %d\n"), *LessonName, Size), *OutPath);
+		return 0;
+	}
+
 	// The puzzle core logs every generated clue to LogTemp; keep only errors
 	LogTemp.SetVerbosity(ELogVerbosity::Error);
 
@@ -269,10 +330,30 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 		UPuzzle& P = *Puzzle;
 
 		double T0 = FPlatformTime::Seconds();
-		P.Init(Seed, Size, Diff);
+		if (bCampaign)
+		{
+			if (!P.InitCampaign(Seed, Size, Diff, Lesson))
+				CampaignFails++;
+		}
+		else
+		{
+			P.Init(Seed, Size, Diff);
+		}
 		double GenMs = (FPlatformTime::Seconds() - T0) * 1000.0;
 		GenTime += GenMs;
 		const int32 GenErrors = Errors.Count;
+
+		if (bCampaign)
+		{
+			// No clue may come from a later lesson, and the puzzle must need the lesson's clues
+			for (UClue* C : P.m_Clues)
+			{
+				if (C->GetCampaignLesson() > Lesson)
+					UE_LOG(LogTemp, Error, TEXT("Clue above lesson: %s"), *C->ToString());
+			}
+			if (!P.RequiresLesson(Lesson))
+				UE_LOG(LogTemp, Error, TEXT("Puzzle does not require lesson"));
+		}
 
 		FSolveResult A = AnalyzeSolve(P);
 
@@ -356,6 +437,9 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 	Out += FString::Printf(TEXT(" (NotHere clues=%d)\n"), NotHereClues);
 
 	// How many puzzles got each number of givens
+	if (bCampaign)
+		Out += FString::Printf(TEXT("CAMPAIGN lesson=%s failedToRequireLesson=%d\n"), *LessonName, CampaignFails);
+
 	Out += TEXT("GIVENS count:puzzles");
 	for (int32 i = 0; i < 16; i++)
 	{

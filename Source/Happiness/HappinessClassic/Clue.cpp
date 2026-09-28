@@ -8,7 +8,28 @@
 
 void UClue::Init(UPuzzle& P, FRandomStream& Rand)
 {
-	GenerateClue(P, Rand);
+	if (!P.m_bCampaign)
+	{
+		GenerateClue(P, Rand);
+		return;
+	}
+
+	// Campaign: only clue types from the current lesson or earlier. Half the time insist on the current
+	// lesson itself so it shows up plenty; if that type can't be generated here, fall back to any allowed type.
+	const bool bWantLesson = Rand.FRand() < 0.5f;
+	for (int iTries = 0; iTries < 2000; iTries++)
+	{
+		GenerateClue(P, Rand);
+
+		const ECampaignLesson Lesson = GetCampaignLesson();
+		if (Lesson == P.m_CampaignLesson || (Lesson < P.m_CampaignLesson && (!bWantLesson || iTries >= 1000)))
+			return;
+	}
+
+	// Nothing allowed could be generated; a NotHere is always within any lesson
+	m_Type = eClueType::NotHere;
+	GenerateNotHere(P, Rand);
+	GenerateClueHelp(P);
 }
 
 void UClue::GenerateClue(UPuzzle& P, FRandomStream& Rand)
@@ -4033,8 +4054,12 @@ bool UClue::GenerateHorizontalExtended(UPuzzle& P, FRandomStream& Rand)
 	if (iSize < 3 && m_HorizontalType != eHorizontalType::Edge && m_HorizontalType != eHorizontalType::DirectlyLeftOf)
 		return false;
 
-	// On a 3 wide board Between and Chain can only use columns 0, 1 and 2, so they are just a Span
-	if (iSize < 4 && (m_HorizontalType == eHorizontalType::Between || m_HorizontalType == eHorizontalType::Chain))
+	// On a 3 wide board Between and Chain can only use columns 0, 1 and 2, so they are just a Span,
+	// NotEdge can only mean "the middle column", and Edge is too strong. The campaign lesson that
+	// teaches one of them still uses it on 3x3.
+	const bool bTeachingThis = P.m_bCampaign && GetCampaignLesson() == P.m_CampaignLesson;
+	if (iSize < 4 && !bTeachingThis && (m_HorizontalType == eHorizontalType::Between || m_HorizontalType == eHorizontalType::Chain ||
+		m_HorizontalType == eHorizontalType::Edge || m_HorizontalType == eHorizontalType::NotEdge))
 		return false;
 
 	auto Sol = [&P, iSize](int Row, int Col) { return P.m_Solution[(Row * iSize) + Col]; };
@@ -4333,4 +4358,98 @@ FString UClue::ExtendedToString() const
 	}
 
 	return ClueString;
+}
+
+void UClue::GetPositiveParts(UPuzzle& P, TArray<UClue*>& Out)
+{
+	auto Make = [&P](eClueType Type)
+	{
+		UClue* C = NewObject<UClue>(&P);
+		C->m_Type = Type;
+		C->m_iRow2 = C->m_iRow3 = -1;
+		C->m_iCol2 = C->m_iCol3 = -1;
+		C->m_iHorizontal1 = C->m_iNotCell = -1;
+		return C;
+	};
+
+	auto MakeTwo = [&](int Row, int Row2)
+	{
+		UClue* C = Make(eClueType::Vertical);
+		C->m_VerticalType = eVerticalType::Two;
+		C->m_iCol = m_iCol;
+		C->m_iRow = Row;
+		C->m_iRow2 = Row2;
+		Out.Add(C);
+	};
+
+	auto MakeNextTo = [&](int Row, int Col, int Row2, int Col2)
+	{
+		UClue* C = Make(eClueType::Horizontal);
+		C->m_HorizontalType = eHorizontalType::NextTo;
+		C->m_iRow = Row;
+		C->m_iCol = Col;
+		C->m_iRow2 = Row2;
+		C->m_iCol2 = Col2;
+		C->m_iRow3 = Row;
+		Out.Add(C);
+	};
+
+	// The middle of a span can't be in an end column; that comes from the span's shape, not its "not"
+	auto MakeNotEdge = [&](int Row, int Col)
+	{
+		UClue* C = Make(eClueType::Horizontal);
+		C->m_HorizontalType = eHorizontalType::NotEdge;
+		C->m_iRow = Row;
+		C->m_iCol = Col;
+		Out.Add(C);
+	};
+
+	if (m_Type == eClueType::Vertical)
+	{
+		switch (m_VerticalType)
+		{
+			case eVerticalType::TwoNot:			return;
+			case eVerticalType::ThreeTopNot:	MakeTwo(m_iRow2, m_iRow3); return;
+			case eVerticalType::ThreeMidNot:	MakeTwo(m_iRow, m_iRow3); return;
+			case eVerticalType::ThreeBotNot:	MakeTwo(m_iRow, m_iRow2); return;
+			default: break;
+		}
+	}
+	else if (m_Type == eClueType::Horizontal)
+	{
+		switch (m_HorizontalType)
+		{
+			case eHorizontalType::NotNextTo:
+			case eHorizontalType::NotLeftOf:
+			case eHorizontalType::NotEdge:
+				return;
+
+			case eHorizontalType::SpanNotLeft:
+				MakeNextTo(m_iRow2, m_iCol2, m_iRow3, m_iCol3);
+				MakeNotEdge(m_iRow2, m_iCol2);
+				return;
+
+			case eHorizontalType::SpanNotRight:
+				MakeNextTo(m_iRow, m_iCol, m_iRow2, m_iCol2);
+				MakeNotEdge(m_iRow2, m_iCol2);
+				return;
+
+			case eHorizontalType::SpanNotMid:
+			{
+				UClue* C = Make(eClueType::Horizontal);
+				C->m_HorizontalType = eHorizontalType::Gap;
+				C->m_iRow = m_iRow;
+				C->m_iCol = m_iCol;
+				C->m_iRow2 = m_iRow3;
+				C->m_iCol2 = m_iCol3;
+				Out.Add(C);
+				return;
+			}
+
+			default: break;
+		}
+	}
+
+	// No "not" component: the clue itself
+	Out.Add(this);
 }

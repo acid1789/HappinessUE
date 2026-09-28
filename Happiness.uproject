@@ -40,6 +40,10 @@
 		{
 			"Name": "HappinessMCPInput",
 			"Enabled": true
+		},
+		{
+			"Name": "HappinessMCPLookup",
+			"Enabled": true
 		}
 	]
 }

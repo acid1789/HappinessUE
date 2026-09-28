@@ -47,6 +47,13 @@ public:
 	UPROPERTY(BlueprintReadWrite)
 	bool AutoSetIcons = true;
 
+	// Set by InitCampaign: clue generation is limited to lessons up to m_CampaignLesson
+	UPROPERTY(BlueprintReadOnly)
+	bool m_bCampaign = false;
+
+	UPROPERTY(BlueprintReadOnly)
+	ECampaignLesson m_CampaignLesson = ECampaignLesson::Given;
+
 	FRandomStream m_Rand;
 
 public:
@@ -54,6 +61,20 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void Init(int Seed, int Size, int Difficulty);
+
+	// Campaign puzzle: only clue types from Lesson and earlier lessons, and it can't be solved without Lesson's clues.
+	// Difficulty sets the givens and extra clues as usual. Returns false if no such puzzle was found (e.g. Between on 3x3).
+	UFUNCTION(BlueprintCallable)
+	bool InitCampaign(int Seed, int Size, int Difficulty, ECampaignLesson Lesson);
+
+	// False for lessons that can't be played at this size (Given is never playable)
+	UFUNCTION(BlueprintCallable, BlueprintPure)
+	static bool IsLessonAvailable(ECampaignLesson Lesson, int Size);
+
+	// True if the puzzle can't be solved once every clue of Lesson is removed. Clues with a "not" component
+	// are reduced to their positive part instead, so the "not" itself must be needed.
+	UFUNCTION(BlueprintCallable)
+	bool RequiresLesson(ECampaignLesson Lesson);
 
 	UFUNCTION(BlueprintCallable, BlueprintPure)
 	int GetNumGivenClues();
@@ -111,6 +132,9 @@ public:
 
 private:
 
+	// Build a fresh solution and clue set from m_Rand (shared by Init and InitCampaign)
+	void Generate();
+
 	void GenerateSolution();
 	void GenerateClues();
 
@@ -120,6 +144,12 @@ private:
 	void AnalyzeAllClues();
 
 	void OptimizeClues();
+
+	// Sort clues easiest campaign lesson first
+	static void SortCluesByLesson(TArray<UClue*>& Clues);
+
+	// Reset the board and solve using only SortedClues, trying easier clues first each pass
+	bool IsSolvableWith(const TArray<UClue*>& SortedClues);
 	void BuildClueLists();
 	void ScrambleClues();
 

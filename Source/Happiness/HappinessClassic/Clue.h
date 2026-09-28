@@ -133,6 +133,10 @@ public:
 	// Row and icon for each display slot of a constraint clue; unused slots are -1
 	void GetSlots(const UPuzzle& P, int Rows[3], int Icons[3]) const;
 
+	// Campaign: add clues equivalent to this clue with its "not" component removed (e.g. SpanNotMid -> Gap,
+	// ThreeTopNot -> Two). Adds nothing for purely negative clues, and a copy of this clue if it has no "not".
+	void GetPositiveParts(UPuzzle& P, TArray<UClue*>& Out);
+
 	// True if Other is the same clue (used for duplicate rejection of NotHere and constraint clues)
 	bool IsSameClue(const UClue& Other) const;
 

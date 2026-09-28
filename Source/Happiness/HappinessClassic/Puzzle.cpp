@@ -10,14 +10,86 @@ void UPuzzle::Init(int Seed, int Size, int Difficulty)
 	m_iSeed = Seed;
 	m_iSize = Size;
 	m_iDifficulty = Difficulty;
+	m_bCampaign = false;
 
 	m_Rand.Initialize(Seed);
 
-	m_Rows.Empty();
-	m_Rows.Reserve(Size);
-	for (int i = 0; i < Size; i++)
+	Generate();
+}
+
+bool UPuzzle::InitCampaign(int Seed, int Size, int Difficulty, ECampaignLesson Lesson)
+{
+	if (!IsLessonAvailable(Lesson, Size))
 	{
-		m_Rows.Emplace(Size);
+		UE_LOG(LogTemp, Warning, TEXT("InitCampaign: lesson %s is not available on size %d"),
+			*StaticEnum<ECampaignLesson>()->GetNameStringByValue((int64)Lesson), Size);
+		return false;
+	}
+
+	m_iSeed = Seed;
+	m_iSize = Size;
+	m_iDifficulty = Difficulty;
+	m_bCampaign = true;
+	m_CampaignLesson = Lesson;
+
+	m_Rand.Initialize(Seed);
+
+	// Keep generating from the same random stream until the lesson's clues are needed to solve the puzzle
+	for (int Attempt = 0; Attempt < 50; Attempt++)
+	{
+		Generate();
+
+		if (RequiresLesson(Lesson))
+			return true;
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("InitCampaign: no puzzle requiring lesson %s (seed %d, size %d)"),
+		*StaticEnum<ECampaignLesson>()->GetNameStringByValue((int64)Lesson), Seed, Size);
+	return false;
+}
+
+bool UPuzzle::IsLessonAvailable(ECampaignLesson Lesson, int Size)
+{
+	// Given only ranks givens and NotHere (allowed in every lesson); its puzzles would start solved.
+	// Edge, Between and Chain are kept out of other 3x3 puzzles but still used by their own lesson.
+	return Lesson != ECampaignLesson::Given && Size >= 3;
+}
+
+bool UPuzzle::RequiresLesson(ECampaignLesson Lesson)
+{
+	// Remove the lesson's clues. Clues with a "not" component keep their positive part instead
+	// (SpanNotMid -> Gap, ThreeTopNot -> Two, ...), so the puzzle only counts if the "not" itself is needed.
+	TArray<UClue*> Without;
+	for (UClue* C : m_Clues)
+	{
+		if (C->GetCampaignLesson() != Lesson)
+		{
+			Without.Add(C);
+			continue;
+		}
+
+		TArray<UClue*> Parts;
+		C->GetPositiveParts(*this, Parts);
+		if (!Parts.Contains(C))
+			Without.Append(Parts);
+	}
+
+	SortCluesByLesson(Without);
+	const bool bSolvableWithout = IsSolvableWith(Without);
+
+	// IsSolvableWith leaves the board part solved
+	Reset();
+
+	return !bSolvableWithout;
+}
+
+void UPuzzle::Generate()
+{
+	m_Rows.Empty();
+	m_Rows.Reserve(m_iSize);
+	for (int i = 0; i < m_iSize; i++)
+	{
+		m_Rows.Emplace(m_iSize);
 	}
 
 	GenerateSolution();
@@ -117,6 +189,7 @@ void UPuzzle::GenerateClues()
 	{
 		UClue* C = NewObject<UClue>(this);
 		UE_LOG(LogTemp, Log, TEXT("Initializing Clue"));
+
 		C->Init(*this, m_Rand);
 
 		UE_LOG(LogTemp, Log, TEXT("Validating Clue: %s"), *C->ToString());
@@ -576,112 +649,98 @@ void UPuzzle::ApplyAllGiven()
 	}
 }
 
+void UPuzzle::SortCluesByLesson(TArray<UClue*>& Clues)
+{
+	// Easiest campaign lesson first; stable so clues of the same type keep their random generation order
+	Clues.StableSort([](const UClue& A, const UClue& B) { return A.GetCampaignLesson() < B.GetCampaignLesson(); });
+}
+
+bool UPuzzle::IsSolvableWith(const TArray<UClue*>& SortedClues)
+{
+	for (FPuzzleRow& Row : m_Rows)
+		Row.Reset();
+
+	for (UClue* C : SortedClues)
+		C->m_iUseCount = 0;
+
+	// Givens and NotHeres are applied up front, the same as Reset()
+	for (UClue* C : SortedClues)
+	{
+		if (C->m_Type == eClueType::Given || C->m_Type == eClueType::NotHere)
+			C->Analyze(*this);
+	}
+
+	// Each pass tries the clues easiest first; any deduction bumps a clue's use count, so no change means stuck
+	while (!IsSolved())
+	{
+		int UseBefore = 0;
+		for (UClue* C : SortedClues)
+			UseBefore += C->m_iUseCount;
+
+		for (UClue* C : SortedClues)
+		{
+			if (C->m_Type == eClueType::Vertical || C->m_Type == eClueType::Horizontal)
+				C->Analyze(*this);
+		}
+
+		int UseAfter = 0;
+		for (UClue* C : SortedClues)
+			UseAfter += C->m_iUseCount;
+
+		if (UseAfter == UseBefore)
+			return false;
+	}
+
+	return true;
+}
+
 void UPuzzle::OptimizeClues()
 {
-	// Build the separate clue lists
+	TArray<UClue*> Clues = m_Clues;
+	SortCluesByLesson(Clues);
+
+	if (!IsSolvableWith(Clues))
+	{
+		UE_LOG(LogTemp, Error, TEXT("Unsolvable in the optimize stage?"));
+		BuildClueLists();
+		DebugError();
+		return;
+	}
+
+	// Throw away the hardest clues first: drop each non-given clue unless the puzzle can't be solved without it.
+	// Easier clue types are tried first when solving, so harder ones are the likeliest to be redundant.
+	// In campaign mode the lesson being taught goes last (second pass), so its clues are the ones that stay needed.
+	for (int Pass = 0; Pass < 2; Pass++)
+	{
+		for (int i = Clues.Num() - 1; i >= 0; i--)
+		{
+			UClue* C = Clues[i];
+			if (C->m_Type == eClueType::Given)
+				continue;
+
+			const bool bLessonClue = m_bCampaign && C->GetCampaignLesson() == m_CampaignLesson;
+			if (bLessonClue != (Pass == 1))
+				continue;
+
+			Clues.RemoveAt(i);
+			if (!IsSolvableWith(Clues))
+				Clues.Insert(C, i);
+		}
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("UClue Count after optimization: %d"), Clues.Num());
+
+	m_Clues = Clues;
 	BuildClueLists();
-
-	// Reset the UPuzzle & apply all the givens
-	Reset();
-
-	// Solve again with the new clue order
-	int iPass = 0;
-
-	while (!IsSolved())
-	{
-		for (int i = 0; i < m_VeritcalClues.Num(); i++)
-		{
-			UClue& C = *m_VeritcalClues[i];
-			C.Analyze(*this);
-		}
-
-		for (int i = 0; i < m_HorizontalClues.Num(); i++)
-		{
-			UClue& C = *m_HorizontalClues[i];
-			C.Analyze(*this);
-		}
-
-		iPass++;
-
-		if (iPass > 100)
-		{
-			UE_LOG(LogTemp, Error, TEXT("Unsolvable in the optimize stage?"));
-			DumpPuzzle();
-			DebugError();
-			return;
-		}
-	}
-
-	UE_LOG(LogTemp, Log, TEXT("Passes: %d"), iPass++);
-
-	// Sort the list based on most used
-	m_Clues.Sort();
-
-	// Remove any zero use count clues
-	for (int i = m_Clues.Num() - 1; i > 0; i--)
-	{
-		UClue& C = *m_Clues[i];
-
-		if (C.m_iUseCount > 0)
-			break;
-
-		m_Clues.RemoveAt(i);
-	}
-
-	// Resolve sorted
-	UE_LOG(LogTemp, Log, TEXT("UClue Count Before 2nd stage optimization: %d"), m_Clues.Num());
-
-	BuildClueLists();
-	Reset();
-
-	iPass = 0;
-
-	while (!IsSolved())
-	{
-		for (int i = 0; i < m_VeritcalClues.Num(); i++)
-		{
-			UClue& C = *m_VeritcalClues[i];
-			C.Analyze(*this);
-		}
-
-		for (int i = 0; i < m_HorizontalClues.Num(); i++)
-		{
-			UClue& C = *m_HorizontalClues[i];
-			C.Analyze(*this);
-		}
-
-		iPass++;
-
-		if (iPass > 100)
-		{
-			UE_LOG(LogTemp, Error, TEXT("Unsolvable in the optimize stage?"));
-			DumpPuzzle();
-			DebugError();
-			return;
-		}
-	}
-
-	UE_LOG(LogTemp, Log, TEXT("Passes: %d"), iPass);
-
-	// Sort the list based on most used
-	m_Clues.Sort();
-
-	// Remove any zero use count clues
-	for (int i = m_Clues.Num() - 1; i > 0; i--)
-	{
-		UClue& C = *m_Clues[i];
-
-		if (C.m_iUseCount > 0)
-			break;
-
-		m_Clues.RemoveAt(i);
-	}
 
 	// Easy gets some extra clues; normal and hard use exactly the clues needed (they differ only in givens)
 	Reset();
 
 	int iUsableClueCount = m_HorizontalClues.Num() + m_VeritcalClues.Num();
-	if (m_iDifficulty == 0)
+
+	// Skip if the givens alone already solve the board: the clue generators search for an
+	// unsolved cell and would never find one
+	if (m_iDifficulty == 0 && !IsSolved())
 	{
 		// Add some clues		
 		int iCluesToAdd = FMath::Max((int)(iUsableClueCount * 0.1f), 1);
