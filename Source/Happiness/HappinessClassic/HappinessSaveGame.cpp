@@ -4,14 +4,18 @@
 
 void UHappinessSaveGame::Serialize(FArchive& Ar)
 {
-	// Writing a save game: take the current campaign progress. Not for the class default object (saved with the
+	// Writing a save game: take the current campaign progress and free play settings. Not for the class default object (saved with the
 	// Blueprint asset) or for reference collection and the like.
 	if (Ar.IsSaving() && !Ar.IsObjectReferenceCollector() && !Ar.IsCountingMemory() && !Ar.IsTransacting() &&
 		!HasAnyFlags(RF_ClassDefaultObject | RF_ArchetypeObject))
 	{
-		if (const UCampaignSubsystem* Subsystem = UCampaignSubsystem::GetInstance())
+		if (const UCampaignSubsystem* CampaignSubsystem = UCampaignSubsystem::GetInstance())
 		{
-			Campaign = Subsystem->GetSaveData();
+			Campaign = CampaignSubsystem->GetSaveData();
+		}
+		if (const UFreePlaySubsystem* FreePlaySubsystem = UFreePlaySubsystem::GetInstance())
+		{
+			FreePlay = FreePlaySubsystem->GetSaveData();
 		}
 	}
 
@@ -25,6 +29,15 @@ UHappinessSaveGame* UHappinessSaveGame::LoadFromSlot()
 		return nullptr;
 	}
 	return Cast<UHappinessSaveGame>(UGameplayStatics::LoadGameFromSlot(SaveSlotName, SaveUserIndex));
+}
+
+void UHappinessSaveGame::SaveCurrentSettings()
+{
+	// Serialize fills in the current settings as the save is written
+	if (UHappinessSaveGame* SaveGame = LoadFromSlot())
+	{
+		UGameplayStatics::SaveGameToSlot(SaveGame, SaveSlotName, SaveUserIndex);
+	}
 }
 
 bool UHappinessSaveGame::HasActivePuzzle()

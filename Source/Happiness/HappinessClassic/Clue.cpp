@@ -11,7 +11,18 @@ void UClue::Init(UPuzzle& P, FRandomStream& Rand)
 {
 	if (!P.m_bCampaign)
 	{
-		GenerateClue(P, Rand);
+		// Free play: skip any clue types the player turned off
+		for (int iTries = 0; iTries < 2000; iTries++)
+		{
+			GenerateClue(P, Rand);
+			if (!P.IsClueExcluded(GetCampaignLesson()))
+				return;
+		}
+
+		// Nothing allowed could be generated; a NotHere is never excluded
+		m_Type = eClueType::NotHere;
+		GenerateNotHere(P, Rand);
+		GenerateClueHelp(P);
 		return;
 	}
 

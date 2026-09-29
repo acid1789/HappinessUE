@@ -53,6 +53,16 @@ public:
 	UPROPERTY(BlueprintReadOnly)
 	ECampaignLesson m_CampaignLesson = ECampaignLesson::Given;
 
+	// Free play: clue types (bit 1 << ECampaignLesson) that Init won't generate. Set before Init; Given (givens and
+	// NotHeres) can't be excluded, so every puzzle can still be solved. Ignored by InitCampaign.
+	UPROPERTY(BlueprintReadWrite)
+	int32 m_ExcludedClues = 0;
+
+	bool IsClueExcluded(ECampaignLesson Lesson) const
+	{
+		return Lesson != ECampaignLesson::Given && (m_ExcludedClues & (1 << int32(Lesson))) != 0;
+	}
+
 	// Hints handed out by GenerateHint since Init/InitCampaign or the last Reset, and how many of those came from the
 	// campaign lesson's clue type
 	UPROPERTY(BlueprintReadOnly)

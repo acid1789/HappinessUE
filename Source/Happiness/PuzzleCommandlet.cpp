@@ -309,6 +309,29 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 	const ECampaignLesson Lesson = bCampaign ? (ECampaignLesson)LessonValue : ECampaignLesson::Given;
 	int32 CampaignFails = 0;
 
+	// Free play clue selection (without -lesson): -only=A,B keeps just those clue types, -exclude=A,B drops them
+	int32 ExcludedClues = 0;
+	FString OnlyList, ExcludeList;
+	const bool bOnly = FParse::Value(Cmd, TEXT("only="), OnlyList, false);
+	if (bOnly || FParse::Value(Cmd, TEXT("exclude="), ExcludeList, false))
+	{
+		TArray<FString> Names;
+		(bOnly ? OnlyList : ExcludeList).ParseIntoArray(Names, TEXT(","));
+		int32 Listed = 0;
+		for (const FString& Name : Names)
+		{
+			const int64 Value = StaticEnum<ECampaignLesson>()->GetValueByNameString(Name.TrimStartAndEnd());
+			if (Value == INDEX_NONE)
+			{
+				FFileHelper::SaveStringToFile(FString::Printf(TEXT("Unknown clue type '%s'\n"), *Name), *OutPath);
+				return 1;
+			}
+			Listed |= 1 << int32(Value);
+		}
+		ExcludedClues = bOnly ? ~Listed : Listed;
+		ExcludedClues &= ~(1 << int32(ECampaignLesson::Given));
+	}
+
 	if (bCampaign && !UPuzzle::IsLessonAvailable(Lesson, Size))
 	{
 		FFileHelper::SaveStringToFile(FString::Printf(TEXT("Lesson %s is not available at size %d\n"), *LessonName, Size), *OutPath);
@@ -347,6 +370,7 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 		}
 		else
 		{
+			P.m_ExcludedClues = ExcludedClues;
 			P.Init(Seed, Size, Diff);
 		}
 		double GenMs = (FPlatformTime::Seconds() - T0) * 1000.0;
@@ -363,6 +387,15 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 			}
 			if (!P.RequiresLesson(Lesson))
 				UE_LOG(LogTemp, Error, TEXT("Puzzle does not require lesson"));
+		}
+		else if (ExcludedClues != 0)
+		{
+			// No excluded clue type may appear
+			for (UClue* C : P.m_Clues)
+			{
+				if (P.IsClueExcluded(C->GetCampaignLesson()))
+					UE_LOG(LogTemp, Error, TEXT("Excluded clue type: %s"), *C->ToString());
+			}
 		}
 
 		FSolveResult A = AnalyzeSolve(P);

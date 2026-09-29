@@ -2,6 +2,7 @@
 #include "CampaignTree.h"
 #include "Puzzle.h"
 #include "HappinessSaveGame.h"
+#include "FreePlaySettings.h"
 
 #include "Kismet/GameplayStatics.h"
 
@@ -320,6 +321,11 @@ void UCampaignSubsystem::InitPuzzleForPlay(const UObject* WorldContextObject, UP
 		Campaign->EndLessonSession();
 	}
 
+	// Free play: only the clue types the player chose
+	if (const UFreePlaySubsystem* FreePlay = UFreePlaySubsystem::Get(WorldContextObject))
+	{
+		Puzzle->m_ExcludedClues = FreePlay->GetExcludedClueMask();
+	}
 	Puzzle->Init(Number, Size, Difficulty);
 }
 
@@ -364,13 +370,7 @@ FLessonProgress& UCampaignSubsystem::GetMutableProgress(ECampaignLesson Lesson)
 
 void UCampaignSubsystem::Save()
 {
-	// Rewrite the game save with the new progress. The rest of the save (the classic puzzle, experience, icons)
-	// is kept as it is on disk. With no game save yet, progress goes to disk with the game's first save.
-	if (UHappinessSaveGame* SaveGame = UHappinessSaveGame::LoadFromSlot())
-	{
-		SaveGame->Campaign = Data;
-		UGameplayStatics::SaveGameToSlot(SaveGame, UHappinessSaveGame::SaveSlotName, UHappinessSaveGame::SaveUserIndex);
-	}
+	UHappinessSaveGame::SaveCurrentSettings();
 }
 
 #undef LOCTEXT_NAMESPACE

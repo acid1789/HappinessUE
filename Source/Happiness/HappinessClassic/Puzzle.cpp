@@ -35,6 +35,7 @@ bool UPuzzle::InitCampaign(int Seed, int Size, int Difficulty, ECampaignLesson L
 	m_bCampaign = true;
 	m_HintsUsed = m_LessonHintsUsed = 0;
 	m_CampaignLesson = Lesson;
+	m_ExcludedClues = 0;
 
 	m_Rand.Initialize(Seed);
 
