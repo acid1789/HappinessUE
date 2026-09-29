@@ -7,12 +7,18 @@
 #include "Hint.h"
 #include "Puzzle.generated.h"
 
+class UPuzzle;
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnPuzzleHintUsed, UPuzzle*);
+
 UCLASS(BlueprintType)
 class HAPPINESS_API UPuzzle : public UObject
 {
 	GENERATED_BODY()
 
 public:
+	// Fired by GenerateHint whenever it hands out a hint (the campaign saves hint counts for resume)
+	static FOnPuzzleHintUsed OnHintUsed;
+
 
 	UPROPERTY(BlueprintReadOnly)
 	int32 m_iSeed;
@@ -54,6 +60,13 @@ public:
 	UPROPERTY(BlueprintReadOnly)
 	ECampaignLesson m_CampaignLesson = ECampaignLesson::Given;
 
+	// Hints handed out by GenerateHint since Init/InitCampaign, and how many of those came from the campaign lesson's clue type
+	UPROPERTY(BlueprintReadOnly)
+	int32 m_HintsUsed = 0;
+
+	UPROPERTY(BlueprintReadOnly)
+	int32 m_LessonHintsUsed = 0;
+
 	FRandomStream m_Rand;
 
 public:
@@ -70,6 +83,10 @@ public:
 	// False for lessons that can't be played at this size (Given is never playable)
 	UFUNCTION(BlueprintCallable, BlueprintPure)
 	static bool IsLessonAvailable(ECampaignLesson Lesson, int Size);
+
+	// Campaign score for this puzzle: 3 with no hints, 2 if hints were used but none from the lesson clue, 1 otherwise
+	UFUNCTION(BlueprintCallable, BlueprintPure)
+	int32 GetCampaignScore() const;
 
 	// True if the puzzle can't be solved once every clue of Lesson is removed. Clues with a "not" component
 	// are reduced to their positive part instead, so the "not" itself must be needed.

@@ -17,7 +17,11 @@ public class HappinessMCPLookup : ModuleRules
 		PrivateDependencyModuleNames.AddRange(new string[]
 		{
 			"Json",
-			"UnrealEd"
+			"UnrealEd",
+			"UMG",
+			"Slate",
+			"SlateCore",
+			"RenderCore"
 		});
 	}
 }

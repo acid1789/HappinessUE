@@ -1,7 +1,10 @@
 #include "Puzzle.h"
+#include "CampaignTree.h"
 #include "Clue.h"
 #include "PuzzleRow.h"
 #include "Hint.h"
+
+FOnPuzzleHintUsed UPuzzle::OnHintUsed;
 
 #pragma optimize("", off)
 
@@ -11,6 +14,7 @@ void UPuzzle::Init(int Seed, int Size, int Difficulty)
 	m_iSize = Size;
 	m_iDifficulty = Difficulty;
 	m_bCampaign = false;
+	m_HintsUsed = m_LessonHintsUsed = 0;
 
 	m_Rand.Initialize(Seed);
 
@@ -30,6 +34,7 @@ bool UPuzzle::InitCampaign(int Seed, int Size, int Difficulty, ECampaignLesson L
 	m_iSize = Size;
 	m_iDifficulty = Difficulty;
 	m_bCampaign = true;
+	m_HintsUsed = m_LessonHintsUsed = 0;
 	m_CampaignLesson = Lesson;
 
 	m_Rand.Initialize(Seed);
@@ -50,9 +55,9 @@ bool UPuzzle::InitCampaign(int Seed, int Size, int Difficulty, ECampaignLesson L
 
 bool UPuzzle::IsLessonAvailable(ECampaignLesson Lesson, int Size)
 {
-	// Given only ranks givens and NotHere (allowed in every lesson); its puzzles would start solved.
+	// Only lessons in the campaign tree are playable (Given just ranks givens and NotHere).
 	// Edge, Between and Chain are kept out of other 3x3 puzzles but still used by their own lesson.
-	return Lesson != ECampaignLesson::Given && Size >= 3;
+	return UCampaignTree::GetLessonColumn(Lesson) != INDEX_NONE && Size >= 3;
 }
 
 bool UPuzzle::RequiresLesson(ECampaignLesson Lesson)
@@ -268,6 +273,10 @@ bool UPuzzle::IsDuplicateClue(UClue& testClue)
 					switch (C.m_HorizontalType)
 					{
 					case eHorizontalType::NextTo:
+						// Order doesn't matter for NextTo: A next to B is B next to A
+						if (C.m_iRow == testClue.m_iRow2 && C.m_iCol == testClue.m_iCol2 && C.m_iRow2 == testClue.m_iRow && C.m_iCol2 == testClue.m_iCol)
+							return true;
+						// fall through to the same-order check
 					case eHorizontalType::LeftOf:
 					case eHorizontalType::NotLeftOf:
 						if (C.m_iRow == testClue.m_iRow && C.m_iCol == testClue.m_iCol && C.m_iRow2 == testClue.m_iRow2 && C.m_iCol2 == testClue.m_iCol2)
@@ -279,6 +288,9 @@ bool UPuzzle::IsDuplicateClue(UClue& testClue)
 						break;
 					case eHorizontalType::Span:
 						if (C.m_iRow == testClue.m_iRow && C.m_iCol == testClue.m_iCol && C.m_iRow2 == testClue.m_iRow2 && C.m_iCol2 == testClue.m_iCol2 && C.m_iRow3 == testClue.m_iRow3 && C.m_iCol3 == testClue.m_iCol3)
+							return true;
+						// The outer two can be either way round
+						if (C.m_iRow == testClue.m_iRow3 && C.m_iCol == testClue.m_iCol3 && C.m_iRow2 == testClue.m_iRow2 && C.m_iCol2 == testClue.m_iCol2 && C.m_iRow3 == testClue.m_iRow && C.m_iCol3 == testClue.m_iCol)
 							return true;
 						break;
 					case eHorizontalType::SpanNotLeft:
@@ -366,6 +378,57 @@ bool UPuzzle::ValidateClue(UClue& C)
 						break;
 					}
 				}
+			}
+		}
+
+		// Two Three clues on the same rows look like the same clue (on a 3x3 every Three spans all rows)
+		if (C.m_VerticalType == eVerticalType::Three)
+		{
+			for (const UClue* cTest : m_Clues)
+			{
+				if (cTest->m_Type == eClueType::Vertical && cTest->m_VerticalType == eVerticalType::Three &&
+					cTest->m_iRow == C.m_iRow && cTest->m_iRow2 == C.m_iRow2 && cTest->m_iRow3 == C.m_iRow3)
+				{
+					return false;
+				}
+			}
+		}
+
+		// In one column, a clue whose "same column" rows sit inside (or contain) another's says nothing new
+		// and looks like a piece of it, e.g. a Two inside a Three
+		auto PositiveRows = [](const UClue& Clue) -> TArray<int>
+		{
+			switch (Clue.m_VerticalType)
+			{
+				case eVerticalType::Two:			return { Clue.m_iRow, Clue.m_iRow2 };
+				case eVerticalType::Three:			return { Clue.m_iRow, Clue.m_iRow2, Clue.m_iRow3 };
+				case eVerticalType::ThreeTopNot:	return { Clue.m_iRow2, Clue.m_iRow3 };
+				case eVerticalType::ThreeMidNot:	return { Clue.m_iRow, Clue.m_iRow3 };
+				case eVerticalType::ThreeBotNot:	return { Clue.m_iRow, Clue.m_iRow2 };
+				default:							return {};
+			}
+		};
+		auto IsSubset = [](const TArray<int>& Small, const TArray<int>& Large)
+		{
+			for (int Row : Small)
+			{
+				if (!Large.Contains(Row))
+					return false;
+			}
+			return true;
+		};
+
+		const TArray<int> NewRows = PositiveRows(C);
+		if (NewRows.Num() > 0)
+		{
+			for (const UClue* cTest : m_Clues)
+			{
+				if (cTest->m_Type != eClueType::Vertical || cTest->m_iCol != C.m_iCol)
+					continue;
+
+				const TArray<int> TestRows = PositiveRows(*cTest);
+				if (TestRows.Num() > 0 && (IsSubset(NewRows, TestRows) || IsSubset(TestRows, NewRows)))
+					return false;
 			}
 		}
 	}
@@ -590,6 +653,13 @@ UHint* UPuzzle::GenerateHint(const TArray<UClue*>& VisibleClues)
 				if (Hint->Init(*this, *VisibleClues[i]))
 				{
 					hRet = Hint;
+
+					m_HintsUsed++;
+					if (m_bCampaign && VisibleClues[i]->GetCampaignLesson() == m_CampaignLesson)
+					{
+						m_LessonHintsUsed++;
+					}
+					OnHintUsed.Broadcast(this);
 					break;
 				}
 			}
@@ -903,4 +973,12 @@ void UPuzzle::FixPuzzle()
 			}
 		}
 	}
+}
+int32 UPuzzle::GetCampaignScore() const
+{
+	if (m_LessonHintsUsed > 0)
+	{
+		return 1;
+	}
+	return m_HintsUsed > 0 ? 2 : 3;
 }

@@ -2,6 +2,8 @@
 #include "HappinessClassic/Puzzle.h"
 #include "HappinessClassic/Clue.h"
 #include "HappinessClassic/Hint.h"
+#include "HappinessClassic/CampaignTree.h"
+#include "HappinessClassic/CampaignProgress.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "Misc/OutputDevice.h"
@@ -296,6 +298,14 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 		}
 	}
 	const bool bCampaign = LessonValue != INDEX_NONE;
+
+	// -stage=N (with -lesson): generate exactly what the campaign plays for that stage: its size, difficulty and seed mapping
+	int32 Stage = -1;
+	if (bCampaign && FParse::Value(Cmd, TEXT("stage="), Stage))
+	{
+		Size = UCampaignSubsystem::GetStageSize(Stage);
+		Diff = UCampaignSubsystem::GetStageDifficulty(Stage);
+	}
 	const ECampaignLesson Lesson = bCampaign ? (ECampaignLesson)LessonValue : ECampaignLesson::Given;
 	int32 CampaignFails = 0;
 
@@ -332,7 +342,7 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 		double T0 = FPlatformTime::Seconds();
 		if (bCampaign)
 		{
-			if (!P.InitCampaign(Seed, Size, Diff, Lesson))
+			if (!P.InitCampaign(Stage >= 0 ? UCampaignSubsystem::GetGenerationSeed(Lesson, Stage, Seed) : Seed, Size, Diff, Lesson))
 				CampaignFails++;
 		}
 		else
@@ -348,7 +358,7 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 			// No clue may come from a later lesson, and the puzzle must need the lesson's clues
 			for (UClue* C : P.m_Clues)
 			{
-				if (C->GetCampaignLesson() > Lesson)
+				if (!UCampaignTree::IsClueLessonAllowed(C->GetCampaignLesson(), Lesson))
 					UE_LOG(LogTemp, Error, TEXT("Clue above lesson: %s"), *C->ToString());
 			}
 			if (!P.RequiresLesson(Lesson))
@@ -407,7 +417,11 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 			Out += TEXT(" solution:\n") + SolutionString(P);
 			Out += TEXT(" clues:\n");
 			for (int i = 0; i < P.m_Clues.Num(); i++)
-				Out += FString::Printf(TEXT("  C%d %s\n"), i, *P.m_Clues[i]->ToString());
+			{
+				const UClue* C = P.m_Clues[i];
+				const FString Column = C->m_Type == eClueType::Vertical ? FString::Printf(TEXT(" [col %d]"), C->m_iCol) : FString();
+				Out += FString::Printf(TEXT("  C%d %s%s\n"), i, *C->ToString(), *Column);
+			}
 			if (!H.bSolved)
 				Out += TEXT(" board at hint failure:\n") + StateString(P);
 			if (bTrace)

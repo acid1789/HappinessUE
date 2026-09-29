@@ -3,6 +3,7 @@
 #include "Engine/Engine.h"
 #include "ToolsetRegistry/UToolsetRegistry.h"
 #include "HappinessMCPLookupToolset.h"
+#include "HappinessUIToolset.h"
 
 class FHappinessMCPLookupModule : public IModuleInterface
 {
@@ -28,6 +29,7 @@ public:
 		if (bRegistered && UObjectInitialized())
 		{
 			UToolsetRegistry::UnregisterToolsetClass(UHappinessMCPLookupToolset::StaticClass());
+			UToolsetRegistry::UnregisterToolsetClass(UHappinessUIToolset::StaticClass());
 		}
 	}
 
@@ -35,6 +37,7 @@ private:
 	void Register()
 	{
 		UToolsetRegistry::RegisterToolsetClass(UHappinessMCPLookupToolset::StaticClass());
+		UToolsetRegistry::RegisterToolsetClass(UHappinessUIToolset::StaticClass());
 		bRegistered = true;
 	}
 

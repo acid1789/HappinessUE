@@ -1,4 +1,5 @@
 #include "Clue.h"
+#include "CampaignTree.h"
 #include "Puzzle.h"
 #include "PuzzleRow.h"
 #include "PuzzleCell.h"
@@ -22,7 +23,7 @@ void UClue::Init(UPuzzle& P, FRandomStream& Rand)
 		GenerateClue(P, Rand);
 
 		const ECampaignLesson Lesson = GetCampaignLesson();
-		if (Lesson == P.m_CampaignLesson || (Lesson < P.m_CampaignLesson && (!bWantLesson || iTries >= 1000)))
+		if (Lesson == P.m_CampaignLesson || (UCampaignTree::IsClueLessonAllowed(Lesson, P.m_CampaignLesson) && (!bWantLesson || iTries >= 1000)))
 			return;
 	}
 
@@ -4017,9 +4018,48 @@ bool UClue::IsSameClue(const UClue& Other) const
 	if (m_Type == eClueType::Horizontal && m_HorizontalType != Other.m_HorizontalType)
 		return false;
 
-	return m_iRow == Other.m_iRow && m_iRow2 == Other.m_iRow2 && m_iRow3 == Other.m_iRow3 &&
-		m_iCol == Other.m_iCol && m_iCol2 == Other.m_iCol2 && m_iCol3 == Other.m_iCol3 &&
-		m_iHorizontal1 == Other.m_iHorizontal1 && m_iNotCell == Other.m_iNotCell;
+	if (!IsConstraintClue())
+	{
+		return m_iRow == Other.m_iRow && m_iRow2 == Other.m_iRow2 && m_iRow3 == Other.m_iRow3 &&
+			m_iCol == Other.m_iCol && m_iCol2 == Other.m_iCol2 && m_iCol3 == Other.m_iCol3 &&
+			m_iHorizontal1 == Other.m_iHorizontal1 && m_iNotCell == Other.m_iNotCell;
+	}
+
+	// Constraint clues: compare slots as (row, column, false-option icon), with the slots whose order
+	// doesn't matter sorted, so e.g. Gap A..C and Gap C..A count as the same clue
+	auto CanonicalSlots = [](const UClue& Clue)
+	{
+		const int Rows[3] = { Clue.m_iRow, Clue.m_iRow2, Clue.m_iRow3 };
+		const int Cols[3] = { Clue.m_iCol, Clue.m_iCol2, Clue.m_iCol3 };
+		TArray<FIntVector> Slots;
+		for (int i = 0; i < 3; i++)
+		{
+			const bool bFalseOption = Clue.m_HorizontalType == eHorizontalType::NextToEitherOr && Clue.m_iNotCell == i;
+			Slots.Add(FIntVector(Rows[i], bFalseOption ? -1 : Cols[i], bFalseOption ? Clue.m_iHorizontal1 : -1));
+		}
+
+		auto Less = [](const FIntVector& A, const FIntVector& B)
+		{
+			return A.X != B.X ? A.X < B.X : (A.Y != B.Y ? A.Y < B.Y : A.Z < B.Z);
+		};
+		auto SortPair = [&Slots, &Less](int A, int B)
+		{
+			if (Less(Slots[B], Slots[A]))
+				Slots.Swap(A, B);
+		};
+
+		switch (Clue.m_HorizontalType)
+		{
+			case eHorizontalType::Gap:				SortPair(0, 1); break;	// A and C either way round
+			case eHorizontalType::Between:
+			case eHorizontalType::NextToEitherOr:	SortPair(0, 2); break;	// the two outer slots
+			case eHorizontalType::AllApart:			Slots.Sort(Less); break;
+			default:								break;					// Edge, NotEdge, DirectlyLeftOf, Chain: ordered
+		}
+		return Slots;
+	};
+
+	return CanonicalSlots(*this) == CanonicalSlots(Other);
 }
 
 void UClue::GenerateNotHere(UPuzzle& P, FRandomStream& Rand)
