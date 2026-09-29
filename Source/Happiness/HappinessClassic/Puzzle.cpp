@@ -4,7 +4,6 @@
 #include "PuzzleRow.h"
 #include "Hint.h"
 
-FOnPuzzleHintUsed UPuzzle::OnHintUsed;
 
 #pragma optimize("", off)
 
@@ -456,6 +455,9 @@ void UPuzzle::Reset()
 	}
 
 	ApplyAllGiven();
+
+	// Restarting the puzzle starts over without hints
+	m_HintsUsed = m_LessonHintsUsed = 0;
 }
 
 void UPuzzle::ResetRow(int Row)
@@ -659,7 +661,6 @@ UHint* UPuzzle::GenerateHint(const TArray<UClue*>& VisibleClues)
 					{
 						m_LessonHintsUsed++;
 					}
-					OnHintUsed.Broadcast(this);
 					break;
 				}
 			}
@@ -976,9 +977,11 @@ void UPuzzle::FixPuzzle()
 }
 int32 UPuzzle::GetCampaignScore() const
 {
-	if (m_LessonHintsUsed > 0)
-	{
-		return 1;
-	}
-	return m_HintsUsed > 0 ? 2 : 3;
+	// 3 for completing it, -1 if any hint was used, and another -1 if any hint was on the lesson's clue
+	const bool bHints = m_HintsUsed > 0;
+	const bool bLessonHints = m_LessonHintsUsed > 0;
+	return 3 - (bHints ? 1 : 0) - (bLessonHints ? 1 : 0);
 }
+
+// Restore optimization so the "off" above doesn't carry into the next file of a unity build
+#pragma optimize("", on)

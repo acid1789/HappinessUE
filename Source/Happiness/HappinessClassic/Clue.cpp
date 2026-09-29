@@ -4493,3 +4493,6 @@ void UClue::GetPositiveParts(UPuzzle& P, TArray<UClue*>& Out)
 	// No "not" component: the clue itself
 	Out.Add(this);
 }
+
+// Restore optimization so the "off" above doesn't carry into the next file of a unity build
+#pragma optimize("", on)

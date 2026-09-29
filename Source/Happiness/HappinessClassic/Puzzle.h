@@ -7,19 +7,12 @@
 #include "Hint.h"
 #include "Puzzle.generated.h"
 
-class UPuzzle;
-DECLARE_MULTICAST_DELEGATE_OneParam(FOnPuzzleHintUsed, UPuzzle*);
-
 UCLASS(BlueprintType)
 class HAPPINESS_API UPuzzle : public UObject
 {
 	GENERATED_BODY()
 
 public:
-	// Fired by GenerateHint whenever it hands out a hint (the campaign saves hint counts for resume)
-	static FOnPuzzleHintUsed OnHintUsed;
-
-
 	UPROPERTY(BlueprintReadOnly)
 	int32 m_iSeed;
 
@@ -60,7 +53,8 @@ public:
 	UPROPERTY(BlueprintReadOnly)
 	ECampaignLesson m_CampaignLesson = ECampaignLesson::Given;
 
-	// Hints handed out by GenerateHint since Init/InitCampaign, and how many of those came from the campaign lesson's clue type
+	// Hints handed out by GenerateHint since Init/InitCampaign or the last Reset, and how many of those came from the
+	// campaign lesson's clue type
 	UPROPERTY(BlueprintReadOnly)
 	int32 m_HintsUsed = 0;
 
@@ -84,7 +78,7 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure)
 	static bool IsLessonAvailable(ECampaignLesson Lesson, int Size);
 
-	// Campaign score for this puzzle: 3 with no hints, 2 if hints were used but none from the lesson clue, 1 otherwise
+	// Campaign score for this puzzle: 3 for completing it, -1 if any hint was used, another -1 if any was on the lesson clue (1 to 3)
 	UFUNCTION(BlueprintCallable, BlueprintPure)
 	int32 GetCampaignScore() const;
 

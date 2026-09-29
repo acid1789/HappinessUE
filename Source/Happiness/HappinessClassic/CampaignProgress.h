@@ -31,13 +31,39 @@ struct FLessonPuzzleResult
 {
 	GENERATED_BODY()
 
-	/** The puzzle's score, 1 to 3 (3 = no hints, 2 = hints but none from the lesson clue, 1 = a lesson-clue hint) */
+	UPROPERTY(BlueprintReadOnly, Category = "Campaign")
+	ECampaignLesson Lesson = ECampaignLesson::Given;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Campaign")
+	int32 Stage = 0;
+
+	/** False if the finished board has mistakes: nothing is scored and the puzzle stays open to try again */
+	UPROPERTY(BlueprintReadOnly, Category = "Campaign")
+	bool bSolved = false;
+
+	/** False when the puzzle had already been scored (finished again after a restart) */
+	UPROPERTY(BlueprintReadOnly, Category = "Campaign")
+	bool bFirstFinish = false;
+
+	/** Any hint was used (-1) */
+	UPROPERTY(BlueprintReadOnly, Category = "Campaign")
+	bool bUsedHints = false;
+
+	/** A hint was used on the lesson's clue (another -1) */
+	UPROPERTY(BlueprintReadOnly, Category = "Campaign")
+	bool bUsedLessonHint = false;
+
+	/** The puzzle's score, 1 to 3: 3 for completing it, -1 for using hints, another -1 for a lesson-clue hint */
 	UPROPERTY(BlueprintReadOnly, Category = "Campaign")
 	int32 Score = 0;
 
 	/** Points added to the lesson; 0 when replaying an earlier stage or the final */
 	UPROPERTY(BlueprintReadOnly, Category = "Campaign")
 	int32 PointsEarned = 0;
+
+	/** Lesson points before this puzzle */
+	UPROPERTY(BlueprintReadOnly, Category = "Campaign")
+	int32 PreviousPoints = 0;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Campaign")
 	int32 TotalPoints = 0;
@@ -76,12 +102,6 @@ struct FCampaignSaveData
 
 	UPROPERTY(SaveGame)
 	int32 OpenSeed = 0;
-
-	UPROPERTY(SaveGame)
-	int32 OpenHintsUsed = 0;
-
-	UPROPERTY(SaveGame)
-	int32 OpenLessonHintsUsed = 0;
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCampaignProgressChanged);
@@ -171,8 +191,8 @@ public:
 
 	// ---- Lesson session ----
 	// A lesson session is active while the player is playing a lesson stage: from choosing a stage until they
-	// start a classic game. It is saved with the campaign, together with the open puzzle's seed and hint counts,
-	// so reloading the game resumes the same lesson puzzle.
+	// start a classic game. It is saved with the campaign, together with the open puzzle's seed, so reloading the
+	// game resumes the same lesson puzzle. Hint penalties belong to one play of a puzzle and aren't saved.
 
 	/** Called by the lesson popup when the player picks a stage: starts a session for it and broadcasts OnLessonPuzzleRequested */
 	UFUNCTION(BlueprintCallable, Category = "Campaign")
@@ -206,6 +226,13 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Campaign")
 	FLessonPuzzleResult GetLastResult() const { return LastResult; }
 
+	/**
+	 * Before playing the session's next puzzle: the session moves on to the stage that currently earns points (the
+	 * final once all points are earned). Returns the size and difficulty of the stage to play.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Campaign", meta = (WorldContext = "WorldContextObject"))
+	static void PrepareNextLessonPuzzle(const UObject* WorldContextObject, int32& Size, int32& Difficulty);
+
 	/** Debug: wipe all campaign progress */
 	UFUNCTION(BlueprintCallable, Category = "Campaign")
 	void ResetAllProgress();
@@ -216,7 +243,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Campaign", meta = (WorldContext = "WorldContextObject"))
 	static void InitPuzzleForPlay(const UObject* WorldContextObject, UPuzzle* Puzzle, int32 Number, int32 Size, int32 Difficulty);
 
-	/** Call when a puzzle is finished. During a lesson session records the result and returns true (skip classic bookkeeping). */
+	/**
+	 * Call when a puzzle is finished. During a lesson session returns true (skip classic bookkeeping) and records the
+	 * result if the lesson end screen hasn't already (FinishLessonPuzzle).
+	 */
 	UFUNCTION(BlueprintCallable, Category = "Campaign", meta = (WorldContext = "WorldContextObject"))
 	static bool HandlePuzzleFinished(const UObject* WorldContextObject, UPuzzle* Puzzle);
 
@@ -236,12 +266,10 @@ public:
 
 private:
 	FLessonProgress& GetMutableProgress(ECampaignLesson Lesson);
-	void HandleHintUsed(UPuzzle* Puzzle);
 	void Save();
 
 	FCampaignSaveData Data;
 
 	FLessonPuzzleResult LastResult;
 	static TWeakObjectPtr<UCampaignSubsystem> Instance;
-	FDelegateHandle HintUsedHandle;
 };

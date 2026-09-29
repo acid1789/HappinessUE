@@ -26,3 +26,16 @@ UHappinessSaveGame* UHappinessSaveGame::LoadFromSlot()
 	}
 	return Cast<UHappinessSaveGame>(UGameplayStatics::LoadGameFromSlot(SaveSlotName, SaveUserIndex));
 }
+
+bool UHappinessSaveGame::HasActivePuzzle()
+{
+	const UHappinessSaveGame* SaveGame = LoadFromSlot();
+	if (!SaveGame)
+	{
+		return false;
+	}
+
+	// ActivePuzzle is a Blueprint variable of SG_Happiness
+	const FBoolProperty* ActivePuzzle = FindFProperty<FBoolProperty>(SaveGame->GetClass(), TEXT("ActivePuzzle"));
+	return ActivePuzzle && ActivePuzzle->GetPropertyValue_InContainer(SaveGame);
+}

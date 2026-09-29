@@ -17,5 +17,8 @@ Average Puzzle Time
 Friends
 Daily Competition
 
-Hard Difficulty is not solvable
 Show Puzzle Number
+
+Master Mode
+Lessons End Screen
+Free Play

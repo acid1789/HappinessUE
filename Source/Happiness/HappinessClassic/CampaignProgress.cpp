@@ -13,7 +13,6 @@ void UCampaignSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
 
-	HintUsedHandle = UPuzzle::OnHintUsed.AddUObject(this, &UCampaignSubsystem::HandleHintUsed);
 
 	Instance = this;
 
@@ -28,7 +27,6 @@ void UCampaignSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 void UCampaignSubsystem::Deinitialize()
 {
-	UPuzzle::OnHintUsed.Remove(HintUsedHandle);
 	if (Instance == this)
 	{
 		Instance = nullptr;
@@ -177,21 +175,8 @@ bool UCampaignSubsystem::StartLessonPuzzle(ECampaignLesson Lesson, int32 Stage, 
 
 		Progress.NextSeed[Stage] = Seed;
 
-		const bool bResuming = Data.bInSession && Data.bPuzzleOpen && Data.SessionLesson == Lesson &&
-			Data.SessionStage == Stage && Data.OpenSeed == Seed;
-		if (bResuming)
-		{
-			// Same puzzle as before (reload, restart, back from the menu): hints already used still count
-			Puzzle->m_HintsUsed = Data.OpenHintsUsed;
-			Puzzle->m_LessonHintsUsed = Data.OpenLessonHintsUsed;
-		}
-		else
-		{
-			Data.OpenSeed = Seed;
-			Data.OpenHintsUsed = 0;
-			Data.OpenLessonHintsUsed = 0;
-		}
-
+		// Every start is a new play of the puzzle: InitCampaign cleared the hint counts
+		Data.OpenSeed = Seed;
 		Data.bInSession = true;
 		Data.SessionLesson = Lesson;
 		Data.SessionStage = Stage;
@@ -221,35 +206,41 @@ int32 UCampaignSubsystem::GetSessionStage() const
 FLessonPuzzleResult UCampaignSubsystem::FinishLessonPuzzle(UPuzzle* Puzzle)
 {
 	FLessonPuzzleResult Result;
-	if (!Data.bInSession || !Data.bPuzzleOpen || !Puzzle)
+	if (!Data.bInSession || !Puzzle)
 	{
 		return Result;
 	}
 
-	const ECampaignLesson Lesson = Data.SessionLesson;
-	const int32 Stage = Data.SessionStage;
-	FLessonProgress& Progress = GetMutableProgress(Lesson);
-	Data.bPuzzleOpen = false;
+	Result.Lesson = Data.SessionLesson;
+	Result.Stage = Data.SessionStage;
+	Result.bSolved = Puzzle->IsSolved();
+	Result.Score = Puzzle->GetCampaignScore();
+	Result.bUsedHints = Puzzle->m_HintsUsed > 0;
+	Result.bUsedLessonHint = Puzzle->m_LessonHintsUsed > 0;
+	Result.bFirstFinish = Data.bPuzzleOpen;
 
-	// A completed but incorrect board earns nothing and the same puzzle comes up again
-	if (Puzzle->IsSolved())
+	FLessonProgress& Progress = GetMutableProgress(Result.Lesson);
+	Result.PreviousPoints = Progress.Points;
+
+	// Scored once, when first solved. A board with mistakes earns nothing and the puzzle stays open, so the
+	// player can restart it and still earn its points.
+	if (Data.bPuzzleOpen && Result.bSolved)
 	{
-		Result.Score = Puzzle->GetCampaignScore();
-		Progress.NextSeed[Stage] = Data.OpenSeed + 1;
+		Data.bPuzzleOpen = false;
+		Progress.NextSeed[Result.Stage] = Data.OpenSeed + 1;
 
-		if (Stage == FinalStage)
+		if (Result.Stage == FinalStage)
 		{
 			// The final completes the lesson whatever hints were used
 			Result.bLessonCompleted = !Progress.bFinalCompleted;
 			Progress.bFinalCompleted = true;
 		}
-		else if (Stage == GetCurrentStage(Lesson) && Progress.Points < MaxPoints)
+		else if (Result.Stage == GetCurrentStage(Result.Lesson) && Progress.Points < MaxPoints)
 		{
 			// Only the stage currently being worked on earns points; replays of earlier stages don't
-			const int32 OldPoints = Progress.Points;
-			Progress.Points = FMath::Min(MaxPoints, OldPoints + Result.Score);
-			Result.PointsEarned = Progress.Points - OldPoints;
-			Result.bStageUnlocked = Progress.Points / PointsPerStage > OldPoints / PointsPerStage;
+			Progress.Points = FMath::Min(MaxPoints, Result.PreviousPoints + Result.Score);
+			Result.PointsEarned = Progress.Points - Result.PreviousPoints;
+			Result.bStageUnlocked = Progress.Points / PointsPerStage > Result.PreviousPoints / PointsPerStage;
 		}
 	}
 
@@ -259,6 +250,32 @@ FLessonPuzzleResult UCampaignSubsystem::FinishLessonPuzzle(UPuzzle* Puzzle)
 	Save();
 	OnProgressChanged.Broadcast();
 	return Result;
+}
+
+void UCampaignSubsystem::PrepareNextLessonPuzzle(const UObject* WorldContextObject, int32& Size, int32& Difficulty)
+{
+	Size = GetStageSize(0);
+	Difficulty = GetStageDifficulty(0);
+
+	UCampaignSubsystem* Campaign = Get(WorldContextObject);
+	if (!Campaign)
+	{
+		return;
+	}
+
+	// Next puzzle always moves on through the lesson: the stage that currently earns points (the final once all
+	// points are earned), whether the last puzzle unlocked it or was a replay of an earlier stage
+	FCampaignSaveData& SaveData = Campaign->Data;
+	const int32 CurrentStage = Campaign->GetCurrentStage(SaveData.SessionLesson);
+	if (SaveData.bInSession && SaveData.SessionStage != CurrentStage)
+	{
+		SaveData.SessionStage = CurrentStage;
+		SaveData.bPuzzleOpen = false;
+		Campaign->Save();
+	}
+
+	Size = GetStageSize(SaveData.SessionStage);
+	Difficulty = GetStageDifficulty(SaveData.SessionStage);
 }
 
 void UCampaignSubsystem::EndLessonSession()
@@ -276,18 +293,6 @@ void UCampaignSubsystem::ResetAllProgress()
 	Data = FCampaignSaveData();
 	Save();
 	OnProgressChanged.Broadcast();
-}
-
-void UCampaignSubsystem::HandleHintUsed(UPuzzle* Puzzle)
-{
-	// Keep the open puzzle's hint counts saved so a reload can't clear the penalty
-	if (Data.bInSession && Data.bPuzzleOpen && Puzzle && Puzzle->m_bCampaign &&
-		Puzzle->m_CampaignLesson == Data.SessionLesson)
-	{
-		Data.OpenHintsUsed = Puzzle->m_HintsUsed;
-		Data.OpenLessonHintsUsed = Puzzle->m_LessonHintsUsed;
-		Save();
-	}
 }
 
 UCampaignSubsystem* UCampaignSubsystem::Get(const UObject* WorldContextObject)
@@ -326,7 +331,10 @@ bool UCampaignSubsystem::HandlePuzzleFinished(const UObject* WorldContextObject,
 		return false;
 	}
 
-	Campaign->FinishLessonPuzzle(Puzzle);
+	if (Campaign->Data.bPuzzleOpen)
+	{
+		Campaign->FinishLessonPuzzle(Puzzle);
+	}
 	return true;
 }
 

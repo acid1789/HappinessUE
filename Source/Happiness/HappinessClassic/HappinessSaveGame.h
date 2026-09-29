@@ -26,6 +26,10 @@ public:
 	/** The game save on disk, or null if there isn't one (or it isn't a UHappinessSaveGame) */
 	static UHappinessSaveGame* LoadFromSlot();
 
+	/** True if the game save holds a puzzle in progress (SG_Happiness's ActivePuzzle): the player left it with Save and Quit */
+	UFUNCTION(BlueprintPure, Category = "Happiness")
+	static bool HasActivePuzzle();
+
 	UPROPERTY(SaveGame)
 	FCampaignSaveData Campaign;
 };
