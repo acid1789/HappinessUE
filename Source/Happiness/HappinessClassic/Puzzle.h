@@ -83,6 +83,10 @@ public:
 	// Cached ComputeRating result for GetRating; negative until computed
 	float m_Rating = -1.f;
 
+	// Set while trying out hypothetical boards (UHint::GetExplanation): contradictions are expected there, so they
+	// aren't logged as errors and don't call DebugError (which resets the board)
+	bool m_bHypothetical = false;
+
 	bool IsClueExcluded(ECampaignLesson Lesson) const
 	{
 		return Lesson != ECampaignLesson::Given && (m_ExcludedClues & (1 << int32(Lesson))) != 0;
@@ -176,8 +180,14 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void EliminateIconWithClue(UClue* clue, int Row, int Col, int Icon);
 
+	// The best hint from all the clues, hidden or not; on a tie, one of the clues on screen (VisibleClues) wins.
+	// Counts as a hint used.
 	UFUNCTION(BlueprintCallable)
 	UHint* GenerateHint(const TArray<UClue*>& VisibleClues);
+
+	// The clue GenerateHint would pick, without handing out a hint. Lets the UI unhide it first.
+	UFUNCTION(BlueprintCallable)
+	UClue* GetHintClue(const TArray<UClue*>& VisibleClues);
 
 	const TArray<UClue*>& HorizontalClues() const { return m_HorizontalClues; }
 	const TArray<UClue*>& VerticalClues() const { return m_VeritcalClues; }
@@ -192,6 +202,9 @@ public:
 	void FixPuzzle();
 
 private:
+	UHint* FindBestHint(const TArray<UClue*>& VisibleClues, UClue*& OutClue);
+
+
 
 	// Build a fresh solution and clue set from m_Rand (shared by Init and InitCampaign)
 	void Generate();

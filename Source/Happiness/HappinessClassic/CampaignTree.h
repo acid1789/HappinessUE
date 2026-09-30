@@ -39,6 +39,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Campaign")
 	static FText GetLessonDescription(ECampaignLesson Lesson);
 
+	/** How a clue of this type works, for hints: the lesson's description, except the first lesson's, which is about the game */
+	UFUNCTION(BlueprintPure, Category = "Campaign")
+	static FText GetClueTypeDescription(ECampaignLesson Lesson);
+
 	// True if a clue of ClueLesson may appear in puzzles for CurrentLesson: givens always, the lesson
 	// itself, and anything from an earlier column
 	static bool IsClueLessonAllowed(ECampaignLesson ClueLesson, ECampaignLesson CurrentLesson);

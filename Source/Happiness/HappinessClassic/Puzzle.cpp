@@ -523,18 +523,31 @@ void UPuzzle::SetFinalIcon(int Row, int Col, int Icon)
 
 void UPuzzle::SetFinalIconWithClue(UClue* TheClue, int Row, int Col, int Icon)
 {
+	// Some analyzers reach two or three columns out without checking the edge (SolveSpan on small boards, or on
+	// a board with a wrongly placed icon); there's nothing to do off the board
+	if (!m_Rows.IsValidIndex(Row) || !m_Rows[Row].m_Cells.IsValidIndex(Col))
+	{
+		return;
+	}
+
 	int Final = m_Rows[Row].m_Cells[Col].m_iFinalIcon;
 
 	if (Final >= 0 && Final != Icon)
 	{
-		UE_LOG(LogTemp, Error, TEXT("SetFinalIcon conflict"));
-		DebugError();
+		if (!m_bHypothetical)
+		{
+			UE_LOG(LogTemp, Error, TEXT("SetFinalIcon conflict"));
+			DebugError();
+		}
 	}
 
 	if (!m_Rows[Row].m_Cells[Col].m_bValues[Icon])
 	{
-		UE_LOG(LogTemp, Error, TEXT("SetFinalIcon already eliminated"));
-		DebugError();
+		if (!m_bHypothetical)
+		{
+			UE_LOG(LogTemp, Error, TEXT("SetFinalIcon already eliminated"));
+			DebugError();
+		}
 	}
 
 	if (Final != Icon)
@@ -565,12 +578,22 @@ void UPuzzle::EliminateIcon(int Row, int Col, int Icon)
 
 void UPuzzle::EliminateIconWithClue(UClue* TheClue, int Row, int Col, int Icon)
 {
+	// Some analyzers reach two or three columns out without checking the edge (SolveSpan on small boards, or on
+	// a board with a wrongly placed icon); there's nothing to do off the board
+	if (!m_Rows.IsValidIndex(Row) || !m_Rows[Row].m_Cells.IsValidIndex(Col))
+	{
+		return;
+	}
+
 	auto& Cell = m_Rows[Row].m_Cells[Col];
 
 	if (Cell.m_iFinalIcon == Icon)
 	{
-		UE_LOG(LogTemp, Error, TEXT("EliminateIcon removing final"));
-		DebugError();
+		if (!m_bHypothetical)
+		{
+			UE_LOG(LogTemp, Error, TEXT("EliminateIcon removing final"));
+			DebugError();
+		}
 	}
 
 	if (Cell.m_bValues[Icon])
@@ -639,38 +662,70 @@ void UPuzzle::ReEnforceFinalIcons()
 
 UHint* UPuzzle::GenerateHint(const TArray<UClue*>& VisibleClues)
 {
-	UHint* hRet = nullptr;
-
-	// Pick a clue that we could use for a hint
-	for (int i = 0; i < VisibleClues.Num(); i++)
+	UClue* BestClue = nullptr;
+	UHint* Best = FindBestHint(VisibleClues, BestClue);
+	if (Best)
 	{
-		SetMarker();
-		if (VisibleClues[i] != nullptr)
+		m_HintsUsed++;
+		if (m_bCampaign && BestClue->GetCampaignLesson() == m_CampaignLesson)
 		{
-			int iUseCount = VisibleClues[i]->m_iUseCount;
-			VisibleClues[i]->Analyze(*this);
-			RestoreMarker();
+			m_LessonHintsUsed++;
+		}
+	}
+	return Best;
+}
 
-			if (VisibleClues[i]->m_iUseCount > iUseCount)
-			{
-				// This clue can do something, use it for the hint
-				UHint* Hint = NewObject<UHint>(this);
-				if (Hint->Init(*this, *VisibleClues[i]))
-				{
-					hRet = Hint;
+UClue* UPuzzle::GetHintClue(const TArray<UClue*>& VisibleClues)
+{
+	UClue* BestClue = nullptr;
+	FindBestHint(VisibleClues, BestClue);
+	return BestClue;
+}
 
-					m_HintsUsed++;
-					if (m_bCampaign && VisibleClues[i]->GetCampaignLesson() == m_CampaignLesson)
-					{
-						m_LessonHintsUsed++;
-					}
-					break;
-				}
-			}
+UHint* UPuzzle::FindBestHint(const TArray<UClue*>& VisibleClues, UClue*& OutClue)
+{
+	// Every clue that can do something now, hidden or not, ranked: a placement first, then the clue that works out
+	// the most (candidates removed when applied fully), then one on screen, then the easier clue type
+	UHint* Best = nullptr;
+	UClue* BestClue = nullptr;
+	auto Better = [&VisibleClues](const UHint& Hint, const UHint& Than, const UClue& HintClue, const UClue& ThanClue)
+	{
+		if (Hint.bSetFinalIcon != Than.bSetFinalIcon)
+			return Hint.bSetFinalIcon;
+		if (Hint.Impact != Than.Impact)
+			return Hint.Impact > Than.Impact;
+		const bool bShown = VisibleClues.Contains(&HintClue);
+		if (bShown != VisibleClues.Contains(&ThanClue))
+			return bShown;
+		return GetClueRatingWeight(HintClue.GetCampaignLesson()) < GetClueRatingWeight(ThanClue.GetCampaignLesson());
+	};
+
+	TArray<UClue*> AllClues = m_VeritcalClues;
+	AllClues.Append(m_HorizontalClues);
+	for (UClue* Clue : AllClues)
+	{
+		if (Clue == nullptr)
+			continue;
+
+		SetMarker();
+		const int iUseCount = Clue->m_iUseCount;
+		Clue->Analyze(*this);
+		RestoreMarker();
+		const bool bProgress = Clue->m_iUseCount > iUseCount;
+		Clue->m_iUseCount = iUseCount;
+		if (!bProgress)
+			continue;
+
+		UHint* Hint = NewObject<UHint>(this);
+		if (Hint->Init(*this, *Clue) && (!Best || Better(*Hint, *Best, *Clue, *BestClue)))
+		{
+			Best = Hint;
+			BestClue = Clue;
 		}
 	}
 
-	return hRet;
+	OutClue = BestClue;
+	return Best;
 }
 
 void UPuzzle::BuildClueLists()
@@ -1061,7 +1116,7 @@ FPuzzleRating UPuzzle::ComputeRating()
 
 		// One deduction from it, as a hint would give
 		UHint* Step = Best ? NewObject<UHint>(GetTransientPackage()) : nullptr;
-		if (!Step || !Step->Init(*this, *Best))
+		if (!Step || !Step->Init(*this, *Best, false))
 			break;
 
 		if (Step->bSetFinalIcon)

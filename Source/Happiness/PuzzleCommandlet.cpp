@@ -126,7 +126,22 @@ namespace
 	}
 
 	// Solves the way a player relying on hints would: ask for a hint, apply it, repeat
-	FSolveResult HintSolve(UPuzzle& P, FString* Trace, int32* HintsByLesson)
+	// -explain: per clue type, hint steps explained / steps that fell back to the plain action; a few examples
+	int32 ExplainedByLesson[256] = {}, FallbackByLesson[256] = {};
+	FString ExplainExamples;
+	int32 NumExplainExamples = 0;
+
+	FString HelpString(const FClueHelp& Help)
+	{
+		FString S;
+		for (const FClueHelpSegment& Seg : Help.Segments)
+		{
+			S += (S.IsEmpty() ? TEXT("") : TEXT(" ")) + (Seg.Type == EClueHelpSegementType::Text ? Seg.Text : FString::Printf(TEXT("[r%d:%d]"), Seg.IconRow, Seg.IconColumn));
+		}
+		return S;
+	}
+
+	FSolveResult HintSolve(UPuzzle& P, FString* Trace, int32* HintsByLesson, bool bExplain = false)
 	{
 		FSolveResult Res;
 		P.Reset();
@@ -171,6 +186,22 @@ namespace
 			int Sol = P.SolutionIcon(H->Row, H->Col);
 			FString Desc = FString::Printf(TEXT("#%d C%d %s r%dc%d%s%d"), Res.Steps, ClueIdx,
 				H->bSetFinalIcon ? TEXT("set") : TEXT("elim"), H->Row, H->Col, H->bSetFinalIcon ? TEXT("=") : TEXT("-"), H->Icon);
+
+			if (bExplain)
+			{
+				const FClueHelp Explanation = H->GetExplanation();
+				const bool bFallback = Explanation.Segments.Num() > 0 && Explanation.Segments[0].Type == EClueHelpSegementType::Text && Explanation.Segments[0].Text == TEXT("So");
+				const int32 Lesson = (int32)H->TheClue->GetCampaignLesson();
+				(bFallback ? FallbackByLesson : ExplainedByLesson)[Lesson]++;
+				const FString Line = FString::Printf(TEXT("  %s | %s\n"), *H->TheClue->ToString(), *HelpString(Explanation));
+				if (Trace)
+					*Trace += Line;
+				else if (NumExplainExamples < 60 && (bFallback || NumExplainExamples < 30))
+				{
+					ExplainExamples += (bFallback ? TEXT("  FALLBACK") : TEXT("  ")) + Line;
+					NumExplainExamples++;
+				}
+			}
 
 			if (Trace)
 				*Trace += TEXT("  ") + Desc + TEXT("\n");
@@ -245,6 +276,8 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 	const bool bNoAuto = FParse::Param(Cmd, TEXT("noauto"));
 	const bool bShow = Mode == TEXT("show") || Mode == TEXT("trace");
 	const bool bTrace = Mode == TEXT("trace");
+	// -explain: build every hint's explanation (UHint::GetExplanation) and report how many fell back to the plain action
+	const bool bExplain = FParse::Param(Cmd, TEXT("explain"));
 
 	// -lesson=Name generates campaign puzzles for that lesson
 	FString LessonName;
@@ -406,7 +439,7 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 
 		P.AutoSetIcons = !bNoAuto;
 		FString Trace;
-		FSolveResult H = HintSolve(P, bTrace ? &Trace : nullptr, HintsByLesson);
+		FSolveResult H = HintSolve(P, bTrace ? &Trace : nullptr, HintsByLesson, bExplain);
 		P.AutoSetIcons = true;
 
 		const double RatingStart = FPlatformTime::Seconds();
@@ -532,6 +565,20 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 	// How many puzzles got each number of givens
 	if (bCampaign)
 		Out += FString::Printf(TEXT("CAMPAIGN lesson=%s failedToRequireLesson=%d\n"), *LessonName, CampaignFails);
+
+	if (bExplain)
+	{
+		// Per clue type: hints explained / hints that fell back to "So [icon] can't be in column N"
+		Out += TEXT("EXPLAIN explained/fallback:");
+		const UEnum* Lessons = StaticEnum<ECampaignLesson>();
+		for (int32 i = 0; i < Lessons->NumEnums() - 1; i++)
+		{
+			const int32 Value = (int32)Lessons->GetValueByIndex(i);
+			if (ExplainedByLesson[Value] || FallbackByLesson[Value])
+				Out += FString::Printf(TEXT(" %s=%d/%d"), *Lessons->GetNameStringByIndex(i), ExplainedByLesson[Value], FallbackByLesson[Value]);
+		}
+		Out += TEXT("\n") + ExplainExamples;
+	}
 
 	Out += TEXT("GIVENS count:puzzles");
 	for (int32 i = 0; i < 16; i++)

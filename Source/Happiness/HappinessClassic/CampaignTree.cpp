@@ -72,6 +72,15 @@ FText UCampaignTree::GetLessonDisplayName(ECampaignLesson Lesson)
 	}
 }
 
+FText UCampaignTree::GetClueTypeDescription(ECampaignLesson Lesson)
+{
+	if (Lesson == ECampaignLesson::VerticalTwo)
+	{
+		return LOCTEXT("VerticalTwoClueDesc", "Two stacked icons are in the same column. Where you find one, the other is in that column too, and where one can't be, neither can the other.");
+	}
+	return GetLessonDescription(Lesson);
+}
+
 FText UCampaignTree::GetLessonDescription(ECampaignLesson Lesson)
 {
 	switch (Lesson)
