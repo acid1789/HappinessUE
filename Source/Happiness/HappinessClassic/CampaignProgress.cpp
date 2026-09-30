@@ -327,6 +327,9 @@ void UCampaignSubsystem::InitPuzzleForPlay(const UObject* WorldContextObject, UP
 		Puzzle->m_ExcludedClues = FreePlay->GetExcludedClueMask();
 	}
 	Puzzle->Init(Number, Size, Difficulty);
+
+	// Rate it now, while the player is starting, rather than on the end screen
+	Puzzle->GetRating();
 }
 
 bool UCampaignSubsystem::HandlePuzzleFinished(const UObject* WorldContextObject, UPuzzle* Puzzle)

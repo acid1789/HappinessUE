@@ -7,6 +7,28 @@
 #include "Hint.h"
 #include "Puzzle.generated.h"
 
+/** How hard a puzzle is to solve, from UPuzzle::ComputeRating */
+USTRUCT(BlueprintType)
+struct FPuzzleRating
+{
+	GENERATED_BODY()
+
+	/** Sum over the solve's steps of each step's clue weight; 0 if it couldn't be solved */
+	UPROPERTY(BlueprintReadOnly)
+	float Rating = 0.f;
+
+	/** Deductions (single eliminations or placements) needed to solve it */
+	UPROPERTY(BlueprintReadOnly)
+	int32 Steps = 0;
+
+	/** The hardest clue type the solve needed */
+	UPROPERTY(BlueprintReadOnly)
+	ECampaignLesson HardestClue = ECampaignLesson::Given;
+
+	UPROPERTY(BlueprintReadOnly)
+	bool bSolved = false;
+};
+
 UCLASS(BlueprintType)
 class HAPPINESS_API UPuzzle : public UObject
 {
@@ -58,6 +80,9 @@ public:
 	UPROPERTY(BlueprintReadWrite)
 	int32 m_ExcludedClues = 0;
 
+	// Cached ComputeRating result for GetRating; negative until computed
+	float m_Rating = -1.f;
+
 	bool IsClueExcluded(ECampaignLesson Lesson) const
 	{
 		return Lesson != ECampaignLesson::Given && (m_ExcludedClues & (1 << int32(Lesson))) != 0;
@@ -87,6 +112,21 @@ public:
 	// False for lessons that can't be played at this size (Given is never playable)
 	UFUNCTION(BlueprintCallable, BlueprintPure)
 	static bool IsLessonAvailable(ECampaignLesson Lesson, int Size);
+
+	// Difficulty rating: solves the puzzle one deduction at a time, each time using the easiest clue that can make
+	// progress, and adds up those clues' weights (GetClueRatingWeight). Harder clue types, more deductions and fewer
+	// givens all raise it. The board, hint counts and clue use counts are left as they were.
+	UFUNCTION(BlueprintCallable)
+	FPuzzleRating ComputeRating();
+
+	// ComputeRating's Rating, computed the first time it's asked for (free play computes it when the puzzle starts)
+	UFUNCTION(BlueprintCallable)
+	float GetRating();
+
+	// Rating weight of one deduction made with a clue of this type. Changing the weights changes every rating:
+	// bump UFreePlaySubsystem::RatingVersion so players' learned pace starts over.
+	UFUNCTION(BlueprintPure)
+	static float GetClueRatingWeight(ECampaignLesson Clue);
 
 	// Campaign score for this puzzle: 3 for completing it, -1 if any hint was used, another -1 if any was on the lesson clue (1 to 3)
 	UFUNCTION(BlueprintCallable, BlueprintPure)

@@ -351,6 +351,10 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 	int32 CluesByLesson[256] = {}, HintsByLesson[256] = {}, NotHereClues = 0;
 	int32 GivenCounts[16] = {};
 	int64 ClueSum = 0, HintStepSum = 0;
+	TArray<float> Ratings;
+	int64 RatingStepSum = 0;
+	int32 RatingFails = 0, HardestClueCounts[256] = {};
+	double RatingTime = 0.0;
 	double GenTime = 0.0;
 	const double StartTime = FPlatformTime::Seconds();
 
@@ -405,6 +409,21 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 		FSolveResult H = HintSolve(P, bTrace ? &Trace : nullptr, HintsByLesson);
 		P.AutoSetIcons = true;
 
+		const double RatingStart = FPlatformTime::Seconds();
+		const FPuzzleRating Rating = P.ComputeRating();
+		RatingTime += FPlatformTime::Seconds() - RatingStart;
+		if (Rating.bSolved)
+		{
+			Ratings.Add(Rating.Rating);
+			RatingStepSum += Rating.Steps;
+			HardestClueCounts[(int32)Rating.HardestClue]++;
+		}
+		else
+		{
+			RatingFails++;
+			UE_LOG(LogTemp, Error, TEXT("Rating solve failed"));
+		}
+
 		Total++;
 		ClueSum += P.m_Clues.Num();
 		int32 MinGivens, MaxGivens;
@@ -433,9 +452,10 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 		const bool bFailed = !A.bSolved || !H.bSolved || Errors.Count > 0;
 		if (bShow || bAll || bFailed)
 		{
-			Out += FString::Printf(TEXT("seed=%d clues=%d(g%d v%d h%d) gen=%.0fms analyze=%s/%d hint=%s/%d errs=%d(gen %d)"),
+			Out += FString::Printf(TEXT("seed=%d clues=%d(g%d v%d h%d) gen=%.0fms analyze=%s/%d hint=%s/%d rating=%.1f/%d(%s) errs=%d(gen %d)"),
 				Seed, P.m_Clues.Num(), P.m_GivenClues.Num(), P.m_VeritcalClues.Num(), P.m_HorizontalClues.Num(), GenMs,
-				A.bSolved ? TEXT("OK") : TEXT("FAIL"), A.Steps, H.bSolved ? TEXT("OK") : TEXT("FAIL"), H.Steps, Errors.Count, GenErrors);
+				A.bSolved ? TEXT("OK") : TEXT("FAIL"), A.Steps, H.bSolved ? TEXT("OK") : TEXT("FAIL"), H.Steps,
+				Rating.Rating, Rating.Steps, *StaticEnum<ECampaignLesson>()->GetNameStringByValue((int64)Rating.HardestClue), Errors.Count, GenErrors);
 			if (!A.bSolved)
 				Out += TEXT(" | analyze: ") + A.Failure;
 			if (!H.bSolved)
@@ -471,6 +491,32 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 	Out += FString::Printf(TEXT("SUMMARY n=%d analyzeFail=%d hintFail=%d withErrors=%d avgClues=%.1f avgHintSteps=%.1f avgGen=%.1fms total=%.1fs\n"),
 		Total, AnalyzeFails, HintFails, ErrorPuzzles, Total ? (double)ClueSum / Total : 0.0, Total ? (double)HintStepSum / Total : 0.0,
 		Total ? GenTime / Total : 0.0, FPlatformTime::Seconds() - StartTime);
+
+	// Difficulty ratings (UPuzzle::ComputeRating): spread, deductions, and how often each clue type was the hardest needed
+	Ratings.Sort();
+	auto Percentile = [&Ratings](float Fraction)
+	{
+		return Ratings.Num() ? Ratings[FMath::Clamp(FMath::FloorToInt(Fraction * Ratings.Num()), 0, Ratings.Num() - 1)] : 0.f;
+	};
+	float RatingSum = 0.f;
+	for (float R : Ratings)
+	{
+		RatingSum += R;
+	}
+	Out += FString::Printf(TEXT("RATING avg=%.1f min=%.1f p10=%.1f p50=%.1f p90=%.1f max=%.1f avgSteps=%.1f perStep=%.2f avgMs=%.1f fails=%d hardest:"),
+		Ratings.Num() ? RatingSum / Ratings.Num() : 0.f, Percentile(0.f), Percentile(0.1f), Percentile(0.5f), Percentile(0.9f), Percentile(1.f),
+		Ratings.Num() ? (double)RatingStepSum / Ratings.Num() : 0.0, RatingStepSum ? RatingSum / RatingStepSum : 0.f,
+		Total ? RatingTime * 1000.0 / Total : 0.0, RatingFails);
+	{
+		const UEnum* Lessons = StaticEnum<ECampaignLesson>();
+		for (int32 i = 0; i < Lessons->NumEnums() - 1; i++)
+		{
+			const int32 Value = (int32)Lessons->GetValueByIndex(i);
+			if (HardestClueCounts[Value])
+				Out += FString::Printf(TEXT(" %s=%d"), *Lessons->GetNameStringByIndex(i), HardestClueCounts[Value]);
+		}
+	}
+	Out += TEXT("\n");
 
 	// Per campaign lesson: clues in the final puzzles / hint steps that used that lesson's clues
 	Out += TEXT("LESSONS clues/hints:");

@@ -1,6 +1,7 @@
 #include "FreePlaySettings.h"
 #include "CampaignTree.h"
 #include "HappinessSaveGame.h"
+#include "Puzzle.h"
 
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
@@ -17,6 +18,14 @@ void UFreePlaySubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	if (const UHappinessSaveGame* SaveGame = UHappinessSaveGame::LoadFromSlot())
 	{
 		Data = SaveGame->FreePlay;
+	}
+
+	// A pace learned from different ratings would be off; start it over
+	if (Data.RatingVersion != RatingVersion)
+	{
+		Data.SecondsPerPoint = 0.f;
+		Data.SolvedPuzzles = 0;
+		Data.RatingVersion = RatingVersion;
 	}
 }
 
@@ -125,6 +134,71 @@ UFreePlaySubsystem* UFreePlaySubsystem::Get(const UObject* WorldContextObject)
 	const UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull) : nullptr;
 	const UGameInstance* GameInstance = World ? World->GetGameInstance() : nullptr;
 	return GameInstance ? GameInstance->GetSubsystem<UFreePlaySubsystem>() : nullptr;
+}
+
+float UFreePlaySubsystem::GetSecondsPerPoint() const
+{
+	return Data.SecondsPerPoint > 0.f ? Data.SecondsPerPoint : DefaultSecondsPerPoint;
+}
+
+float UFreePlaySubsystem::GetParSeconds(const UObject* WorldContextObject, UPuzzle* Puzzle)
+{
+	const UFreePlaySubsystem* FreePlay = Get(WorldContextObject);
+	const float Pace = FreePlay ? FreePlay->GetSecondsPerPoint() : DefaultSecondsPerPoint;
+	return Puzzle ? Puzzle->GetRating() * Pace * ParAllowance : 0.f;
+}
+
+FFreePlayScore UFreePlaySubsystem::FinishFreePlayPuzzle(const UObject* WorldContextObject, UPuzzle* Puzzle, float PuzzleSeconds)
+{
+	UFreePlaySubsystem* FreePlay = Get(WorldContextObject);
+	if (!FreePlay || !Puzzle)
+	{
+		return FFreePlayScore();
+	}
+
+	// The same finish asked for again (the end screen recomputing): don't count the time twice
+	if (FreePlay->LastScoredPuzzle.Get() == Puzzle && FreePlay->LastScore.PuzzleSeconds == PuzzleSeconds)
+	{
+		return FreePlay->LastScore;
+	}
+
+	FFreePlayScore Score;
+	Score.Rating = Puzzle->GetRating();
+	Score.ParSeconds = Score.Rating * FreePlay->GetSecondsPerPoint() * ParAllowance;
+	Score.PuzzleSeconds = PuzzleSeconds;
+	Score.bSolved = Puzzle->IsSolved();
+
+	if (Score.bSolved)
+	{
+		Score.BaseExp = FMath::RoundToInt(Score.Rating * ExpPerRatingPoint);
+
+		// Nothing at par, a quarter of the maximum at two thirds of it, the maximum at half of it or better
+		if (PuzzleSeconds > 0.f && PuzzleSeconds < Score.ParSeconds)
+		{
+			const float Bonus = FMath::Min(MaxTimeBonus, MaxTimeBonus * (Score.ParSeconds / PuzzleSeconds - 1.f));
+			Score.BonusExp = FMath::RoundToInt(Score.BaseExp * Bonus);
+		}
+
+		// Fold this solve into the pace. One very slow (left running) or very fast solve can only move it so far.
+		if (Score.Rating > 0.f && PuzzleSeconds > 0.f)
+		{
+			const float Pace = FreePlay->GetSecondsPerPoint();
+			const float Sample = FMath::Clamp(PuzzleSeconds / Score.Rating, Pace / 3.f, Pace * 3.f);
+			FreePlay->Data.SecondsPerPoint = FreePlay->Data.SolvedPuzzles == 0 ? Sample : FMath::Lerp(Pace, Sample, PaceSmoothing);
+			FreePlay->Data.SolvedPuzzles++;
+			UHappinessSaveGame::SaveCurrentSettings();
+		}
+	}
+
+	FreePlay->LastScore = Score;
+	FreePlay->LastScoredPuzzle = Puzzle;
+	return Score;
+}
+
+FFreePlayScore UFreePlaySubsystem::GetLastFreePlayScore(const UObject* WorldContextObject)
+{
+	const UFreePlaySubsystem* FreePlay = Get(WorldContextObject);
+	return FreePlay ? FreePlay->LastScore : FFreePlayScore();
 }
 
 void UFreePlaySubsystem::Changed()

@@ -13,6 +13,7 @@ void UPuzzle::Init(int Seed, int Size, int Difficulty)
 	m_iSize = Size;
 	m_iDifficulty = Difficulty;
 	m_bCampaign = false;
+	m_Rating = -1.f;
 	m_HintsUsed = m_LessonHintsUsed = 0;
 
 	m_Rand.Initialize(Seed);
@@ -36,6 +37,7 @@ bool UPuzzle::InitCampaign(int Seed, int Size, int Difficulty, ECampaignLesson L
 	m_HintsUsed = m_LessonHintsUsed = 0;
 	m_CampaignLesson = Lesson;
 	m_ExcludedClues = 0;
+	m_Rating = -1.f;
 
 	m_Rand.Initialize(Seed);
 
@@ -976,6 +978,118 @@ void UPuzzle::FixPuzzle()
 		}
 	}
 }
+float UPuzzle::GetClueRatingWeight(ECampaignLesson Clue)
+{
+	// Roughly the campaign's teaching order, rising steeply: a deduction with one of the late clue types takes
+	// several times as long to find as one with a same-column clue
+	switch (Clue)
+	{
+		case ECampaignLesson::Given:			return 0.5f;	// NotHere and givens are applied up front; shouldn't come up
+		case ECampaignLesson::VerticalTwo:		return 1.0f;
+		case ECampaignLesson::VerticalThree:	return 1.0f;
+		case ECampaignLesson::NextTo:			return 1.5f;
+		case ECampaignLesson::DirectlyLeftOf:	return 1.5f;
+		case ECampaignLesson::TwoNot:			return 1.5f;
+		case ECampaignLesson::Span:				return 2.5f;
+		case ECampaignLesson::Edge:				return 2.5f;
+		case ECampaignLesson::ThreeNot:			return 2.5f;
+		case ECampaignLesson::NotNextTo:		return 2.5f;
+		case ECampaignLesson::Gap:				return 2.5f;
+		case ECampaignLesson::SpanNotSide:		return 3.5f;
+		case ECampaignLesson::SpanNotMid:		return 3.5f;
+		case ECampaignLesson::LeftOf:			return 3.5f;
+		case ECampaignLesson::NotLeftOf:		return 3.5f;
+		case ECampaignLesson::Between:			return 5.0f;
+		case ECampaignLesson::Chain:			return 5.0f;
+		case ECampaignLesson::AllApart:			return 5.0f;
+		case ECampaignLesson::EitherOr:			return 5.0f;
+		case ECampaignLesson::NextToEitherOr:	return 6.0f;
+		default:								return 1.0f;
+	}
+}
+
+float UPuzzle::GetRating()
+{
+	if (m_Rating < 0.f)
+	{
+		m_Rating = ComputeRating().Rating;
+	}
+	return m_Rating;
+}
+
+FPuzzleRating UPuzzle::ComputeRating()
+{
+	FPuzzleRating Result;
+
+	// Leave everything as it was
+	const TArray<FPuzzleRow> SavedRows = m_Rows;
+	TArray<int> SavedUseCounts;
+	for (UClue* C : m_Clues)
+	{
+		SavedUseCounts.Add(C->m_iUseCount);
+	}
+	const int32 SavedHints = m_HintsUsed;
+	const int32 SavedLessonHints = m_LessonHintsUsed;
+
+	Reset();
+
+	const int32 MaxSteps = m_iSize * m_iSize * m_iSize * 2;
+	while (!IsSolved() && Result.Steps < MaxSteps)
+	{
+		// The easiest clue that can do something now
+		UClue* Best = nullptr;
+		float BestWeight = TNumericLimits<float>::Max();
+		for (UClue* C : m_Clues)
+		{
+			if (C->m_Type == eClueType::Given || C->m_Type == eClueType::NotHere)
+				continue;
+
+			const float Weight = GetClueRatingWeight(C->GetCampaignLesson());
+			if (Weight >= BestWeight)
+				continue;
+
+			SetMarker();
+			const int UseCount = C->m_iUseCount;
+			C->Analyze(*this);
+			RestoreMarker();
+			if (C->m_iUseCount > UseCount)
+			{
+				Best = C;
+				BestWeight = Weight;
+			}
+		}
+
+		// One deduction from it, as a hint would give
+		UHint* Step = Best ? NewObject<UHint>(GetTransientPackage()) : nullptr;
+		if (!Step || !Step->Init(*this, *Best))
+			break;
+
+		if (Step->bSetFinalIcon)
+			SetFinalIcon(Step->Row, Step->Col, Step->Icon);
+		else
+			EliminateIcon(Step->Row, Step->Col, Step->Icon);
+
+		Result.Steps++;
+		Result.Rating += BestWeight;
+		if (GetClueRatingWeight(Best->GetCampaignLesson()) > GetClueRatingWeight(Result.HardestClue))
+			Result.HardestClue = Best->GetCampaignLesson();
+	}
+
+	Result.bSolved = IsSolved();
+	if (!Result.bSolved)
+		Result.Rating = 0.f;
+
+	m_Rows = SavedRows;
+	for (int i = 0; i < m_Clues.Num(); i++)
+	{
+		m_Clues[i]->m_iUseCount = SavedUseCounts[i];
+	}
+	m_HintsUsed = SavedHints;
+	m_LessonHintsUsed = SavedLessonHints;
+
+	return Result;
+}
+
 int32 UPuzzle::GetCampaignScore() const
 {
 	// 3 for completing it, -1 if any hint was used, and another -1 if any hint was on the lesson's clue
