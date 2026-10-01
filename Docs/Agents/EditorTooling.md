@@ -66,8 +66,10 @@ and arrange a safe editor shutdown; then `python Tools/editor_gate.py recover --
 Recovery refuses while an editor or recorded tool process is running. Never reclaim merely because a
 heartbeat is old. Asset ownership still needs coordination: separate checkouts cannot merge `.uasset` edits.
 
-The gated scripts are versioned. Legacy `puzzle.sh` and `mcp.sh` are still local, ignored helpers with
-checkout-specific paths; inspect those paths before running them in a new checkout.
+All these scripts are versioned and work on the checkout they live in. `puzzle.sh` and `mcp.sh` get the
+project and `Saved` paths from `Tools/checkout_env.sh`, and use the checkout's `Engine` symlink (every checkout
+needs one, pointing at the installed engine). `puzzle.sh --build` refuses while this checkout's editor is open;
+each agent builds only its own checkout.
 
 ## The two tool servers
 
@@ -124,7 +126,8 @@ python Tools/mcp_call.py HappinessMCPLookup.HappinessUIToolset RenderWidget \
 - It renders the **designer** state: placeholder texts, default visibility, no game running. Anything set at
   runtime (scores, which buttons are locked, mode-dependent tick marks) won't show.
 
-`Tools/render_ui.sh` uses the same gate and current checkout, defaults to landscape, and leaves the editor open.
+`Tools/render_ui.sh /Game/Path/WBP_Name [w] [h]` does the same through the gate in the current checkout: it starts
+the editor if needed, defaults to landscape, and leaves the editor open.
 
 ## Work without the editor UI
 
@@ -145,7 +148,6 @@ cannot render PNG previews. None of those new authoring/rendering commandlets ha
 
 For asset-writing or rendering commandlets, use the shared gate as well and keep the same checkout's editor
 closed during the job. Read-only puzzle logic jobs can run separately when they don't write assets.
-- `Tools/render_ui.sh /Game/Path/WBP_Name [w] [h]` does the same and starts the editor if needed.
 
 ## Importing images
 

@@ -8,7 +8,8 @@
 
 ## Format
 
-- Phone game, **portrait**. Preview renders at **1080 × 1920**.
+- Phone game, locked to **landscape**. Preview renders at **1920 × 1080** (see
+  [ArtDirection.md](ArtDirection.md) for the aspect ratios to check).
 - Screens are UMG widgets (see [GameStructure.md](GameStructure.md) for the list). Check any visual change by
   rendering the widget ([EditorTooling.md](EditorTooling.md#rendering-a-widget-to-png)); remember the render
   shows designer placeholders, not live values.

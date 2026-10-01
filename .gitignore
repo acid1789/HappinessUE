@@ -88,6 +88,9 @@ Tools/*
 !Tools/render_ui.sh
 !Tools/bp_dump.py
 !Tools/bp_swap_node.py
+!Tools/checkout_env.sh
+!Tools/puzzle.sh
+!Tools/mcp.sh
 !Tools/tests/
 Tools/tests/__pycache__/
 
