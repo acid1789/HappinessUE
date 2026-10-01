@@ -18,18 +18,25 @@ Keep it true: when you learn something that would have saved you time, add it he
 1. **Never modify the engine.** `E:\HappinessUE\Engine` is a symlink to Epic's installed engine
    (`E:\UE4\UE_5.8\Engine`). Anything under it is Epic's. Project tooling belongs in `Plugins/` or `Tools/`.
 2. **Don't commit.** The user reviews and commits their own changes.
-3. **`.uasset` files are binary.** Change them only through the editor (the tools below), never as files.
-   Two agents can't merge edits to the same asset: only one agent should edit a given asset at a time.
-4. **Only one agent drives the editor at a time.** Use the shared editor gate, not routine permission
-   questions to the user. Set `HAPPINESS_AGENT_ID` to your unique session name (`codex-art` or
-   `claude-gameplay` if only one session of each is active). `Tools/editor.sh start` acquires ownership
-   and targets the current checkout. UMG/MCP clients enforce ownership and exact project/PID routing.
-   See [EditorTooling.md](Docs/Agents/EditorTooling.md#shared-editor-gate).
-5. **Leave the editor running** when you finish unless rebuilding C++ or handing it to another checkout.
-   Check `Tools/editor.sh status` at least every 60 seconds while holding the gate and between asset edits.
-   When another checkout is waiting, finish your current operation, end PIE, save, stop YOUR editor,
-   and release the gate. Otherwise release ownership and leave the editor running. Never stop another
-   checkout's editor or force-close unsaved work. After rebuilding, restart your editor.
+3. **Lock a file before changing it.** Each checkout has its own copy of every file, and git can't merge two
+   checkouts' edits to the same `.uasset`. Before changing an asset (or any file another agent might edit),
+   run `python Tools/editor_gate.py lock <path> --task "..."`; if another agent holds it, pick other work
+   or ask the user. The editor tools refuse to change an asset you haven't locked. Keep the lock until the
+   user has committed and pushed your change (`unlock` refuses before that), and pull before locking a file
+   that changed upstream. `.uasset` files are binary: change them only through the editor, never as files.
+   See [EditorTooling.md](Docs/Agents/EditorTooling.md#file-locks).
+4. **Each checkout runs its own editor; one owner per editor.** Agents in different checkouts work at the
+   same time, each in its own editor with its own MCP port. Set `HAPPINESS_AGENT_ID` to your unique session
+   name (`codex-art` or `claude-gameplay` if only one session of each is active) and take your checkout's
+   editor with `Tools/editor.sh start`. Within a checkout only the owner may use the editor: anyone else
+   (including the user, e.g. `ron-playtest` for a playtest) queues with a request. UMG/MCP clients enforce
+   ownership and exact project/PID/port routing. See
+   [EditorTooling.md](Docs/Agents/EditorTooling.md#editor-gate-one-editor-per-checkout).
+5. **Leave the editor running** when you finish unless rebuilding C++. Release ownership with
+   `Tools/editor.sh release`; the editor stays open for the next owner. Check `Tools/editor.sh status` at
+   least every 60 seconds while holding your editor and between asset edits; if someone is waiting on your
+   checkout, finish your current operation, end PIE, save and release. Never stop another checkout's editor
+   or force-close unsaved work. After rebuilding, restart your editor.
 6. **Don't save while Play-In-Editor is running.** Saving fails during PIE ("Asset does not exist").
    Look for an open PIE session in `Saved/Logs/Happiness.log` (`Creating play world` without a later
    `Shutting down PIE`) before saving.

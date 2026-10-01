@@ -1,4 +1,8 @@
-"""Machine-local ownership gate shared by all Happiness checkouts (stdlib only).
+"""Machine-local editor ownership gate, one per Happiness checkout (stdlib only).
+
+Each checkout runs its own editor, so agents in different checkouts work at the same time. Within a checkout,
+one agent (or the user, e.g. for a playtest) owns that checkout's editor at a time. Each checkout also gets its
+own Epic MCP port, so the editors' servers don't collide.
 
 Set HAPPINESS_AGENT_ID to a unique session name, e.g. codex-art or claude-gameplay.
 python Tools/editor_gate.py acquire --task "Inspect menu"
@@ -57,6 +61,9 @@ def state_dir():
     return Path(local) / "Happiness" / "AgentGate"
 
 
+FIRST_MCP_PORT = 8000
+
+
 @contextmanager
 def transaction():
     folder = state_dir()
@@ -66,7 +73,7 @@ def transaction():
         db.execute("BEGIN IMMEDIATE")
         db.execute("CREATE TABLE IF NOT EXISTS state (id INTEGER PRIMARY KEY, data TEXT NOT NULL)")
         row = db.execute("SELECT data FROM state WHERE id=1").fetchone()
-        state = json.loads(row[0]) if row else {"owner": None, "requests": [], "operations": []}
+        state = upgrade(json.loads(row[0]) if row else {})
         yield state
         db.execute("INSERT OR REPLACE INTO state VALUES (1, ?)", (json.dumps(state),))
         db.commit()
@@ -77,41 +84,76 @@ def transaction():
         db.close()
 
 
+def upgrade(state):
+    # State is kept per checkout: {"checkouts": {canonical project: {project, owner, requests, operations,
+    # mcp_port, umg_target}}, "locks": {asset key: lock}}. The first version had one global
+    # owner/requests/operations; file each under its checkout.
+    if "checkouts" in state:
+        state.setdefault("locks", {})
+        return state
+    upgraded = {"checkouts": {}, "locks": {}}
+    owner = state.get("owner")
+    if owner:
+        entry = checkout(upgraded, owner["project"])
+        entry["owner"] = owner
+        entry["operations"] = state.get("operations", [])
+    for waiting in state.get("requests", []):
+        checkout(upgraded, waiting["project"])["requests"].append(waiting)
+    return upgraded
+
+
+def checkout(state, project=None):
+    project = project or project_file()
+    key = canonical(project)
+    if key not in state["checkouts"]:
+        state["checkouts"][key] = {"project": str(project), "owner": None, "requests": [], "operations": [],
+                                   "mcp_port": None}
+    return state["checkouts"][key]
+
+
 def require_owner(state):
-    owner = state["owner"]
-    if not owner or owner["agent"] != agent_id() or canonical(owner["project"]) != canonical(project_file()):
-        who = f"{owner['agent']} in {owner['project']}" if owner else "nobody"
-        raise GateError(f"Editor gate owned by {who}. Acquire it before using editor tools")
+    entry = checkout(state)
+    owner = entry["owner"]
+    if not owner or owner["agent"] != agent_id():
+        who = owner["agent"] if owner else "nobody"
+        raise GateError(f"This checkout's editor is owned by {who}. Acquire it before using editor tools")
     owner["heartbeat"] = time.time()
     return owner
 
 
 def acquire(task=""):
     project = project_file()
-    editors = editor_processes()
-    foreign = [e for e in editors if not e["project"] or canonical(e["project"]) != canonical(project)]
-    if foreign:
-        request(task)
-        raise GateError(f"Another editor is open: {foreign}. Handoff requested; its owner must save and close it")
+    identity = agent_id()
     with transaction() as state:
-        if state["owner"]:
-            owner = require_owner(state)
+        elsewhere = [e["project"] for key, e in state["checkouts"].items()
+                     if key != canonical(project) and e["owner"] and e["owner"]["agent"] == identity]
+        if elsewhere:
+            raise GateError(f"{identity} already owns the editor of {elsewhere[0]}; release it there first")
+        entry = checkout(state, project)
+        holder = entry["owner"]
+        if not holder:
+            entry["owner"] = {"agent": identity, "project": str(project), "task": task,
+                              "acquired": time.time(), "heartbeat": time.time(), "editor_pid": None}
+        elif holder["agent"] == identity:
+            holder["heartbeat"] = time.time()
             if task:
-                owner["task"] = task
-        else:
-            owner = {"agent": agent_id(), "project": str(project), "task": task,
-                     "acquired": time.time(), "heartbeat": time.time(), "editor_pid": None}
-            state["owner"] = owner
-        state["requests"] = [r for r in state["requests"] if r["agent"] != owner["agent"]]
-        return dict(owner)
+                holder["task"] = task
+        if not holder or holder["agent"] == identity:
+            entry["requests"] = [r for r in entry["requests"] if r["agent"] != identity]
+            return dict(entry["owner"])
+    # Someone else holds this checkout's editor: queue behind them
+    request(task)
+    raise GateError(f"This checkout's editor is owned by {holder['agent']} ({holder['task'] or 'no task'}). "
+                    "Request recorded; retry when they release")
 
 
 def request(task=""):
     with transaction() as state:
         identity = agent_id()
-        state["requests"] = [r for r in state["requests"] if r["agent"] != identity]
-        state["requests"].append({"agent": identity, "project": str(project_file()),
-                                  "task": task, "requested": time.time()})
+        entry = checkout(state)
+        entry["requests"] = [r for r in entry["requests"] if r["agent"] != identity]
+        entry["requests"].append({"agent": identity, "project": entry["project"], "task": task,
+                                  "requested": time.time()})
         return state
 
 
@@ -122,13 +164,12 @@ def status():
 
 def release():
     with transaction() as state:
-        owner = require_owner(state)
-        if state["operations"]:
+        require_owner(state)
+        entry = checkout(state)
+        if entry["operations"]:
             raise GateError("An editor operation is in progress; finish it before releasing")
-        other_checkout = any(canonical(r["project"]) != canonical(owner["project"]) for r in state["requests"])
-        if other_checkout and project_editors(owner["project"]):
-            raise GateError("Another checkout is waiting. Save, stop YOUR editor, then release")
-        state["owner"] = None
+        # The editor stays open for whoever takes this checkout next
+        entry["owner"] = None
         return state
 
 
@@ -137,22 +178,191 @@ def operation(label):
     token = uuid.uuid4().hex
     with transaction() as state:
         require_owner(state)
-        # Serialize operations even when several tool processes use the same owner identity.
-        if state["operations"]:
+        entry = checkout(state)
+        # Serialize calls to this checkout's editor, even from several tool processes of the same owner.
+        if entry["operations"]:
             raise GateError("Another editor tool call is in progress; wait for it to finish")
-        state["operations"].append({"token": token, "pid": os.getpid(), "label": label, "started": time.time()})
+        entry["operations"].append({"token": token, "pid": os.getpid(), "label": label, "started": time.time()})
     try:
         yield
     finally:
         with transaction() as state:
-            state["operations"] = [op for op in state["operations"] if op["token"] != token]
-            if state["owner"]:
-                state["owner"]["heartbeat"] = time.time()
+            entry = checkout(state)
+            entry["operations"] = [op for op in entry["operations"] if op["token"] != token]
+            if entry["owner"]:
+                entry["owner"]["heartbeat"] = time.time()
 
 
 def record_editor(pid):
     with transaction() as state:
         require_owner(state)["editor_pid"] = pid
+
+
+def mcp_port(project=None):
+    # Each checkout keeps its own Epic MCP port: the lowest from FIRST_MCP_PORT no other checkout uses
+    with transaction() as state:
+        entry = checkout(state, project)
+        if not entry["mcp_port"]:
+            taken = {e["mcp_port"] for e in state["checkouts"].values() if e["mcp_port"]}
+            port = FIRST_MCP_PORT
+            while port in taken:
+                port += 1
+            entry["mcp_port"] = port
+        return entry["mcp_port"]
+
+
+def mcp_url():
+    return os.environ.get("UE_MCP_URL") or f"http://127.0.0.1:{mcp_port()}/mcp"
+
+
+# ---- File locks, shared by all checkouts ----
+# Each checkout has its own copy of every file, and git can't merge two checkouts' edits to the same .uasset.
+# An agent locks a file before changing it; the editor tools refuse to change an asset without its lock.
+# A lock is held until the change is committed and pushed, so the next agent edits the latest version.
+
+def lock_key(path):
+    """The checkout-independent name of a file: /Game/Folder/Asset for Unreal assets (from a /Game object or
+    graph path, or a Content/... .uasset/.umap file), else the path relative to the checkout root."""
+    text = str(path).strip().replace("\\", "/")
+    if text.startswith("/Game/"):
+        text = text.split(":", 1)[0]
+        folder, _, name = text.rpartition("/")
+        return f"{folder}/{name.split('.', 1)[0]}"
+    file = Path(text)
+    if file.is_absolute():
+        # A path inside any checkout: relative to that checkout's root
+        for folder in file.parents:
+            if len(list(folder.glob("*.uproject"))) == 1:
+                file = file.relative_to(folder)
+                break
+        else:
+            # Git Bash turns a /Game/... argument into <Git install>/Game/...; take it back
+            if "/Game/" in text:
+                return lock_key(text[text.index("/Game/"):])
+            raise GateError(f"{path} is not inside a project checkout")
+    parts = file.as_posix().lstrip("./").split("/")
+    if parts[0] == "Content" and file.suffix.lower() in (".uasset", ".umap"):
+        return "/Game/" + "/".join(parts[1:])[: -len(file.suffix)]
+    return "/".join(parts)
+
+
+def lock_file(key, root=None):
+    """The file a lock key names in a checkout (an existing .umap or else the .uasset for /Game keys)."""
+    root = Path(root or project_file().parent)
+    if key.startswith("/Game/"):
+        base = root / "Content" / key[len("/Game/"):]
+        level = base.with_name(base.name + ".umap")
+        return level if level.exists() else base.with_name(base.name + ".uasset")
+    return root / key
+
+
+def git(*args, root=None):
+    result = subprocess.run(["git", "-C", str(root or project_file().parent), *args], capture_output=True,
+                            text=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    return result.returncode, result.stdout.strip()
+
+
+def unshared_changes(key):
+    """Why this checkout's copy isn't in the shared history yet: uncommitted or unpushed changes ('' if none)."""
+    file = lock_file(key).relative_to(project_file().parent).as_posix()
+    code, changes = git("status", "--porcelain", "--", file)
+    if code == 0 and changes:
+        return "uncommitted changes"
+    code, unpushed = git("log", "--oneline", "@{u}..HEAD", "--", file)
+    if code == 0 and unpushed:
+        return "unpushed commits"
+    return ""
+
+
+def behind_upstream(key):
+    """True if the shared history has a newer version of the file than this checkout (after fetching)."""
+    git("fetch", "--quiet")
+    file = lock_file(key).relative_to(project_file().parent).as_posix()
+    code, newer = git("log", "--oneline", "HEAD..@{u}", "--", file)
+    return code == 0 and bool(newer)
+
+
+def lock(paths, task=""):
+    identity = agent_id()
+    keys = [lock_key(p) for p in paths]
+    stale = [k for k in keys if behind_upstream(k)]
+    if stale:
+        raise GateError(f"Your checkout is behind GitHub for {stale}; pull before locking")
+    with transaction() as state:
+        taken = [f"{k} ({state['locks'][k]['agent']}: {state['locks'][k]['task'] or 'no task'})"
+                 for k in keys if k in state["locks"] and state["locks"][k]["agent"] != identity]
+        if taken:
+            raise GateError(f"Locked by another agent: {', '.join(taken)}")
+        for key in keys:
+            state["locks"][key] = {"agent": identity, "project": str(project_file()), "task": task,
+                                   "locked": time.time()}
+        return {k: state["locks"][k] for k in keys}
+
+
+def unlock(paths, force=False):
+    identity = agent_id()
+    keys = [lock_key(p) for p in paths]
+    if not force:
+        pending = [f"{k} ({why})" for k in keys if (why := unshared_changes(k))]
+        if pending:
+            raise GateError(f"Not in the shared history yet: {', '.join(pending)}. Keep the lock until the user "
+                            "commits and pushes (or unlock --force to abandon the change)")
+    with transaction() as state:
+        foreign = [k for k in keys if k in state["locks"] and state["locks"][k]["agent"] != identity]
+        if foreign:
+            raise GateError(f"Not your locks: {foreign}")
+        for key in keys:
+            state["locks"].pop(key, None)
+        return state["locks"]
+
+
+def locks():
+    with transaction() as state:
+        return state["locks"]
+
+
+def require_locks(paths):
+    """Refuse unless this agent holds the lock on every file named."""
+    keys = sorted({lock_key(p) for p in paths})
+    if not keys:
+        return
+    identity = agent_id()
+    with transaction() as state:
+        missing = [k for k in keys if state["locks"].get(k, {}).get("agent") != identity]
+    if missing:
+        raise GateError(f"Lock before changing: {missing}  (python Tools/editor_gate.py lock <path> --task ...)")
+
+
+def game_paths(value):
+    """Every /Game/... path mentioned anywhere in a JSON-like value."""
+    if isinstance(value, str):
+        return [value] if value.startswith("/Game/") else []
+    if isinstance(value, dict):
+        return [p for v in value.values() for p in game_paths(v)]
+    if isinstance(value, (list, tuple)):
+        return [p for v in value for p in game_paths(v)]
+    return []
+
+
+# Tools that only read: everything else that names an asset needs its lock
+READ_ONLY_PREFIXES = ("get", "find", "read", "list", "describe", "search", "query", "is")
+READ_ONLY_TOOLS = {"renderwidget", "startpie", "stoppie", "clickviewport"}
+
+
+def is_read_only(tool):
+    name = tool.lower()
+    return name.startswith(READ_ONLY_PREFIXES) or name in READ_ONLY_TOOLS
+
+
+def set_umg_target(path):
+    # None when a fresh editor starts: UmgMcp forgets its target then
+    with transaction() as state:
+        checkout(state)["umg_target"] = lock_key(path) if path else None
+
+
+def umg_target():
+    with transaction() as state:
+        return checkout(state).get("umg_target")
 
 
 def windows_argv(command):
@@ -200,13 +410,10 @@ def project_editors(project=None):
 
 
 def verify_single_editor():
+    # Other checkouts' editors are fine (each has its own MCP port; UmgMcp routes by project and PID).
+    # This checkout must have exactly one, e.g. not also a "Standalone Game" launched from it.
     target = project_file()
-    editors = editor_processes()
-    # Unknown projects are unsafe, as they may own the shared MCP port.
-    foreign = [e for e in editors if not e["project"] or canonical(e["project"]) != canonical(target)]
-    if foreign:
-        raise GateError(f"Another editor is open: {foreign}. Its owner must save and close it before handoff")
-    own = [e for e in editors if e["project"] and canonical(e["project"]) == canonical(target)]
+    own = project_editors(target)
     if len(own) != 1:
         raise GateError(f"Expected one editor for {target}, found {len(own)}")
     return own[0]["pid"]
@@ -259,12 +466,13 @@ def recover(confirmed):
     if not confirmed:
         raise GateError("Recovery needs --confirm-abandoned, after confirming the old agent is gone")
     with transaction() as state:
-        if editor_processes():
-            raise GateError("Recovery refused while an editor is running; arrange a safe handoff")
-        if any(pid_alive(op["pid"]) for op in state["operations"]):
+        entry = checkout(state)
+        if project_editors(entry["project"]):
+            raise GateError("Recovery refused while this checkout's editor is running; arrange a safe handoff")
+        if any(pid_alive(op["pid"]) for op in entry["operations"]):
             raise GateError("Recovery refused while an editor tool process is still running")
-        state["owner"] = None
-        state["operations"] = []
+        entry["owner"] = None
+        entry["operations"] = []
         return state
 
 
@@ -284,15 +492,26 @@ def pid_alive(pid):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["status", "acquire", "request", "release", "heartbeat", "recover"])
+    parser.add_argument("command", choices=["status", "acquire", "request", "release", "heartbeat", "recover",
+                                            "lock", "unlock", "locks"])
+    parser.add_argument("paths", nargs="*", help="lock/unlock: /Game/... asset paths or files in the checkout")
     parser.add_argument("--task", default="")
     parser.add_argument("--agent", help="Override HAPPINESS_AGENT_ID for this call")
     parser.add_argument("--confirm-abandoned", action="store_true")
+    parser.add_argument("--force", action="store_true", help="unlock: drop the lock even with unshared changes")
     args = parser.parse_args()
     if args.agent:
         os.environ["HAPPINESS_AGENT_ID"] = args.agent
     try:
-        if args.command == "recover":
+        if args.command in ("lock", "unlock") and not args.paths:
+            raise GateError(f"{args.command} needs at least one path")
+        if args.command == "lock":
+            result = lock(args.paths, args.task)
+        elif args.command == "unlock":
+            result = unlock(args.paths, args.force)
+        elif args.command == "locks":
+            result = locks()
+        elif args.command == "recover":
             result = recover(args.confirm_abandoned)
         elif args.command == "heartbeat":
             with transaction() as state:

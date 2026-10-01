@@ -23,11 +23,29 @@ def find_endpoint():
     return gate.checked_endpoint()
 
 
+READ_ONLY_COMMANDS = {"connect", "set_target_umg_asset", "get_target_umg_asset"}
+
+
+def changed_assets(command, params):
+    """The widget assets a command may change: the current target (and any asset it names), unless it only
+    reads. Changing a widget needs its lock (Tools/editor_gate.py lock)."""
+    if command in READ_ONLY_COMMANDS or command.startswith(("get_", "query_", "list_")):
+        return []
+    target = gate.umg_target()
+    if not target:
+        raise gate.GateError("No UMG target recorded; call set_target_umg_asset first")
+    return [target] + gate.game_paths(params)
+
+
 def send(host, port, command, params, timeout=30):
     with gate.operation(f"UMG {command}"):
         if (host, port) != find_endpoint():
             raise gate.GateError("UMG endpoint changed; reconnect to this checkout's editor")
-        return _send(host, port, command, params, timeout)
+        gate.require_locks(changed_assets(command, params))
+        reply = _send(host, port, command, params, timeout)
+        if command == "set_target_umg_asset" and isinstance(reply, dict) and reply.get("status") == "success":
+            gate.set_umg_target(reply.get("asset_path") or params.get("asset_path", ""))
+        return reply
 
 
 def _send(host, port, command, params, timeout):
@@ -77,4 +95,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except gate.GateError as error:
+        sys.exit(f"Editor gate: {error}")

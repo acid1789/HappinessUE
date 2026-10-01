@@ -4,9 +4,14 @@ Widget layouts (the designer hierarchy and each widget's properties) are edited 
 (`Plugins/UmgMcp`, third-party, reviewed) with `python Tools/umg.py <command> '<json>'`. Epic's MCP tools only
 cover Blueprint graphs, not the designer.
 
-Acquire the shared editor gate first with `Tools/editor.sh start`, and keep `HAPPINESS_AGENT_ID` set for
-all calls. Instance selection verifies this checkout's full project path and live PID; agent/checkout-specific
-client IDs replace the old shared client ID. See [EditorTooling.md](EditorTooling.md#shared-editor-gate).
+Take your checkout's editor first with `Tools/editor.sh start`, and keep `HAPPINESS_AGENT_ID` set for
+all calls. Instance selection verifies this checkout's full project path and live PID, so another checkout's
+editor running at the same time is never targeted; client IDs are agent- and checkout-specific. See
+[EditorTooling.md](EditorTooling.md#editor-gate-one-editor-per-checkout).
+
+Lock a widget before changing it (`python Tools/editor_gate.py lock /Game/... --task "..."`). Commands that
+change the current `set_target_umg_asset` target are refused without its lock; reading the tree and querying
+properties need none ([EditorTooling.md](EditorTooling.md#file-locks)).
 
 ## Basics
 

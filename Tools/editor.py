@@ -34,8 +34,33 @@ def engine_directory(project):
     raise gate.GateError("Engine not found. Set UE_ENGINE_DIR to the installed Engine directory")
 
 
+MCP_SECTION = "[/Script/ModelContextProtocolEngine.ModelContextProtocolSettings]"
+
+
+def write_mcp_settings(project, port):
+    """Store this checkout's MCP port and auto-start in its local (unversioned) editor settings, so an editor
+    opened by hand on this checkout serves on the same port. Only call while this checkout's editor is closed:
+    a running editor rewrites the file from memory when it exits."""
+    path = project.parent / "Saved" / "Config" / "WindowsEditor" / "EditorPerProjectUserSettings.ini"
+    lines = path.read_text(encoding="utf-8").splitlines() if path.is_file() else []
+    wanted = {"ServerPortNumber": str(port), "bAutoStartServer": "True"}
+    try:
+        start = lines.index(MCP_SECTION) + 1
+    except ValueError:
+        lines += ["", MCP_SECTION]
+        start = len(lines)
+    end = start
+    while end < len(lines) and not lines[end].startswith("["):
+        end += 1
+    body = [line for line in lines[start:end] if line.split("=", 1)[0] not in wanted and line.strip()]
+    body += [f"{key}={value}" for key, value in wanted.items()]
+    lines[start:end] = body + [""]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\r\n".join(lines) + "\r\n", encoding="utf-8", newline="")
+
+
 def mcp_ready():
-    request = urllib.request.Request(os.environ.get("UE_MCP_URL", "http://127.0.0.1:8000/mcp"),
+    request = urllib.request.Request(gate.mcp_url(),
                                      data=b'{}', headers={"Content-Type": "application/json"}, method="POST")
     try:
         with urllib.request.urlopen(request, timeout=2):
@@ -48,29 +73,28 @@ def mcp_ready():
 
 def start(timeout, task=""):
     project = gate.project_file()
-    try:
-        gate.acquire(task)
-    except gate.GateError:
-        gate.request(task or "Need editor")
-        raise
+    gate.acquire(task or "Need editor")  # records a request and raises if another agent holds this checkout
     with gate.operation("start editor"):
-        editors = gate.editor_processes()
-        if any(not e["project"] or gate.canonical(e["project"]) != gate.canonical(project) for e in editors):
-            raise gate.GateError(f"Another checkout's editor is open: {editors}. Request a handoff")
+        # Other checkouts' editors don't matter: each checkout has its own editor and MCP port
+        editors = gate.project_editors(project)
         if len(editors) > 1:
             raise gate.GateError("Multiple editors are open for this checkout; resolve before continuing")
         if not editors:
+            port = gate.mcp_port(project)
+            write_mcp_settings(project, port)
             executable = engine_directory(project) / "Binaries" / "Win64" / "UnrealEditor.exe"
-            child = subprocess.Popen([str(executable), str(project), "-nosplash", "-unattended"],
+            child = subprocess.Popen([str(executable), str(project), "-nosplash", "-unattended",
+                                      f"-ModelContextProtocolPort={port}", "-ModelContextProtocolStartServer"],
                                      cwd=project.parent, stdin=subprocess.DEVNULL,
                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                      creationflags=subprocess.CREATE_NO_WINDOW)
             gate.record_editor(child.pid)
+            gate.set_umg_target(None)
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             try:
                 gate.checked_endpoint()
-                url = os.environ.get("UE_MCP_URL", "http://127.0.0.1:8000/mcp")
+                url = gate.mcp_url()
                 gate.verify_mcp_listener(url)
                 if mcp_ready():
                     print(f"Editor ready: {project} (PID {gate.verify_single_editor()})")

@@ -30,6 +30,10 @@ Check what a node really is with `bp_dump.py` / `node_info` before relying on th
 
 ## Editing
 
+Lock the Blueprint first (`python Tools/editor_gate.py lock /Game/... --task "..."`): every call that changes
+it, compiling included, is refused without the lock. Reading needs none
+([EditorTooling.md](EditorTooling.md#file-locks)).
+
 | Step | Call |
 |---|---|
 | Find a node type id | `find_node_types {"graph": G, "type_id_filter": "...", "context_pins": []}` |

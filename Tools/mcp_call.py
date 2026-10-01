@@ -7,29 +7,45 @@ Example:
         '{"blueprint": {"refPath": "/Game/Happiness/UI/WBP_CampaignTree.WBP_CampaignTree"}}'
 
 Use Tools/mcp.sh -find / -describe first to learn a tool's arguments. The editor must be running with
-the MCP server started (auto-start is on); the URL defaults to http://127.0.0.1:8000/mcp.
+the MCP server started (Tools/editor.sh start does that). Each checkout's editor serves on its own port
+(Tools/editor_gate.py mcp_port); UE_MCP_URL overrides the URL.
 """
 import json
-import os
 import sys
 import urllib.request
 import editor_gate as gate
 
-URL = os.environ.get("UE_MCP_URL", "http://127.0.0.1:8000/mcp")
+
+def changed_assets(payload):
+    """The assets a tools/call may change: every /Game path in its arguments, unless the tool only reads.
+    An import names a folder and a new asset; the lock is on the new asset."""
+    if payload.get("method") != "tools/call":
+        return []
+    call = payload.get("params", {}).get("arguments", {})
+    tool, arguments = call.get("tool_name", ""), call.get("arguments", {})
+    if gate.is_read_only(tool) or not isinstance(arguments, dict):
+        return []
+    arguments = dict(arguments)
+    paths = []
+    if isinstance(arguments.get("folder_path"), str) and isinstance(arguments.get("asset_name"), str):
+        paths.append(arguments.pop("folder_path").rstrip("/") + "/" + arguments.pop("asset_name"))
+    return paths + gate.game_paths(arguments)
 
 
 def post(payload, session=None):
     with gate.operation("Epic MCP " + payload.get("method", "request")):
         gate.checked_endpoint()
-        gate.verify_mcp_listener(URL)
-        return _post(payload, session)
+        gate.require_locks(changed_assets(payload))
+        url = gate.mcp_url()
+        gate.verify_mcp_listener(url)
+        return _post(url, payload, session)
 
 
-def _post(payload, session=None):
+def _post(url, payload, session=None):
     headers = {"Content-Type": "application/json", "Accept": "application/json, text/event-stream"}
     if session:
         headers["Mcp-Session-Id"] = session
-    request = urllib.request.Request(URL, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
+    request = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
     with urllib.request.urlopen(request, timeout=300) as response:
         session = response.headers.get("Mcp-Session-Id") or session
         body = response.read().decode("utf-8")
@@ -72,4 +88,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except gate.GateError as error:
+        sys.exit(f"Editor gate: {error}")

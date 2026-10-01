@@ -1,8 +1,8 @@
 # Editor tooling
 
 Run from Git Bash in **your own checkout** (or a subdirectory); most tools need the editor open unless noted.
-The gated Python tools also work from PowerShell. Engine discovery uses the checkout's `Engine` link,
-Unreal's Windows installation registry, or an explicit `UE_ENGINE_DIR` pointing to the installed `Engine` directory.
+The gated Python tools also work from PowerShell. Every checkout needs an `Engine` symlink to the installed
+engine (`editor.py` can also use Unreal's registry or an explicit `UE_ENGINE_DIR`).
 
 ## Starting, stopping, building
 
@@ -15,56 +15,95 @@ Unreal's Windows installation registry, or an explicit `UE_ENGINE_DIR` pointing 
 The build log is `Saved/PuzzleBuild.log`; look for `Result: Succeeded` and `error C`/`error LNK` lines.
 After building, start the editor again and recompile any Widget Blueprints whose C++ parent changed.
 
-## Shared editor gate
+## Editor gate: one editor per checkout
 
-All checkouts share `%LOCALAPPDATA%/Happiness/AgentGate/gate.sqlite3`. SQLite transactions make acquisition
-atomic; state includes the owning agent, full project path, task, heartbeat, editor PID, handoff requests,
-and any tool operation in progress. Gate files are local runtime data, not Git artifacts.
+Each checkout runs **its own editor**, so agents in different checkouts (Claude in `E:\HappinessUE`, Codex in
+`E:\Happiness_Art`) work at the same time. Within a checkout, one owner at a time uses that editor: an agent,
+or the user taking it for a playtest (e.g. `ron-playtest`).
+
+State lives in `%LOCALAPPDATA%/Happiness/AgentGate/gate.sqlite3`, one record per checkout: owner (agent, task,
+heartbeat, editor PID), waiting requests, the tool call in progress, and the checkout's **Epic MCP port**. SQLite
+transactions make acquisition atomic. Gate files are local runtime data, not Git artifacts.
 `HAPPINESS_EDITOR_GATE_DIR` can override the directory; every agent must use the same absolute directory.
 
 Choose one identity per active agent session, and keep it for subsequent shell calls:
 
 ```bash
 export HAPPINESS_AGENT_ID=codex-art          # Claude uses claude-gameplay
-Tools/editor.sh start --task "Inspect menu"
-Tools/editor.sh status
+Tools/editor.sh start --task "Inspect menu"  # takes this checkout's editor, launching it if needed
+Tools/editor.sh status                       # every checkout: owner, requests, port
 python Tools/umg.py set_target_umg_asset '{"asset_path":"/Game/General/UI/WBP_GameSelect"}'
 # ...inspect/edit, compile, visually verify, save...
-Tools/editor.sh release
+Tools/editor.sh release                      # the editor stays open for the next owner
 ```
 
 In PowerShell use `$env:HAPPINESS_AGENT_ID = 'codex-art'` and `python Tools/editor.py start`.
 Environment settings must be supplied again if your shell tool starts a fresh process each call.
 `--agent` sets identity only for that invocation; UMG/MCP still need the environment variable.
+An identity owns at most one checkout's editor at a time.
 
-If occupied, `start` fails without starting/stopping an editor and records a handoff request.
-You can also request explicitly: `Tools/editor.sh request --task "Need editor for logo placement"`.
-Work on source/art independently while waiting. Check status at least every 60 seconds while holding
-ownership and between asset edits. A heartbeat is refreshed by each tool call; use `heartbeat` while
-doing independent work. Handoff is cooperative, not an automatic interruption.
+**Ports.** Each checkout is given its own MCP port the first time it's used (`E:\HappinessUE` 8000,
+`E:\Happiness_Art` 8001). `start` launches the editor with `-ModelContextProtocolPort=<port>
+-ModelContextProtocolStartServer` and also writes the port into the checkout's local
+`Saved/Config/WindowsEditor/EditorPerProjectUserSettings.ini`, so an editor opened by hand on that checkout
+serves on the same port. `mcp_call.py` targets its checkout's port automatically (`UE_MCP_URL` overrides it).
+The UmgMcp plugin already picks a free port per editor and publishes it with the project path and PID.
 
-The owner finishes its current operation, ends PIE, saves every changed asset, then:
+**Waiting for an editor.** If another owner holds your checkout's editor, `start` fails without touching the
+editor and records a request (or use `Tools/editor.sh request --task "..."`). Work on source/art meanwhile.
+The owner checks `status` at least every 60 seconds and between asset edits; when someone is waiting, it
+finishes the current operation, ends PIE, saves, and releases. Handoff is cooperative. A heartbeat is
+refreshed by each tool call; use `heartbeat` while doing independent work.
+
+**Rebuilding C++.** `Tools/editor.sh stop` closes only this checkout's editor and keeps ownership; build, then
+`start` again. Other checkouts' editors keep running.
+
+**Playtesting.** Take the checkout's editor before playing in it (`HAPPINESS_AGENT_ID=ron-playtest`,
+`start --task "Playtest"`, `release` afterwards) so no agent edits under you. A **Standalone Game** launched
+from an editor is a second `UnrealEditor.exe` for the same checkout, which blocks tool calls there until it
+closes. A packaged build or a device doesn't affect the gate at all. Check for PIE with
+`python Tools/mcp_call.py EditorToolset.EditorAppToolset IsPIERunning '{}'`.
+
+**Routing checks.** UMG routing requires **both** exact `project_file` and live process ID in instance
+metadata; stale discovery files and other checkouts' instances are ignored. Client IDs include agent and
+checkout. Epic MCP requests verify that the checkout's port is owned by that checkout's editor PID. Tool calls
+are serialized per checkout and ownership can't be released during a call. These wrappers are a cooperative
+guard, not an OS security boundary: don't bypass them with raw sockets or start a second editor on the same
+checkout.
+
+**Recovery.** Heartbeats never automatically expire ownership. For a crashed agent/tool, first confirm that it
+is gone and arrange a safe shutdown of that checkout's editor; then
+`python Tools/editor_gate.py recover --confirm-abandoned` (from that checkout). Recovery refuses while that
+checkout's editor or a recorded tool process is running. Never reclaim merely because a heartbeat is old.
+
+## File locks
+
+Each checkout has its own copy of every file, and git can't merge two checkouts' edits to the same `.uasset`.
+So before changing a file, lock it. Locks live in the same gate database and are shared by every checkout;
+each is held by one agent identity.
 
 ```bash
-Tools/editor.sh stop                       # retains ownership; closes only this checkout
-Tools/editor.sh release
+python Tools/editor_gate.py lock /Game/Happiness/UI/WBP_Happiness --task "Hint button art"
+python Tools/editor_gate.py locks                     # every lock: path, agent, task, checkout
+python Tools/editor_gate.py unlock /Game/Happiness/UI/WBP_Happiness
 ```
 
-The waiting agent retries `start` to open its own checkout. If nobody in another checkout is waiting,
-`release` leaves the editor open; a later request still requires the previous agent to reacquire,
-save/stop, and release before the requester can start. Requests remain visible after release.
-An agent can never acquire while a different checkout's editor is open.
-
-UMG routing requires **both** exact `project_file` and live process ID in instance metadata; stale
-discovery files and another checkout's newer instance are ignored. Client IDs include agent and checkout.
-Epic MCP requests verify that the local HTTP listening port belongs to that same editor PID.
-Tool calls are serialized and ownership cannot be released during a call. These wrappers are a cooperative
-guard, not an OS security boundary: don't bypass them with raw sockets or manually start a second editor.
-
-Heartbeats never automatically expire ownership. For a crashed agent/tool, first confirm that it is gone
-and arrange a safe editor shutdown; then `python Tools/editor_gate.py recover --confirm-abandoned`.
-Recovery refuses while an editor or recorded tool process is running. Never reclaim merely because a
-heartbeat is old. Asset ownership still needs coordination: separate checkouts cannot merge `.uasset` edits.
+- **Names:** an asset as `/Game/Folder/Asset` (object paths like `.../WBP_X.WBP_X` and graph paths like
+  `...:DoHint` count as the same asset) or as its file `Content/Folder/Asset.uasset`. Any other file by its path
+  in the checkout, e.g. `Source/Happiness/UI/HintInfoWidget.cpp`. Git Bash rewriting `/Game/...` arguments into
+  `C:/Program Files/Git/Game/...` is handled.
+- **Enforced for assets.** `mcp_call.py` refuses any Epic MCP call that names an asset you haven't locked,
+  unless the tool only reads (names starting `get`/`find`/`read`/`list`/`describe`/`search`/`query`/`is`, plus
+  `RenderWidget` and the PIE tools). An import (`folder_path` + `asset_name`) needs the lock on the new asset.
+  `umg.py` refuses commands that change a widget unless you hold the lock on the current
+  `set_target_umg_asset` target; reading the tree and querying properties are free. Other files (source,
+  docs) aren't enforced: lock them when another agent might edit them too.
+- **Keep the lock until your change is shared.** `unlock` refuses while the file has uncommitted or unpushed
+  changes in your checkout, so the next agent never edits a stale copy. The user commits; unlock after the
+  commit is pushed. `unlock --force` drops a lock regardless (for an abandoned change you've reverted).
+- **Start from the latest version.** `lock` fetches and refuses if GitHub has a newer version of the file than
+  your checkout: pull first.
+- Locks don't expire. When you're blocked by a lock, do other work or ask the user; never edit around it.
 
 All these scripts are versioned and work on the checkout they live in. `puzzle.sh` and `mcp.sh` get the
 project and `Saved` paths from `Tools/checkout_env.sh`, and use the checkout's `Engine` symlink (every checkout
@@ -77,7 +116,7 @@ The editor hosts two servers, each with a small command-line client in `Tools/`:
 
 | Server | Client | Use it for |
 |---|---|---|
-| **Epic MCP** (HTTP, `http://127.0.0.1:8000/mcp`) | `python Tools/mcp_call.py <toolset> <tool> '<json>'` | Blueprint graphs, compiling, reparenting, saving, assets, importing, rendering |
+| **Epic MCP** (HTTP, `http://127.0.0.1:<checkout port>/mcp`) | `python Tools/mcp_call.py <toolset> <tool> '<json>'` | Blueprint graphs, compiling, reparenting, saving, assets, importing, rendering |
 | **UmgMcp** (third-party plugin, local socket) | `python Tools/umg.py <command> '<json>'` | Widget layouts: the designer hierarchy and widget properties (see [UMG.md](UMG.md)) |
 
 Both clients take `--max N` to limit how much of the reply is printed.
