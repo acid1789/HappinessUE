@@ -75,6 +75,9 @@ public:
 	UPROPERTY(BlueprintReadOnly)
 	ECampaignLesson m_CampaignLesson = ECampaignLesson::Given;
 
+	// Set by InitCampaign for Campaign mode: every clue type may appear, not just lessons up to m_CampaignLesson
+	bool m_bCampaignAllClues = false;
+
 	// Free play: clue types (bit 1 << ECampaignLesson) that Init won't generate. Set before Init; Given (givens and
 	// NotHeres) can't be excluded, so every puzzle can still be solved. Ignored by InitCampaign.
 	UPROPERTY(BlueprintReadWrite)
@@ -111,7 +114,7 @@ public:
 	// Campaign puzzle: only clue types from Lesson and earlier lessons, and it can't be solved without Lesson's clues.
 	// Difficulty sets the givens and extra clues as usual. Returns false if no such puzzle was found (e.g. Between on 3x3).
 	UFUNCTION(BlueprintCallable)
-	bool InitCampaign(int Seed, int Size, int Difficulty, ECampaignLesson Lesson);
+	bool InitCampaign(int Seed, int Size, int Difficulty, ECampaignLesson Lesson, bool bAllClueTypes = false);
 
 	// False for lessons that can't be played at this size (Given is never playable)
 	UFUNCTION(BlueprintCallable, BlueprintPure)

@@ -21,7 +21,7 @@ void UPuzzle::Init(int Seed, int Size, int Difficulty)
 	Generate();
 }
 
-bool UPuzzle::InitCampaign(int Seed, int Size, int Difficulty, ECampaignLesson Lesson)
+bool UPuzzle::InitCampaign(int Seed, int Size, int Difficulty, ECampaignLesson Lesson, bool bAllClueTypes)
 {
 	if (!IsLessonAvailable(Lesson, Size))
 	{
@@ -36,6 +36,7 @@ bool UPuzzle::InitCampaign(int Seed, int Size, int Difficulty, ECampaignLesson L
 	m_bCampaign = true;
 	m_HintsUsed = m_LessonHintsUsed = 0;
 	m_CampaignLesson = Lesson;
+	m_bCampaignAllClues = bAllClueTypes;
 	m_ExcludedClues = 0;
 	m_Rating = -1.f;
 

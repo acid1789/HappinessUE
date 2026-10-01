@@ -26,9 +26,9 @@ public:
 		const FLinearColor TintedColor = Color * InWidgetStyle.GetColorAndOpacityTint();
 
 		// One tick per stage after the first, at the points that unlock it; the final's is the bar's end
-		for (int32 Stage = 1; Stage < UCampaignSubsystem::FinalStage; Stage++)
+		for (int32 Stage = 1; Stage < UCampaignSubsystem::GetFinalStage(); Stage++)
 		{
-			const float X = Size.X * float(UCampaignSubsystem::GetStagePointsRequired(Stage)) / UCampaignSubsystem::MaxPoints;
+			const float X = Size.X * float(UCampaignSubsystem::GetStagePointsRequired(Stage)) / UCampaignSubsystem::GetMaxPoints();
 			const TArray<FVector2D> Points = { FVector2D(X, 0.f), FVector2D(X, Size.Y) };
 			FSlateDrawElement::MakeLines(OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(), Points,
 				ESlateDrawEffect::None, TintedColor, true, Thickness);

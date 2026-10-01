@@ -82,11 +82,19 @@ void ULessonPopupWidget::BuildStageButtons()
 	StageButtons.Reset();
 	StageClicks.Reset();
 
-	for (int32 Stage = 0; Stage < UCampaignSubsystem::NumStages; Stage++)
+	// The row is sized for five stages (Lessons). More stages (Campaign) share the same width, with each name on
+	// two lines ("5x5" over "Normal") so it still fits its narrower button.
+	const int32 NumStages = UCampaignSubsystem::GetNumStages();
+	constexpr int32 FittedStages = 5;
+	constexpr float Spacing = 12.f;
+	const bool bNarrow = NumStages > FittedStages;
+	const float ButtonWidth = bNarrow ? FittedStages * (StageButtonSize.X + Spacing) / NumStages - Spacing : StageButtonSize.X;
+
+	for (int32 Stage = 0; Stage < NumStages; Stage++)
 	{
 		// A size box per button keeps them a fixed size whatever panel StageBox is
 		USizeBox* Size = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
-		Size->SetWidthOverride(StageButtonSize.X);
+		Size->SetWidthOverride(ButtonWidth);
 		Size->SetHeightOverride(StageButtonSize.Y);
 
 		UButton* Button = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
@@ -94,7 +102,8 @@ void ULessonPopupWidget::BuildStageButtons()
 		Size->AddChild(Button);
 
 		UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-		Label->SetText(UCampaignSubsystem::GetStageDisplayName(Stage));
+		const FText StageName = UCampaignSubsystem::GetStageDisplayName(Stage);
+		Label->SetText(bNarrow ? FText::FromString(StageName.ToString().Replace(TEXT(" "), TEXT("\n"))) : StageName);
 		Label->SetJustification(ETextJustify::Center);
 		Label->SetColorAndOpacity(StageTextColor);
 		if (StageFont.HasValidFont())
@@ -110,7 +119,7 @@ void ULessonPopupWidget::BuildStageButtons()
 		UPanelSlot* StageSlot = StageBox->AddChild(Size);
 		if (UHorizontalBoxSlot* BoxSlot = Cast<UHorizontalBoxSlot>(StageSlot))
 		{
-			BoxSlot->SetPadding(FMargin(6.f, 0.f));
+			BoxSlot->SetPadding(FMargin(Spacing / 2.f, 0.f));
 			BoxSlot->SetVerticalAlignment(VAlign_Center);
 		}
 
@@ -133,6 +142,13 @@ void ULessonPopupWidget::ShowLesson(ECampaignLesson InLesson)
 
 void ULessonPopupWidget::Refresh()
 {
+	// Lessons and Campaign have different stages
+	if (StageButtons.Num() != UCampaignSubsystem::GetNumStages())
+	{
+		BuildStageButtons();
+	}
+
+	const bool bCampaignMode = UCampaignSubsystem::GetMode() == ECampaignMode::Campaign;
 	const UCampaignSubsystem* Campaign = GetCampaign();
 	const int32 Points = Campaign ? Campaign->GetLessonPoints(Lesson) : 0;
 	const int32 CurrentStage = Campaign ? Campaign->GetCurrentStage(Lesson) : 0;
@@ -148,15 +164,16 @@ void ULessonPopupWidget::Refresh()
 	}
 	if (LessonProgress)
 	{
-		LessonProgress->SetPercent(float(Points) / UCampaignSubsystem::MaxPoints);
+		LessonProgress->SetPercent(float(Points) / UCampaignSubsystem::GetMaxPoints());
 	}
 	if (ProgressText)
 	{
-		const FText StageText = bCompleted
-			? LOCTEXT("LessonComplete", "Lesson complete")
-			: UCampaignSubsystem::GetStageDisplayName(CurrentStage);
-		ProgressText->SetText(FText::Format(LOCTEXT("ProgressFormat", "{0} / {1} points  -  {2}"),
-			Points, UCampaignSubsystem::MaxPoints, StageText));
+		const FText StageText = !bCompleted ? UCampaignSubsystem::GetStageDisplayName(CurrentStage)
+			: (bCampaignMode ? LOCTEXT("CampaignComplete", "Complete") : LOCTEXT("LessonComplete", "Lesson complete"));
+		ProgressText->SetText(FText::Format(bCampaignMode
+				? LOCTEXT("CampaignProgressFormat", "{0} / {1} puzzles  -  {2}")
+				: LOCTEXT("ProgressFormat", "{0} / {1} points  -  {2}"),
+			Points, UCampaignSubsystem::GetMaxPoints(), StageText));
 	}
 
 	// Once the final is done there is nothing left to progress: a single button back to the tree
@@ -167,13 +184,14 @@ void ULessonPopupWidget::Refresh()
 	}
 	if (CloseLabel)
 	{
-		CloseLabel->SetText(bCompleted ? LOCTEXT("ReturnToLessons", "Return to Lessons") : LOCTEXT("Close", "Close"));
+		CloseLabel->SetText(!bCompleted ? LOCTEXT("Close", "Close")
+			: (bCampaignMode ? LOCTEXT("ReturnToCampaign", "Return to Campaign") : LOCTEXT("ReturnToLessons", "Return to Lessons")));
 	}
 
 	for (int32 Stage = 0; Stage < StageButtons.Num(); Stage++)
 	{
 		const bool bUnlocked = Campaign ? Campaign->IsStageUnlocked(Lesson, Stage) : Stage == 0;
-		const bool bIsCurrent = Stage == CurrentStage && !(Stage == UCampaignSubsystem::FinalStage && bCompleted);
+		const bool bIsCurrent = Stage == CurrentStage && !(Stage == UCampaignSubsystem::GetFinalStage() && bCompleted);
 
 		StageButtons[Stage]->SetIsEnabled(bUnlocked);
 		StageButtons[Stage]->SetBackgroundColor(!bUnlocked ? LockedTint : (bIsCurrent ? CurrentTint : PassedTint));

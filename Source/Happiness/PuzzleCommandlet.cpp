@@ -333,11 +333,13 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 	const bool bCampaign = LessonValue != INDEX_NONE;
 
 	// -stage=N (with -lesson): generate exactly what the campaign plays for that stage: its size, difficulty and seed mapping
+	// -campaignmode: Campaign mode's stages, puzzles and clue types instead of the lessons'
+	const ECampaignMode TrackMode = FParse::Param(Cmd, TEXT("campaignmode")) ? ECampaignMode::Campaign : ECampaignMode::Lessons;
 	int32 Stage = -1;
 	if (bCampaign && FParse::Value(Cmd, TEXT("stage="), Stage))
 	{
-		Size = UCampaignSubsystem::GetStageSize(Stage);
-		Diff = UCampaignSubsystem::GetStageDifficulty(Stage);
+		Size = UCampaignSubsystem::GetStageSizeFor(TrackMode, Stage);
+		Diff = UCampaignSubsystem::GetStageDifficultyFor(TrackMode, Stage);
 	}
 	const ECampaignLesson Lesson = bCampaign ? (ECampaignLesson)LessonValue : ECampaignLesson::Given;
 	int32 CampaignFails = 0;
@@ -402,7 +404,7 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 		double T0 = FPlatformTime::Seconds();
 		if (bCampaign)
 		{
-			if (!P.InitCampaign(Stage >= 0 ? UCampaignSubsystem::GetGenerationSeed(Lesson, Stage, Seed) : Seed, Size, Diff, Lesson))
+			if (!P.InitCampaign(Stage >= 0 ? UCampaignSubsystem::GetGenerationSeed(TrackMode, Lesson, Stage, Seed) : Seed, Size, Diff, Lesson, TrackMode == ECampaignMode::Campaign))
 				CampaignFails++;
 		}
 		else
@@ -419,7 +421,7 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 			// No clue may come from a later lesson, and the puzzle must need the lesson's clues
 			for (UClue* C : P.m_Clues)
 			{
-				if (!UCampaignTree::IsClueLessonAllowed(C->GetCampaignLesson(), Lesson))
+				if (TrackMode == ECampaignMode::Lessons && !UCampaignTree::IsClueLessonAllowed(C->GetCampaignLesson(), Lesson))
 					UE_LOG(LogTemp, Error, TEXT("Clue above lesson: %s"), *C->ToString());
 			}
 			if (!P.RequiresLesson(Lesson))

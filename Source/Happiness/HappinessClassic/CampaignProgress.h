@@ -7,13 +7,23 @@
 
 class UPuzzle;
 
+/** Which track the lesson tree is being played in. Each has its own stages and progress. */
+UENUM(BlueprintType)
+enum class ECampaignMode : uint8
+{
+	/** Teaches each clue type: small boards, points per puzzle with hint penalties */
+	Lessons,
+	/** After every lesson is completed: each clue type again on bigger boards, one step per solved puzzle */
+	Campaign,
+};
+
 /** One lesson's saved progress */
 USTRUCT(BlueprintType)
 struct FLessonProgress
 {
 	GENERATED_BODY()
 
-	/** 0 to UCampaignSubsystem::MaxPoints */
+	/** 0 to UCampaignSubsystem::GetMaxPoints(): points in Lessons, solved puzzles in Campaign */
 	UPROPERTY(SaveGame, BlueprintReadOnly, Category = "Campaign")
 	int32 Points = 0;
 
@@ -53,7 +63,8 @@ struct FLessonPuzzleResult
 	UPROPERTY(BlueprintReadOnly, Category = "Campaign")
 	bool bUsedLessonHint = false;
 
-	/** The puzzle's score, 1 to 3: 3 for completing it, -1 for using hints, another -1 for a lesson-clue hint */
+	/** The puzzle's score. Lessons: 1 to 3 (3 for completing it, -1 for using hints, another -1 for a lesson-clue
+	 *  hint). Campaign: 1 for solving it. */
 	UPROPERTY(BlueprintReadOnly, Category = "Campaign")
 	int32 Score = 0;
 
@@ -86,6 +97,14 @@ struct FCampaignSaveData
 	UPROPERTY(SaveGame)
 	TMap<ECampaignLesson, FLessonProgress> Lessons;
 
+	/** Campaign mode's progress, kept apart from the lessons' */
+	UPROPERTY(SaveGame)
+	TMap<ECampaignLesson, FLessonProgress> CampaignLessons;
+
+	/** The track being played; the session below belongs to it */
+	UPROPERTY(SaveGame)
+	ECampaignMode Mode = ECampaignMode::Lessons;
+
 	// The lesson session and its open puzzle, so a reload resumes it
 	UPROPERTY(SaveGame)
 	bool bInSession = false;
@@ -111,9 +130,13 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnLessonPuzzleRequested, ECampaign
  * Campaign progress: points, stages and seeds per lesson. Kept in the normal game save (SG_Happiness, whose
  * parent is UHappinessSaveGame); every SG_Happiness written to disk includes the current progress.
  *
- * Each lesson has stages 0-3 (3x3 easy, 3x3 normal, 4x4 easy, 4x4 normal), unlocked at 0/9/18/27 points,
- * and a final stage (4x4 hard) unlocked at 36 points. Only the current stage earns points; earlier stages
- * and the final can be replayed freely. Completing the final completes the lesson.
+ * Two tracks over the same lesson tree (ECampaignMode), each with its own progress:
+ * - Lessons: stages 0-3 (3x3 easy, 3x3 normal, 4x4 easy, 4x4 normal), unlocked at 0/9/18/27 points, and a final
+ *   (4x4 hard) at 36. A puzzle scores 3, less 1 for any hint and 1 more for a hint on the lesson's clue.
+ * - Campaign, unlocked by completing every lesson: 4 puzzles of 5x5 normal, 1 of 5x5 hard, 4 of 6x6 normal,
+ *   1 of 6x6 hard, 4 of 7x7 normal, 1 of 7x7 hard, then the final, 8x8 easy. Each solved puzzle is one step.
+ * Only the current stage earns progress; earlier stages and the final can be replayed freely. Completing the
+ * final completes that clue. The stage functions below describe the current mode's track.
  *
  * Game flow: the lesson popup calls RequestLessonPuzzle. The game creates puzzles with InitPuzzleForPlay (classic or
  * lesson, depending on the session) and reports finished ones with HandlePuzzleFinished.
@@ -124,25 +147,43 @@ class HAPPINESS_API UCampaignSubsystem : public UGameInstanceSubsystem
 	GENERATED_BODY()
 
 public:
-	static constexpr int32 NumStages = 5;
-	static constexpr int32 FinalStage = 4;
-	static constexpr int32 PointsPerStage = 9;
-	static constexpr int32 MaxPoints = PointsPerStage * FinalStage;
-	static constexpr int32 MaxPuzzleScore = 3;
-
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
 
-	// ---- Stage definitions ----
+	// ---- Mode ----
+
+	/** The track being played (Lessons outside a game) */
+	UFUNCTION(BlueprintPure, Category = "Campaign")
+	static ECampaignMode GetMode();
+
+	/** Switch track. A session in the other track ends. Broadcasts OnProgressChanged. */
+	UFUNCTION(BlueprintCallable, Category = "Campaign")
+	void SetMode(ECampaignMode NewMode);
+
+	/** Campaign mode opens once every lesson is completed */
+	UFUNCTION(BlueprintPure, Category = "Campaign")
+	bool IsCampaignModeUnlocked() const;
+
+	// ---- Stage definitions (current mode) ----
 
 	UFUNCTION(BlueprintPure, Category = "Campaign")
-	static int32 GetNumStages() { return NumStages; }
+	static int32 GetNumStages();
 
 	UFUNCTION(BlueprintPure, Category = "Campaign")
-	static int32 GetFinalStage() { return FinalStage; }
+	static int32 GetFinalStage() { return GetNumStages() - 1; }
 
+	/** Progress that completes the track up to the final */
 	UFUNCTION(BlueprintPure, Category = "Campaign")
-	static int32 GetMaxPoints() { return MaxPoints; }
+	static int32 GetMaxPoints();
+
+	/** Best score of one puzzle: 3 in Lessons, 1 in Campaign */
+	UFUNCTION(BlueprintPure, Category = "Campaign")
+	static int32 GetMaxPuzzleScore();
+
+	/** Stage size, difficulty and the progress needed to unlock it, for a given mode */
+	static int32 GetStageSizeFor(ECampaignMode Mode, int32 Stage);
+	static int32 GetStageDifficultyFor(ECampaignMode Mode, int32 Stage);
+	static int32 GetNumStagesFor(ECampaignMode Mode);
 
 	UFUNCTION(BlueprintPure, Category = "Campaign")
 	static int32 GetStageSize(int32 Stage);
@@ -157,8 +198,8 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Campaign")
 	static FText GetStageDisplayName(int32 Stage);
 
-	/** Generator seed for a stage's Seed-th puzzle; distinct for every lesson and stage */
-	static int32 GetGenerationSeed(ECampaignLesson Lesson, int32 Stage, int32 Seed);
+	/** Generator seed for a stage's Seed-th puzzle; distinct for every mode, lesson and stage */
+	static int32 GetGenerationSeed(ECampaignMode Mode, ECampaignLesson Lesson, int32 Stage, int32 Seed);
 
 	// ---- Progress ----
 
@@ -179,7 +220,7 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Campaign")
 	bool IsLessonCompleted(ECampaignLesson Lesson) const;
 
-	/** True once every lesson in the earlier tree columns is completed */
+	/** True once every lesson in the earlier tree columns is completed (in the current mode) */
 	UFUNCTION(BlueprintPure, Category = "Campaign")
 	bool IsLessonUnlocked(ECampaignLesson Lesson) const;
 
@@ -233,6 +274,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Campaign", meta = (WorldContext = "WorldContextObject"))
 	static void PrepareNextLessonPuzzle(const UObject* WorldContextObject, int32& Size, int32& Difficulty);
 
+	/** Debug: complete every lesson (unlocks Campaign mode). Console: Happiness.CompleteAllLessons */
+	void DebugCompleteAllLessons();
+
 	/** Debug: wipe all campaign progress */
 	UFUNCTION(BlueprintCallable, Category = "Campaign")
 	void ResetAllProgress();
@@ -265,6 +309,17 @@ public:
 	const FCampaignSaveData& GetSaveData() const { return Data; }
 
 private:
+	struct FStage
+	{
+		int32 Size;
+		int32 Difficulty;
+		int32 Required;
+	};
+	static const TArray<FStage>& GetStages(ECampaignMode Mode);
+	static const FStage& GetStage(ECampaignMode Mode, int32 Stage);
+
+	/** The current mode's progress */
+	const TMap<ECampaignLesson, FLessonProgress>& GetProgressMap() const;
 	FLessonProgress& GetMutableProgress(ECampaignLesson Lesson);
 	void Save();
 

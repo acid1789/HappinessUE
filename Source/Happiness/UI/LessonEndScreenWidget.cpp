@@ -63,7 +63,7 @@ void ULessonEndScreenWidget::Show(UPuzzle* Puzzle, float PuzzleSeconds)
 	ResultText->SetColorAndOpacity(Result.bSolved ? SolvedColor : IncorrectColor);
 
 	// The score lines add up to the total: completion 3, -1 for using hints, another -1 for a lesson-clue hint
-	const int32 Completion = Result.bSolved ? UCampaignSubsystem::MaxPuzzleScore : 0;
+	const int32 Completion = Result.bSolved ? UCampaignSubsystem::GetMaxPuzzleScore() : 0;
 	const int32 HintPenalty = Result.bUsedHints ? -1 : 0;
 	const int32 LessonHintPenalty = Result.bUsedLessonHint ? -1 : 0;
 	TimeText->SetText(FText::FromString(Puzzle->FormatTimeString(PuzzleSeconds)));
@@ -217,10 +217,10 @@ void ULessonEndScreenWidget::ShowUnlock()
 
 void ULessonEndScreenWidget::SetShownPoints(float Points)
 {
-	LessonProgress->SetPercent(Points / UCampaignSubsystem::MaxPoints);
+	LessonProgress->SetPercent(Points / UCampaignSubsystem::GetMaxPoints());
 	if (ProgressText)
 	{
-		ProgressText->SetText(FText::Format(LOCTEXT("Progress", "{0} / {1}"), FMath::FloorToInt(Points), UCampaignSubsystem::MaxPoints));
+		ProgressText->SetText(FText::Format(LOCTEXT("Progress", "{0} / {1}"), FMath::FloorToInt(Points), UCampaignSubsystem::GetMaxPoints()));
 	}
 }
 
@@ -249,7 +249,7 @@ FText ULessonEndScreenWidget::GetNoteText() const
 	{
 		return LOCTEXT("AlreadyScored", "Already scored: no points added");
 	}
-	if (Result.Stage == UCampaignSubsystem::FinalStage)
+	if (Result.Stage == UCampaignSubsystem::GetFinalStage())
 	{
 		return LOCTEXT("FinalSolved", "Final solved!");
 	}

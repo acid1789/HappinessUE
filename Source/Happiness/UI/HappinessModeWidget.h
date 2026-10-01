@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "HappinessClassic/CampaignProgress.h"
 #include "HappinessModeWidget.generated.h"
 
 class UButton;
@@ -24,12 +25,17 @@ public:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UButton> LessonsButton;
 
+	/** Campaign mode: the lesson tree again on bigger boards. Disabled until every lesson is completed. */
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UButton> CampaignButton;
+
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UButton> BackButton;
 
 	UPROPERTY(BlueprintAssignable, Category = "Happiness Mode")
 	FOnHappinessModeEvent OnClassicChosen;
 
+	/** Lessons or Campaign chosen; the campaign subsystem's mode says which. Both open the lesson tree. */
 	UPROPERTY(BlueprintAssignable, Category = "Happiness Mode")
 	FOnHappinessModeEvent OnLessonsChosen;
 
@@ -52,6 +58,12 @@ private:
 
 	UFUNCTION()
 	void HandleLessonsClicked();
+
+	UFUNCTION()
+	void HandleCampaignClicked();
+
+	void OpenTree(ECampaignMode Mode);
+	void RefreshCampaignLock();
 
 	UFUNCTION()
 	void HandleBackClicked();

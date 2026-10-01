@@ -14,6 +14,11 @@ void UHappinessModeWidget::NativeConstruct()
 	{
 		LessonsButton->OnClicked.AddUniqueDynamic(this, &UHappinessModeWidget::HandleLessonsClicked);
 	}
+	if (CampaignButton)
+	{
+		CampaignButton->OnClicked.AddUniqueDynamic(this, &UHappinessModeWidget::HandleCampaignClicked);
+	}
+	RefreshCampaignLock();
 	if (BackButton)
 	{
 		BackButton->OnClicked.AddUniqueDynamic(this, &UHappinessModeWidget::HandleBackClicked);
@@ -22,7 +27,17 @@ void UHappinessModeWidget::NativeConstruct()
 
 void UHappinessModeWidget::Show()
 {
+	RefreshCampaignLock();
 	SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+}
+
+void UHappinessModeWidget::RefreshCampaignLock()
+{
+	if (CampaignButton)
+	{
+		const UCampaignSubsystem* Campaign = UCampaignSubsystem::Get(this);
+		CampaignButton->SetIsEnabled(Campaign && Campaign->IsCampaignModeUnlocked());
+	}
 }
 
 void UHappinessModeWidget::Hide()
@@ -38,6 +53,20 @@ void UHappinessModeWidget::HandleClassicClicked()
 
 void UHappinessModeWidget::HandleLessonsClicked()
 {
+	OpenTree(ECampaignMode::Lessons);
+}
+
+void UHappinessModeWidget::HandleCampaignClicked()
+{
+	OpenTree(ECampaignMode::Campaign);
+}
+
+void UHappinessModeWidget::OpenTree(ECampaignMode Mode)
+{
+	if (UCampaignSubsystem* Campaign = UCampaignSubsystem::Get(this))
+	{
+		Campaign->SetMode(Mode);
+	}
 	Hide();
 	OnLessonsChosen.Broadcast();
 }

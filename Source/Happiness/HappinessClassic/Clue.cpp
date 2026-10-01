@@ -34,7 +34,8 @@ void UClue::Init(UPuzzle& P, FRandomStream& Rand)
 		GenerateClue(P, Rand);
 
 		const ECampaignLesson Lesson = GetCampaignLesson();
-		if (Lesson == P.m_CampaignLesson || (UCampaignTree::IsClueLessonAllowed(Lesson, P.m_CampaignLesson) && (!bWantLesson || iTries >= 1000)))
+		const bool bAllowed = P.m_bCampaignAllClues || UCampaignTree::IsClueLessonAllowed(Lesson, P.m_CampaignLesson);
+		if (Lesson == P.m_CampaignLesson || (bAllowed && (!bWantLesson || iTries >= 1000)))
 			return;
 	}
 
