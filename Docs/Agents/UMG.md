@@ -4,6 +4,10 @@ Widget layouts (the designer hierarchy and each widget's properties) are edited 
 (`Plugins/UmgMcp`, third-party, reviewed) with `python Tools/umg.py <command> '<json>'`. Epic's MCP tools only
 cover Blueprint graphs, not the designer.
 
+Acquire the shared editor gate first with `Tools/editor.sh start`, and keep `HAPPINESS_AGENT_ID` set for
+all calls. Instance selection verifies this checkout's full project path and live PID; agent/checkout-specific
+client IDs replace the old shared client ID. See [EditorTooling.md](EditorTooling.md#shared-editor-gate).
+
 ## Basics
 
 ```bash

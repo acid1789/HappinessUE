@@ -79,8 +79,21 @@ DerivedDataCache/*
 
 # Ignore the engine folder
 Engine/*
-Tools/
+Tools/*
+!Tools/editor.sh
+!Tools/editor.py
+!Tools/editor_gate.py
+!Tools/umg.py
+!Tools/mcp_call.py
+!Tools/render_ui.sh
+!Tools/bp_dump.py
+!Tools/bp_swap_node.py
+!Tools/tests/
+Tools/tests/__pycache__/
 
 enc_temp_folder/
+
+# Generated artwork and prompts
+/output/
 
 Config/Windows/WindowsEngine.ini

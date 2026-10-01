@@ -6,7 +6,8 @@ Keep it true: when you learn something that would have saved you time, add it he
 ## The project
 
 - **Happiness** is a logic-grid puzzle game for Android and iOS, built with **Unreal Engine 5.8.3** and **UMG**.
-  Project root: `E:\HappinessUE` (`Happiness.uproject`).
+  Each agent has its own checkout (`Happiness.uproject` in that checkout's root).
+  Claude: `E:\HappinessUE`; Codex art: `E:\Happiness_Art`. Run tooling from your own checkout.
 - **Puzzle logic is C++** in `Source/Happiness/HappinessClassic/` (generation, clues, hints, rating, campaign,
   free play, save data).
 - **The UI is UMG Widget Blueprints** in `Content/`, some with C++ parent classes in `Source/Happiness/UI/`.
@@ -19,10 +20,16 @@ Keep it true: when you learn something that would have saved you time, add it he
 2. **Don't commit.** The user reviews and commits their own changes.
 3. **`.uasset` files are binary.** Change them only through the editor (the tools below), never as files.
    Two agents can't merge edits to the same asset: only one agent should edit a given asset at a time.
-4. **Only one agent drives the editor at a time.** The editor tools share one editor instance and one
-   UmgMcp client id. Coordinate through the user before starting, stopping or editing in it.
-5. **Leave the editor running** when you finish. Close it only to rebuild C++ (`Tools/editor.sh stop`), then
-   start it again (`Tools/editor.sh start`).
+4. **Only one agent drives the editor at a time.** Use the shared editor gate, not routine permission
+   questions to the user. Set `HAPPINESS_AGENT_ID` to your unique session name (`codex-art` or
+   `claude-gameplay` if only one session of each is active). `Tools/editor.sh start` acquires ownership
+   and targets the current checkout. UMG/MCP clients enforce ownership and exact project/PID routing.
+   See [EditorTooling.md](Docs/Agents/EditorTooling.md#shared-editor-gate).
+5. **Leave the editor running** when you finish unless rebuilding C++ or handing it to another checkout.
+   Check `Tools/editor.sh status` at least every 60 seconds while holding the gate and between asset edits.
+   When another checkout is waiting, finish your current operation, end PIE, save, stop YOUR editor,
+   and release the gate. Otherwise release ownership and leave the editor running. Never stop another
+   checkout's editor or force-close unsaved work. After rebuilding, restart your editor.
 6. **Don't save while Play-In-Editor is running.** Saving fails during PIE ("Asset does not exist").
    Look for an open PIE session in `Saved/Logs/Happiness.log` (`Creating play world` without a later
    `Shutting down PIE`) before saving.
