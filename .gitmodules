@@ -1,0 +1,4 @@
+[submodule "Plugins/UmgMcp"]
+	path = Plugins/UmgMcp
+	url = https://github.com/acid1789/UnrealMotionGraphicsMCP.git
+	branch = happiness
