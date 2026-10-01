@@ -62,6 +62,7 @@ python Tools/umg.py reorder_widget_tree '{"root": "Content", "tree": "[\"TitleTe
   - C++ widgets: `/Script/Happiness.LessonProgressTicks`
 - New widgets can be referenced from the Blueprint graph after the widget Blueprint is compiled (they show up as
   `Variables|<WidgetBlueprint>|Get<Name>` node types).
+- **Preserve Blueprint variable bindings when recreating a container:** keep its original name and class, and set `bIsVariable: true` before compiling. `export_umg_to_json` omits this flag; a newly created widget defaults to a non-variable and existing graph references will fail to compile.
 - **There is no rename.** To rename, create a new widget, copy the old one's properties onto it, then delete
   the old one.
 - A C++ parent class binds child widgets **by name** (`meta = (BindWidget)`); a required binding missing from
