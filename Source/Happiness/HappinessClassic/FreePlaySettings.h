@@ -56,6 +56,19 @@ struct FFreePlayScore
 	/** Time bonus: up to MaxTimeBonus of the base, reached at half the par time */
 	UPROPERTY(BlueprintReadOnly, Category = "Free Play")
 	int32 BonusExp = 0;
+
+	/** The puzzle was a daily puzzle */
+	UPROPERTY(BlueprintReadOnly, Category = "Free Play")
+	bool bDaily = false;
+
+	/** The first solve of a daily puzzle: worth UDailySubsystem::ExpMultiplier times the amounts above (which stay
+	 *  normal; the end screen doubles the total in its own step) */
+	UPROPERTY(BlueprintReadOnly, Category = "Free Play")
+	bool bDailyBonus = false;
+
+	/** For a daily puzzle: the streak after it */
+	UPROPERTY(BlueprintReadOnly, Category = "Free Play")
+	int32 DailyStreak = 0;
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnFreePlayCluesChanged);

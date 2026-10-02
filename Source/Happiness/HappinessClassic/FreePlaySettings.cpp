@@ -1,5 +1,6 @@
 #include "FreePlaySettings.h"
 #include "CampaignTree.h"
+#include "DailyPuzzle.h"
 #include "HappinessSaveGame.h"
 #include "Puzzle.h"
 
@@ -163,6 +164,8 @@ FFreePlayScore UFreePlaySubsystem::FinishFreePlayPuzzle(const UObject* WorldCont
 	}
 
 	FFreePlayScore Score;
+	UDailySubsystem* Daily = UDailySubsystem::Get(WorldContextObject);
+	Score.bDaily = Daily && Daily->IsActiveDailyPuzzle(Puzzle);
 	Score.Rating = Puzzle->GetRating();
 	Score.ParSeconds = Score.Rating * FreePlay->GetSecondsPerPoint() * ParAllowance;
 	Score.PuzzleSeconds = PuzzleSeconds;
@@ -179,6 +182,13 @@ FFreePlayScore UFreePlaySubsystem::FinishFreePlayPuzzle(const UObject* WorldCont
 			Score.BonusExp = FMath::RoundToInt(Score.BaseExp * Bonus);
 		}
 
+		// The daily puzzle: its first solve counts toward the streak and is worth double. The amounts here stay
+		// normal; the end screen doubles the total in a step of its own (UFreePlayEndScreenWidget).
+		if (Daily && Daily->RecordSolve(Puzzle))
+		{
+			Score.bDailyBonus = true;
+		}
+
 		// Fold this solve into the pace. One very slow (left running) or very fast solve can only move it so far.
 		if (Score.Rating > 0.f && PuzzleSeconds > 0.f)
 		{
@@ -190,6 +200,10 @@ FFreePlayScore UFreePlaySubsystem::FinishFreePlayPuzzle(const UObject* WorldCont
 		}
 	}
 
+	if (Score.bDaily)
+	{
+		Score.DailyStreak = Daily->GetStreak();
+	}
 	FreePlay->LastScore = Score;
 	FreePlay->LastScoredPuzzle = Puzzle;
 	return Score;

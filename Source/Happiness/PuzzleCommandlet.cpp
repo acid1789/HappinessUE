@@ -4,6 +4,7 @@
 #include "HappinessClassic/Hint.h"
 #include "HappinessClassic/CampaignTree.h"
 #include "HappinessClassic/CampaignProgress.h"
+#include "HappinessClassic/DailyPuzzle.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "Misc/OutputDevice.h"
@@ -279,6 +280,40 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 	// -explain: build every hint's explanation (UHint::GetExplanation) and report how many fell back to the plain action
 	const bool bExplain = FParse::Param(Cmd, TEXT("explain"));
 
+	// -dailies=YYYYMMDD:N checks the daily puzzles of N dates from that one, one summary line per date
+	FString Dailies;
+	if (FParse::Value(Cmd, TEXT("dailies="), Dailies))
+	{
+		FString Start, CountText;
+		Dailies.Split(TEXT(":"), &Start, &CountText);
+		const int32 First = FCString::Atoi(*Start);
+		FDateTime Day(First / 10000, (First / 100) % 100, First % 100);
+		const FString TempOut = FPaths::ProjectSavedDir() / TEXT("PuzzleCLI_daily.txt");
+		FString AllOut;
+		for (int32 i = 0; i < FMath::Max(1, FCString::Atoi(*CountText)); i++, Day += FTimespan::FromDays(1))
+		{
+			const int32 Date = Day.GetYear() * 10000 + Day.GetMonth() * 100 + Day.GetDay();
+			FString SubParams = Params.Replace(*(TEXT("-dailies=") + Dailies), *FString::Printf(TEXT("-daily=%d"), Date));
+			SubParams = SubParams.Replace(*(TEXT("-out=") + OutPath), TEXT("")) + TEXT(" -out=") + TempOut;
+			Main(SubParams);
+
+			FString Result, Daily, Summary;
+			FFileHelper::LoadFileToString(Result, *TempOut);
+			TArray<FString> Lines;
+			Result.ParseIntoArrayLines(Lines);
+			for (const FString& Line : Lines)
+			{
+				if (Line.StartsWith(TEXT("DAILY")))
+					Daily = Line.Replace(TEXT("DAILY "), TEXT(""));
+				else if (Line.StartsWith(TEXT("SUMMARY")))
+					Summary = Line.Replace(TEXT("SUMMARY "), TEXT(""));
+			}
+			AllOut += FString::Printf(TEXT("%s | %s\n"), *Daily, *Summary);
+		}
+		FFileHelper::SaveStringToFile(AllOut, *OutPath);
+		return 0;
+	}
+
 	// -lesson=Name generates campaign puzzles for that lesson
 	FString LessonName;
 	int64 LessonValue = INDEX_NONE;
@@ -370,6 +405,19 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 		ExcludedClues &= ~(1 << int32(ECampaignLesson::Given));
 	}
 
+	// -daily=YYYYMMDD: exactly that date's daily puzzle (its size, difficulty, seed and clue types)
+	int32 DailyDate = 0;
+	FString DailyLine;
+	if (FParse::Value(Cmd, TEXT("daily="), DailyDate))
+	{
+		const FDailyPuzzleSpec Daily = UDailySubsystem::GetSpec(DailyDate);
+		Size = Daily.Size;
+		Diff = Daily.Difficulty;
+		SeedMin = SeedMax = Daily.Seed;
+		ExcludedClues = Daily.ExcludedClueMask;
+		DailyLine = FString::Printf(TEXT("DAILY date=%d size=%d diff=%d seed=%d clueTypes=%d\n"), DailyDate, Size, Diff, Daily.Seed, Daily.Clues.Num());
+	}
+
 	if (bCampaign && !UPuzzle::IsLessonAvailable(Lesson, Size))
 	{
 		FFileHelper::SaveStringToFile(FString::Printf(TEXT("Lesson %s is not available at size %d\n"), *LessonName, Size), *OutPath);
@@ -384,6 +432,7 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 
 	FString Out = FString::Printf(TEXT("size=%d diff=%d seeds=%d-%d mode=%s%s\n"), Size, Diff, SeedMin, SeedMax, *Mode,
 		bNoAuto ? TEXT(" noauto") : TEXT(""));
+	Out += DailyLine;
 
 	int32 Total = 0, AnalyzeFails = 0, HintFails = 0, ErrorPuzzles = 0;
 	int32 CluesByLesson[256] = {}, HintsByLesson[256] = {}, NotHereClues = 0;

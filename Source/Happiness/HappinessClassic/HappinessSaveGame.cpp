@@ -17,6 +17,10 @@ void UHappinessSaveGame::Serialize(FArchive& Ar)
 		{
 			FreePlay = FreePlaySubsystem->GetSaveData();
 		}
+		if (const UDailySubsystem* DailySubsystem = UDailySubsystem::GetInstance())
+		{
+			Daily = DailySubsystem->GetSaveData();
+		}
 	}
 
 	Super::Serialize(Ar);

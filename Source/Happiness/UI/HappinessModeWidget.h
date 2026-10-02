@@ -6,6 +6,7 @@
 #include "HappinessModeWidget.generated.h"
 
 class UButton;
+class UTextBlock;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnHappinessModeEvent);
 
@@ -29,6 +30,14 @@ public:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UButton> CampaignButton;
 
+	/** Today's daily puzzle */
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UButton> DailyButton;
+
+	/** The daily streak, under the Daily button */
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> StreakText;
+
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UButton> BackButton;
 
@@ -38,6 +47,11 @@ public:
 	/** Lessons or Campaign chosen; the campaign subsystem's mode says which. Both open the lesson tree. */
 	UPROPERTY(BlueprintAssignable, Category = "Happiness Mode")
 	FOnHappinessModeEvent OnLessonsChosen;
+
+	/** Daily chosen. The mode screen starts the puzzle itself, through its owner's PlayHappiness(Number, Size,
+	 *  Difficulty) (WBP_GameSelect), the same way Free Play starts one. */
+	UPROPERTY(BlueprintAssignable, Category = "Happiness Mode")
+	FOnHappinessModeEvent OnDailyChosen;
 
 	/** Back pressed: return to the game select screen */
 	UPROPERTY(BlueprintAssignable, Category = "Happiness Mode")
@@ -61,6 +75,14 @@ private:
 
 	UFUNCTION()
 	void HandleCampaignClicked();
+
+	UFUNCTION()
+	void HandleDailyClicked();
+
+	void RefreshStreak();
+
+	/** The Daily button (disabled once today's is solved) and the streak line */
+	void RefreshDaily();
 
 	void OpenTree(ECampaignMode Mode);
 	void RefreshCampaignLock();
