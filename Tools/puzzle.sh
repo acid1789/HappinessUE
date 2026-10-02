@@ -14,6 +14,20 @@ if [ "$1" = "--build" ]; then
     echo "This checkout's editor is open and locks the module DLL. Save, then Tools/editor.sh stop, and build again." >&2
     exit 1
   fi
+  # UnrealBuildTool keeps one log for every checkout (%LOCALAPPDATA%/UnrealBuildTool/Log.txt), so a build
+  # started while another checkout is building fails at once. Wait for it.
+  ubt_running() {
+    powershell.exe -NoProfile -NonInteractive -Command \
+      "@(Get-CimInstance Win32_Process -Filter \"Name = 'dotnet.exe'\" | Where-Object { \$_.CommandLine -match 'UnrealBuildTool' }).Count" \
+      2>/dev/null | tr -d '\r'
+  }
+  waited=0
+  while [ "$(ubt_running)" != "0" ]; do
+    [ "$waited" = 0 ] && echo "Waiting for another checkout's build to finish..." >&2
+    waited=$((waited + 10))
+    [ "$waited" -ge 1800 ] && { echo "Another build is still running after 30 minutes" >&2; exit 1; }
+    sleep 10
+  done
   mkdir -p "$SAVED"
   "$ENGINE/Build/BatchFiles/Build.bat" HappinessEditor Win64 Development -Project="$PROJ" -WaitMutex > "$BUILD_LOG" 2>&1 \
     || { grep -E "error|Error|Unable to build" "$BUILD_LOG" | head -20; exit 1; }

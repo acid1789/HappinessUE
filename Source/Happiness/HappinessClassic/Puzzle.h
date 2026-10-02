@@ -78,6 +78,17 @@ public:
 	// Set by InitCampaign for Campaign mode: every clue type may appear, not just lessons up to m_CampaignLesson
 	bool m_bCampaignAllClues = false;
 
+	// Chance that a generated clue insists on m_CampaignLesson's type (the rest may be any allowed type).
+	// Set by InitCampaign: LessonClueBias in Lessons, CampaignClueBias in Campaign mode.
+	float m_LessonClueBias = 0.5f;
+	static constexpr float LessonClueBias = 0.5f;
+	// Higher in Campaign mode, where every clue type is allowed: about 3 in 4 of the final clues are the featured
+	// type (half was about 56%), for 6-9% more clues per puzzle
+	static constexpr float CampaignClueBias = 0.75f;
+
+	// Testing: when >= 0, InitCampaign uses this bias instead (the Puzzle commandlet's -lessonbias=)
+	float m_LessonClueBiasOverride = -1.f;
+
 	// Free play: clue types (bit 1 << ECampaignLesson) that Init won't generate. Set before Init; Given (givens and
 	// NotHeres) can't be excluded, so every puzzle can still be solved. Ignored by InitCampaign.
 	UPROPERTY(BlueprintReadWrite)

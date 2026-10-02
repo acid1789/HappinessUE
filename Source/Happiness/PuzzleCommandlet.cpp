@@ -334,6 +334,9 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 
 	// -stage=N (with -lesson): generate exactly what the campaign plays for that stage: its size, difficulty and seed mapping
 	// -campaignmode: Campaign mode's stages, puzzles and clue types instead of the lessons'
+	// -lessonbias=0.75: the chance a generated clue insists on the lesson's type (default per mode)
+	float LessonBias = -1.f;
+	FParse::Value(Cmd, TEXT("lessonbias="), LessonBias);
 	const ECampaignMode TrackMode = FParse::Param(Cmd, TEXT("campaignmode")) ? ECampaignMode::Campaign : ECampaignMode::Lessons;
 	int32 Stage = -1;
 	if (bCampaign && FParse::Value(Cmd, TEXT("stage="), Stage))
@@ -404,6 +407,7 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 		double T0 = FPlatformTime::Seconds();
 		if (bCampaign)
 		{
+			P.m_LessonClueBiasOverride = LessonBias;
 			if (!P.InitCampaign(Stage >= 0 ? UCampaignSubsystem::GetGenerationSeed(TrackMode, Lesson, Stage, Seed) : Seed, Size, Diff, Lesson, TrackMode == ECampaignMode::Campaign))
 				CampaignFails++;
 		}
@@ -566,7 +570,20 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 
 	// How many puzzles got each number of givens
 	if (bCampaign)
-		Out += FString::Printf(TEXT("CAMPAIGN lesson=%s failedToRequireLesson=%d\n"), *LessonName, CampaignFails);
+	{
+		// The lesson's share of the non-given clues and of the hint steps
+		int32 AllClues = 0, AllHints = 0;
+		for (int32 i = 0; i < 256; i++)
+		{
+			if (i != (int32)ECampaignLesson::Given)
+				AllClues += CluesByLesson[i];
+			AllHints += HintsByLesson[i];
+		}
+		const int32 Own = (int32)Lesson;
+		Out += FString::Printf(TEXT("CAMPAIGN lesson=%s failedToRequireLesson=%d lessonClues=%.0f%% lessonHints=%.0f%% lessonCluesPerPuzzle=%.1f\n"),
+			*LessonName, CampaignFails, AllClues ? 100.0 * CluesByLesson[Own] / AllClues : 0.0,
+			AllHints ? 100.0 * HintsByLesson[Own] / AllHints : 0.0, double(CluesByLesson[Own]) / FMath::Max(1, SeedMax - SeedMin + 1));
+	}
 
 	if (bExplain)
 	{

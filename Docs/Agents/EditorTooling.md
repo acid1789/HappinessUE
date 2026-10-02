@@ -110,6 +110,15 @@ project and `Saved` paths from `Tools/checkout_env.sh`, and use the checkout's `
 needs one, pointing at the installed engine). `puzzle.sh --build` refuses while this checkout's editor is open;
 each agent builds only its own checkout.
 
+- **One build at a time on this machine.** UnrealBuildTool keeps a single log for every checkout
+  (`%LOCALAPPDATA%/UnrealBuildTool/Log.txt`), so a build started while another checkout is building fails at
+  once. `puzzle.sh --build` waits (up to 30 minutes) for any other build to finish first.
+- **Builds use the engine's real path.** `checkout_env.sh` resolves the `Engine` symlink (to
+  `E:/UE4/UE_5.8/Engine`). Building through the symlink path one time and the real path another includes engine
+  headers by two paths, which fails with redefinition errors (`'FGenericPlatformTypes': 'struct' type
+  redefinition`, `PLATFORM_32BITS should not be defined`). If a checkout shows those, delete its `Intermediate`
+  folders (project and `Plugins/*`) and build again.
+
 ## The two tool servers
 
 The editor hosts two servers, each with a small command-line client in `Tools/`:
