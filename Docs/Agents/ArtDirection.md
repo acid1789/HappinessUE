@@ -295,7 +295,19 @@ A successful UI should feel as though the UI and icons were created by the same 
 
 # 10. Title / Logo
 
-The final visual treatment for the **Happiness** title/logo has not yet been established.
+The user selected **option F** from `output/imagegen/happiness-logo-background-directions-v2.png`:
+warm ivory, elegant italic serif lettering with gently sweeping forms and a restrained painted finish.
+This is the approved title direction; the integrated asset remains subject to in-game review.
+
+The transparent production version is `output/imagegen/happiness-logo-F-final.png`, imported as
+`/Game/General/Textures/T_HappinessLogo_F`. `WBP_GameSelect` uses it in every state of the existing
+`HappinessClassic_Btn`, replacing the legacy smiley logo while retaining its click behavior. Keep the
+lettering separate from background artwork. The local source PNGs and generation prompts are ignored by Git.
+
+The reference background supplied by the user is
+`output/imagegen/Mediterranean Terrace Coastal Vista.png`. It is imported as
+`/Game/General/Textures/T_VillaBackground` and assigned to the full-screen `Background` image in
+`WBP_GameSelect`, replacing `Clouds4`. The F title remains a separate transparent UI asset.
 
 Treat this as a separate design problem from the background.
 
