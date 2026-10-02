@@ -347,6 +347,8 @@ class FileLockTests(GateTestCase):
         imported = mcp_call.changed_assets(call("import_file", {"folder_path": "/Game/Art/", "asset_name": "T_Sky",
                                                                 "source_file": "E:/x.png"}))
         self.assertEqual([gate.lock_key(p) for p in imported], ["/Game/Art/T_Sky"])
+        copied = mcp_call.changed_assets(call("duplicate", {"path": "/Game/A/WBP_X", "new_path": "/Game/A/WBP_Y"}))
+        self.assertEqual([gate.lock_key(p) for p in copied], ["/Game/A/WBP_Y"])
 
         gate.acquire()
         with mock.patch.object(gate, "checked_endpoint"), mock.patch.object(gate, "verify_mcp_listener"), \

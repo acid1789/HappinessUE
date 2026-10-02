@@ -3,6 +3,7 @@
 #include "HappinessClassic/Puzzle.h"
 #include "UI/LessonProgressTicks.h"
 
+#include "Ads/AdsSubsystem.h"
 #include "Components/Button.h"
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
@@ -371,25 +372,38 @@ FText UCampaignEndScreenWidget::GetUnlockText() const
 	return FText::GetEmpty();
 }
 
+void UCampaignEndScreenWidget::PlayAdThen(TFunction<void()> Action)
+{
+	// Every button here plays a full-screen ad first (when one is ready), then does its thing
+	if (UAdsSubsystem* Ads = UAdsSubsystem::Get(this))
+	{
+		Ads->ShowInterstitialThen(FSimpleDelegate::CreateWeakLambda(this, MoveTemp(Action)));
+	}
+	else
+	{
+		Action();
+	}
+}
+
 void UCampaignEndScreenWidget::HandleRestartClicked()
 {
 	PlaySound(ButtonSound);
 	Hide();
-	OnRestartPuzzle.Broadcast();
+	PlayAdThen([this]() { OnRestartPuzzle.Broadcast(); });
 }
 
 void UCampaignEndScreenWidget::HandleReturnClicked()
 {
 	PlaySound(ButtonSound);
 	Hide();
-	OnReturnToLessons.Broadcast();
+	PlayAdThen([this]() { OnReturnToLessons.Broadcast(); });
 }
 
 void UCampaignEndScreenWidget::HandleNextClicked()
 {
 	PlaySound(ButtonSound);
 	Hide();
-	OnNextPuzzle.Broadcast();
+	PlayAdThen([this]() { OnNextPuzzle.Broadcast(); });
 }
 
 #undef LOCTEXT_NAMESPACE

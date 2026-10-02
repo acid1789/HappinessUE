@@ -46,4 +46,8 @@ public:
 
 	UPROPERTY(SaveGame)
 	FDailySaveData Daily;
+
+	/** Ads turned off (UAdsSubsystem) */
+	UPROPERTY(SaveGame)
+	bool bAdsDisabled = false;
 };

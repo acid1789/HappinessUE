@@ -9,6 +9,5 @@ iOS
 Steam
 Restoring Multiple Icons in mouse mode breaks something
 
-Daily Puzzle
 
-
+Usage Analytics
