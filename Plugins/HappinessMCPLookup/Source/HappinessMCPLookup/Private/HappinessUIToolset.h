@@ -16,5 +16,5 @@ public:
 	 * saves it as a PNG. Returns the file path, or "Error: ...". OutputFile defaults to Saved/WidgetRenders/<name>.png.
 	 */
 	UFUNCTION(meta = (AICallable), Category = "HappinessUI")
-	static FString RenderWidget(const FString& WidgetBlueprintPath, int32 Width = 1920, int32 Height = 1080, const FString& OutputFile = TEXT(""));
+	static FString RenderWidget(const FString& WidgetBlueprintPath, int32 Width = 1920, int32 Height = 1080, const FString& OutputFile = TEXT(""), int32 PreviewPuzzleSize = 0);
 };

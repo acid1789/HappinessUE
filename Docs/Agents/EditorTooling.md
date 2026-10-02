@@ -162,6 +162,7 @@ python Tools/mcp_call.py HappinessMCPLookup.HappinessUIToolset RenderWidget \
 ```
 
 - The game is landscape, so render at **1920 × 1080** (and check wider mobile aspect ratios when relevant).
+- For a populated board layout check, pass `previewPuzzleSize: 3` (3–8) to `RenderWidget` with `WBP_GameSelect`, `WBP_Happiness`, or `WBP_GamePanel`. It creates sample cells and icons only in the render instance, using the actual widget classes and native panel sizing. This checks layout, not puzzle generation or interaction; no asset visibility needs to be changed.
 - It renders the **designer** state: placeholder texts, default visibility, no game running. Anything set at
   runtime (scores, which buttons are locked, mode-dependent tick marks) won't show.
 

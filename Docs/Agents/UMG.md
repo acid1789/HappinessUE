@@ -70,6 +70,7 @@ python Tools/umg.py reorder_widget_tree '{"root": "Content", "tree": "[\"TitleTe
 
 ## Gotchas
 
+- **Texture-backed nine-slice borders:** `Brush.ImageSize` does not reliably control corner size for a `Box` brush; the texture's actual rendered dimensions matter. A large source image can produce enormous corners. Set the UI texture's `MaxTextureSize`, check `TextureTools.get_size`, and render at game resolution. The painted villa frame uses `MaxTextureSize: 128`; its 1256px source resolves to 78px in this editor.
 - **Draw order in a CanvasPanel:** children with the same `Slot.ZOrder` share a starting layer, so deeply nested
   content (text) of an earlier child can draw over a later overlay. Overlays and popups need a higher
   `Slot.ZOrder`. Current values in `WBP_Happiness`: `HintInfo` 10, end screens 20. In `WBP_GameSelect`:
