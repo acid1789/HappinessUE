@@ -75,10 +75,89 @@ const TArray<UCampaignSubsystem::FStage>& UCampaignSubsystem::GetStages(ECampaig
 	return Mode == ECampaignMode::Campaign ? CampaignStages : LessonStages;
 }
 
+const TArray<UCampaignSubsystem::FStage>& UCampaignSubsystem::GetMasterStages(ECampaignMode Mode)
+{
+	// After the final, outside the campaign's progression: Required counts Master Mode puzzles solved
+	static const TArray<FStage> None;
+	static const TArray<FStage> CampaignMaster =
+	{
+		{ 8, 1, 0 },
+		{ 8, 2, 4 },
+	};
+	return Mode == ECampaignMode::Campaign ? CampaignMaster : None;
+}
+
 const UCampaignSubsystem::FStage& UCampaignSubsystem::GetStage(ECampaignMode Mode, int32 Stage)
 {
 	const TArray<FStage>& Stages = GetStages(Mode);
+	const TArray<FStage>& Master = GetMasterStages(Mode);
+	if (Stage >= Stages.Num() && Master.Num() > 0)
+	{
+		return Master[FMath::Clamp(Stage - Stages.Num(), 0, Master.Num() - 1)];
+	}
 	return Stages[FMath::Clamp(Stage, 0, Stages.Num() - 1)];
+}
+
+int32 UCampaignSubsystem::GetNumMasterStages()
+{
+	return GetMasterStages(GetMode()).Num();
+}
+
+bool UCampaignSubsystem::IsMasterStage(int32 Stage)
+{
+	return Stage >= GetFirstMasterStage() && Stage < GetFirstMasterStage() + GetNumMasterStages();
+}
+
+int32 UCampaignSubsystem::GetMasterMaxPoints()
+{
+	// 4 puzzles at each Master Mode stage
+	return GetNumMasterStages() > 0 ? GetMasterStages(GetMode()).Last().Required + 4 : 0;
+}
+
+int32 UCampaignSubsystem::GetMasterStagePointsRequired(int32 Stage)
+{
+	return IsMasterStage(Stage) ? GetStage(GetMode(), Stage).Required : 0;
+}
+
+int32 UCampaignSubsystem::GetMasterPoints(ECampaignLesson Lesson) const
+{
+	return GetLessonProgress(Lesson).MasterPoints;
+}
+
+bool UCampaignSubsystem::IsMasterUnlocked(ECampaignLesson Lesson) const
+{
+	return GetNumMasterStages() > 0 && IsLessonCompleted(Lesson);
+}
+
+bool UCampaignSubsystem::IsMasterCompleted(ECampaignLesson Lesson) const
+{
+	return IsMasterUnlocked(Lesson) && GetMasterPoints(Lesson) >= GetMasterMaxPoints();
+}
+
+bool UCampaignSubsystem::IsMasterRevealed(ECampaignLesson Lesson) const
+{
+	return IsMasterUnlocked(Lesson) && GetLessonProgress(Lesson).bMasterRevealed;
+}
+
+void UCampaignSubsystem::RevealMaster(ECampaignLesson Lesson)
+{
+	if (IsMasterUnlocked(Lesson) && !GetLessonProgress(Lesson).bMasterRevealed)
+	{
+		GetMutableProgress(Lesson).bMasterRevealed = true;
+		Save();
+	}
+}
+
+int32 UCampaignSubsystem::GetCurrentMasterStage(ECampaignLesson Lesson) const
+{
+	// The last Master Mode stage whose requirement is met
+	const int32 Points = GetMasterPoints(Lesson);
+	int32 Stage = GetFirstMasterStage();
+	while (Stage + 1 < GetFirstMasterStage() + GetNumMasterStages() && Points >= GetMasterStagePointsRequired(Stage + 1))
+	{
+		Stage++;
+	}
+	return Stage;
 }
 
 ECampaignMode UCampaignSubsystem::GetMode()
@@ -165,14 +244,15 @@ int32 UCampaignSubsystem::GetStagePointsRequired(int32 Stage)
 
 FText UCampaignSubsystem::GetStageDisplayName(int32 Stage)
 {
-	if (Stage >= GetFinalStage())
+	if (Stage == GetFinalStage())
 	{
 		return LOCTEXT("StageFinal", "Final");
 	}
 
 	static const FText Difficulties[] = { LOCTEXT("Easy", "Easy"), LOCTEXT("Normal", "Normal"), LOCTEXT("Hard", "Hard") };
 	const FStage& Def = GetStage(GetMode(), Stage);
-	return FText::Format(LOCTEXT("StageName", "{0}x{0} {1}"), Def.Size, Difficulties[FMath::Clamp(Def.Difficulty, 0, 2)]);
+	const FText Name = FText::Format(LOCTEXT("StageName", "{0}x{0} {1}"), Def.Size, Difficulties[FMath::Clamp(Def.Difficulty, 0, 2)]);
+	return IsMasterStage(Stage) ? FText::Format(LOCTEXT("MasterStageName", "Master {0}"), Name) : Name;
 }
 
 const TMap<ECampaignLesson, FLessonProgress>& UCampaignSubsystem::GetProgressMap() const
@@ -205,6 +285,10 @@ int32 UCampaignSubsystem::GetCurrentStage(ECampaignLesson Lesson) const
 
 bool UCampaignSubsystem::IsStageUnlocked(ECampaignLesson Lesson, int32 Stage) const
 {
+	if (IsMasterStage(Stage))
+	{
+		return IsMasterUnlocked(Lesson) && GetMasterPoints(Lesson) >= GetMasterStagePointsRequired(Stage);
+	}
 	return Stage >= 0 && Stage < GetNumStages() && GetLessonPoints(Lesson) >= GetStagePointsRequired(Stage);
 }
 
@@ -271,8 +355,15 @@ void UCampaignSubsystem::RequestLessonPuzzle(ECampaignLesson Lesson, int32 Stage
 int32 UCampaignSubsystem::GetGenerationSeed(ECampaignMode Mode, ECampaignLesson Lesson, int32 Stage, int32 Seed)
 {
 	// Each stage's puzzle counter starts at 0, but every lesson and stage gets its own puzzles:
-	// a unique generator seed per (lesson, stage, counter). Campaign puzzles are flagged in bit 28.
-	const int32 Seeds = ((Seed * GetNumStagesFor(Mode) + Stage) << 6) | (int32(Lesson) & 63);
+	// a unique generator seed per (lesson, stage, counter). Campaign puzzles are flagged in bit 28, Master Mode
+	// puzzles also in bit 27 (their own range, so the campaign's seeds are unchanged).
+	const int32 NumStages = GetNumStagesFor(Mode);
+	const int32 NumMaster = GetMasterStages(Mode).Num();
+	if (Stage >= NumStages && NumMaster > 0)
+	{
+		return (((Seed * NumMaster + (Stage - NumStages)) << 6) | (int32(Lesson) & 63)) | (1 << 28) | (1 << 27);
+	}
+	const int32 Seeds = ((Seed * NumStages + Stage) << 6) | (int32(Lesson) & 63);
 	return Mode == ECampaignMode::Campaign ? (Seeds | (1 << 28)) : Seeds;
 }
 
@@ -350,7 +441,8 @@ FLessonPuzzleResult UCampaignSubsystem::FinishLessonPuzzle(UPuzzle* Puzzle)
 	Result.bFirstFinish = Data.bPuzzleOpen;
 
 	FLessonProgress& Progress = GetMutableProgress(Result.Lesson);
-	Result.PreviousPoints = Progress.Points;
+	Result.bMaster = IsMasterStage(Result.Stage);
+	Result.PreviousPoints = Result.bMaster ? Progress.MasterPoints : Progress.Points;
 
 	// Scored once, when first solved. A board with mistakes earns nothing and the puzzle stays open, so the
 	// player can restart it and still earn its points.
@@ -360,7 +452,20 @@ FLessonPuzzleResult UCampaignSubsystem::FinishLessonPuzzle(UPuzzle* Puzzle)
 		Progress.NextSeed[Result.Stage] = Data.OpenSeed + 1;
 
 		const int32 MaxPoints = GetMaxPoints();
-		if (Result.Stage == GetFinalStage())
+		if (Result.bMaster)
+		{
+			// Master Mode keeps its own count: only its current stage counts, like the campaign
+			const int32 MasterMax = GetMasterMaxPoints();
+			const int32 StageBefore = GetCurrentMasterStage(Result.Lesson);
+			if (Result.Stage == StageBefore && Progress.MasterPoints < MasterMax)
+			{
+				Progress.MasterPoints++;
+				Result.PointsEarned = 1;
+				Result.bStageUnlocked = GetCurrentMasterStage(Result.Lesson) > StageBefore;
+				Result.bMasterCompleted = Progress.MasterPoints == MasterMax;
+			}
+		}
+		else if (Result.Stage == GetFinalStage())
 		{
 			// The final completes the lesson whatever hints were used
 			Result.bLessonCompleted = !Progress.bFinalCompleted;
@@ -376,7 +481,7 @@ FLessonPuzzleResult UCampaignSubsystem::FinishLessonPuzzle(UPuzzle* Puzzle)
 		}
 	}
 
-	Result.TotalPoints = Progress.Points;
+	Result.TotalPoints = Result.bMaster ? Progress.MasterPoints : Progress.Points;
 	LastResult = Result;
 
 	Save();
@@ -396,9 +501,12 @@ void UCampaignSubsystem::PrepareNextLessonPuzzle(const UObject* WorldContextObje
 	}
 
 	// Next puzzle always moves on through the lesson: the stage that currently earns points (the final once all
-	// points are earned), whether the last puzzle unlocked it or was a replay of an earlier stage
+	// points are earned), whether the last puzzle unlocked it or was a replay of an earlier stage. In Master Mode,
+	// its current stage. (Master Mode itself is only entered from the campaign tree, never by Next.)
 	FCampaignSaveData& SaveData = Campaign->Data;
-	const int32 CurrentStage = Campaign->GetCurrentStage(SaveData.SessionLesson);
+	const ECampaignLesson Lesson = SaveData.SessionLesson;
+	const bool bToMaster = Campaign->IsMasterUnlocked(Lesson) && IsMasterStage(SaveData.SessionStage);
+	const int32 CurrentStage = bToMaster ? Campaign->GetCurrentMasterStage(Lesson) : Campaign->GetCurrentStage(Lesson);
 	if (SaveData.bInSession && SaveData.SessionStage != CurrentStage)
 	{
 		SaveData.SessionStage = CurrentStage;
@@ -511,9 +619,9 @@ FLessonProgress& UCampaignSubsystem::GetMutableProgress(ECampaignLesson Lesson)
 {
 	TMap<ECampaignLesson, FLessonProgress>& Map = Data.Mode == ECampaignMode::Campaign ? Data.CampaignLessons : Data.Lessons;
 	FLessonProgress& Progress = Map.FindOrAdd(Lesson);
-	if (Progress.NextSeed.Num() < GetNumStages())
+	if (Progress.NextSeed.Num() < GetNumStages() + GetNumMasterStages())
 	{
-		Progress.NextSeed.SetNumZeroed(GetNumStages());
+		Progress.NextSeed.SetNumZeroed(GetNumStages() + GetNumMasterStages());
 	}
 	return Progress;
 }

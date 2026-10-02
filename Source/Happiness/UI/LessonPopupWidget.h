@@ -10,6 +10,9 @@ class UButton;
 class UPanelWidget;
 class UProgressBar;
 class UTextBlock;
+class UBorder;
+class UImage;
+class ULessonProgressTicks;
 class ULessonPopupWidget;
 class UCampaignSubsystem;
 
@@ -62,6 +65,45 @@ public:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UPanelWidget> StageBox;
 
+	/** Master Mode's stage buttons (Campaign), shown once the clue's final is completed */
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UPanelWidget> MasterBox;
+
+	/** Tick marks over LessonProgress; switched to the Master Mode track once that's shown */
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<ULessonProgressTicks> ProgressTicks;
+
+	// Master Mode reveal: the first time the player opens a cleared clue, the bar drains, an eraser wipes the
+	// progress line from right to left, the Master line appears, then the Master buttons and bar. EraseCover and
+	// Eraser sit over ProgressText (in an Overlay, aligned right, filling its height); EraseCover is painted in
+	// Panel's color so the text disappears as it grows.
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UBorder> Panel;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UImage> EraseCover;
+
+	/** The eraser; a plain rectangle until it gets art */
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UImage> Eraser;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lesson Popup|Master Reveal")
+	float RevealDrainTime = 2.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lesson Popup|Master Reveal")
+	float RevealEraseTime = 3.f;
+
+	/** Seconds the Master line shows before the Master buttons and bar come in */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lesson Popup|Master Reveal")
+	float RevealTextHold = 0.75f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lesson Popup|Master Reveal")
+	float EraserWidth = 28.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lesson Popup|Master Reveal")
+	FLinearColor EraserColor = FLinearColor(0.85f, 0.45f, 0.5f, 1.f);
+
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UButton> PlayButton;
 
@@ -106,6 +148,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Lesson Popup")
 	void ShowLesson(ECampaignLesson Lesson);
 
+	/** Show the lesson again after playing one of its puzzles. Unlike ShowLesson (the player opening it), this
+	 *  doesn't reveal a newly unlocked Master Mode. */
+	UFUNCTION(BlueprintCallable, Category = "Lesson Popup")
+	void ShowLessonAfterPuzzle(ECampaignLesson Lesson);
+
 	/** Re-read progress for the shown lesson */
 	UFUNCTION(BlueprintCallable, Category = "Lesson Popup")
 	void Refresh();
@@ -123,6 +170,7 @@ protected:
 	virtual void NativePreConstruct() override;
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
+	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 private:
 	UFUNCTION()
@@ -136,11 +184,35 @@ private:
 
 	UCampaignSubsystem* GetCampaign() const;
 	void BuildStageButtons();
+	UButton* AddStageButton(UPanelWidget* Box, int32 Stage, const FText& Name, float Width, float Spacing);
+
+	/** Master Mode is open and revealed for the shown clue: the bar, text and Play button follow it */
+	bool IsShowingMaster() const;
+
+	FText GetMasterProgressText() const;
+
+	enum class ERevealPhase : uint8
+	{
+		None,
+		Drain,	// the completed campaign bar empties
+		Erase,	// the eraser wipes the progress line, right to left
+		Text,	// the Master line shows, before the Master buttons and bar
+	};
+	ERevealPhase RevealPhase = ERevealPhase::None;
+	float RevealElapsed = 0.f;
+
+	void TickReveal(float DeltaTime);
+	/** 0: nothing erased, 1: the whole line covered */
+	void SetEraseProgress(float Alpha);
+	void HideEraser();
 
 	ECampaignLesson Lesson = ECampaignLesson::VerticalTwo;
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UButton>> StageButtons;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UButton>> MasterButtons;
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<ULessonStageClick>> StageClicks;

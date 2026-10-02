@@ -16,8 +16,11 @@ fi
 PROJ="$(cygpath -m "${_projects[0]}")"
 SAVED="$(cygpath -m "$ROOT")/Saved"
 
-# Every checkout has an Engine symlink to the installed engine
-ENGINE="$(cygpath -m "$ROOT")/Engine"
+# Every checkout has an Engine symlink to the installed engine. Use the real path it points to: building
+# through the symlink path once and the real path another time includes engine headers by two paths, and
+# #pragma once treats them as different files (redefinition errors).
+ENGINE="$(python -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$(cygpath -m "$ROOT")/Engine")"
+ENGINE="$(cygpath -m "$ENGINE")"
 if [ ! -f "$ENGINE/Binaries/Win64/UnrealEditor-Cmd.exe" ]; then
   echo "No engine at $ENGINE: link the checkout's Engine folder to the installed engine" >&2
   exit 1

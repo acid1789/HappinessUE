@@ -63,6 +63,12 @@ python Tools/umg.py reorder_widget_tree '{"root": "Content", "tree": "[\"TitleTe
 - New widgets can be referenced from the Blueprint graph after the widget Blueprint is compiled (they show up as
   `Variables|<WidgetBlueprint>|Get<Name>` node types).
 - **Preserve Blueprint variable bindings when recreating a container:** keep its original name and class, and set `bIsVariable: true` before compiling. `export_umg_to_json` omits this flag; a newly created widget defaults to a non-variable and existing graph references will fail to compile.
+- **A created widget isn't a Blueprint variable** until you set `"bIsVariable": true` on it; until then
+  the graph can't reference it (no `Variables|<WidgetBlueprint>|Get<Name>` node).
+- **Don't use `reparent_widget`.** Asked to wrap `ProgressText` in a new Overlay, it removed the widget from
+  the tree and the new Overlay never appeared (2026-10-02). To wrap a widget: query its properties, delete it,
+  create the container where it was, then create a new widget with the same name and properties inside.
+  There's no tool to reload an asset from disk, so a bad edit is undone by closing the editor without saving.
 - **There is no rename.** To rename, create a new widget, copy the old one's properties onto it, then delete
   the old one.
 - A C++ parent class binds child widgets **by name** (`meta = (BindWidget)`); a required binding missing from

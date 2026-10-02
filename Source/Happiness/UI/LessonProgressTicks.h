@@ -7,9 +7,10 @@
 class SLessonProgressTicks;
 
 /**
- * Tick marks for a lesson progress bar: a vertical line at the points that unlock 3x3 Normal, 4x4 Easy and
- * 4x4 Normal (the Final unlocks at the bar's end), spread across the widget's width. Place it over the bar with
- * the same horizontal extent; make it taller than the bar for ticks that overhang it.
+ * Tick marks for a lesson progress bar: a vertical line at the points that unlock each stage of the current mode's
+ * track (the final unlocks at the bar's end), spread across the widget's width, or at explicit positions set with
+ * SetTickFractions (e.g. the Master Mode track). Place it over the bar with the same horizontal extent; make it
+ * taller than the bar for ticks that overhang it.
  */
 UCLASS()
 class HAPPINESS_API ULessonProgressTicks : public UWidget
@@ -23,6 +24,14 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ticks")
 	float TickThickness = 2.f;
 
+	/** Draw ticks at these fractions of the width (0..1) instead of the current mode's stage track */
+	UFUNCTION(BlueprintCallable, Category = "Ticks")
+	void SetTickFractions(const TArray<float>& Fractions);
+
+	/** Back to the current mode's stage track */
+	UFUNCTION(BlueprintCallable, Category = "Ticks")
+	void ClearTickFractions();
+
 	virtual void SynchronizeProperties() override;
 	virtual void ReleaseSlateResources(bool bReleaseChildren) override;
 
@@ -35,4 +44,7 @@ protected:
 
 private:
 	TSharedPtr<SLessonProgressTicks> Ticks;
+
+	bool bCustomTicks = false;
+	TArray<float> CustomFractions;
 };

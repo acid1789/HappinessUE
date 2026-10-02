@@ -37,6 +37,7 @@ bool UPuzzle::InitCampaign(int Seed, int Size, int Difficulty, ECampaignLesson L
 	m_HintsUsed = m_LessonHintsUsed = 0;
 	m_CampaignLesson = Lesson;
 	m_bCampaignAllClues = bAllClueTypes;
+	m_LessonClueBias = m_LessonClueBiasOverride >= 0.f ? m_LessonClueBiasOverride : (bAllClueTypes ? CampaignClueBias : LessonClueBias);
 	m_ExcludedClues = 0;
 	m_Rating = -1.f;
 

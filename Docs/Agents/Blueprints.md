@@ -60,6 +60,16 @@ with `read_graph_dsl` to confirm the result.
 - Reverse loop: `Utilities|Array|ReverseforEachLoop` (pins `ArrayElement`, `ArrayIndex`, no spaces; the normal
   ForEachLoop's pin is `Array Element`).
 
+### New variables
+
+- `add_variable` (member: `"graph": null`), then compile. To give it a default, set it on the class default
+  object: `get_default_object` returns e.g. `/Game/.../PC_Happiness.Default__PC_Happiness_C`, then
+  `ObjectTools.set_properties {"instance": {...}, "values": "{\"MyVar\": true}"}`. It survives recompiles; save
+  the Blueprint.
+- Other Blueprints' `find_node_types` lists can stay stale after you add a variable (even after saving), but
+  `create_node` with the expected type id works, e.g. `Class|PCHappiness|GetHappinessHintAnimation` (the
+  variable's name without underscores).
+
 ### Events from a widget's delegates
 
 - Bound events ("On Clicked (MyButton)" style nodes) can't be created through these tools.

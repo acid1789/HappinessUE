@@ -110,7 +110,8 @@ void UCampaignTreeWidget::ShowForLessonSession()
 	const UCampaignSubsystem* Campaign = GetGameInstance() ? GetGameInstance()->GetSubsystem<UCampaignSubsystem>() : nullptr;
 	if (LessonPopup && Campaign && Campaign->IsInLessonSession())
 	{
-		LessonPopup->ShowLesson(Campaign->GetSessionLesson());
+		// Reopened after a puzzle, not by the player: a newly unlocked Master Mode stays hidden
+		LessonPopup->ShowLessonAfterPuzzle(Campaign->GetSessionLesson());
 	}
 }
 

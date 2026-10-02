@@ -26,9 +26,10 @@ void UClue::Init(UPuzzle& P, FRandomStream& Rand)
 		return;
 	}
 
-	// Campaign: only clue types from the current lesson or earlier. Half the time insist on the current
-	// lesson itself so it shows up plenty; if that type can't be generated here, fall back to any allowed type.
-	const bool bWantLesson = Rand.FRand() < 0.5f;
+	// Campaign: only clue types from the current lesson or earlier (any type in Campaign mode). Some of the time
+	// (m_LessonClueBias) insist on the current lesson itself so it shows up plenty; if that type can't be
+	// generated here, fall back to any allowed type.
+	const bool bWantLesson = Rand.FRand() < P.m_LessonClueBias;
 	for (int iTries = 0; iTries < 2000; iTries++)
 	{
 		GenerateClue(P, Rand);

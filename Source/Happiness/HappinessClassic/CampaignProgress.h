@@ -33,6 +33,16 @@ struct FLessonProgress
 
 	UPROPERTY(SaveGame, BlueprintReadOnly, Category = "Campaign")
 	bool bFinalCompleted = false;
+
+	/** Campaign mode only: Master Mode puzzles solved, 0 to UCampaignSubsystem::GetMasterMaxPoints().
+	 *  Master Mode opens when the final is completed and doesn't count toward the campaign. */
+	UPROPERTY(SaveGame, BlueprintReadOnly, Category = "Campaign")
+	int32 MasterPoints = 0;
+
+	/** Master Mode has been shown to the player: the first time they open the clue from the tree after its final.
+	 *  Until then nothing mentions it, not the end screen nor the popup that reopens after the puzzle. */
+	UPROPERTY(SaveGame, BlueprintReadOnly, Category = "Campaign")
+	bool bMasterRevealed = false;
 };
 
 /** What finishing a lesson puzzle did */
@@ -86,6 +96,14 @@ struct FLessonPuzzleResult
 	/** True the first time the final is completed; the next lessons in the tree unlock */
 	UPROPERTY(BlueprintReadOnly, Category = "Campaign")
 	bool bLessonCompleted = false;
+
+	/** A Master Mode puzzle: PreviousPoints/TotalPoints/PointsEarned count Master Mode puzzles, not the campaign */
+	UPROPERTY(BlueprintReadOnly, Category = "Campaign")
+	bool bMaster = false;
+
+	/** True the first time every Master Mode puzzle is solved */
+	UPROPERTY(BlueprintReadOnly, Category = "Campaign")
+	bool bMasterCompleted = false;
 };
 
 /** Campaign progress, stored in the normal game save (UHappinessSaveGame::Campaign) */
@@ -138,6 +156,10 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnLessonPuzzleRequested, ECampaign
  * Only the current stage earns progress; earlier stages and the final can be replayed freely. Completing the
  * final completes that clue. The stage functions below describe the current mode's track.
  *
+ * Master Mode (Campaign only) opens for a clue once its final is completed: 4 puzzles of 8x8 normal, then 4 of
+ * 8x8 hard (unlocked by the first 4). They come after the final, numbered from GetFirstMasterStage(), and have
+ * their own progress (FLessonProgress::MasterPoints) that doesn't count toward the campaign.
+ *
  * Game flow: the lesson popup calls RequestLessonPuzzle. The game creates puzzles with InitPuzzleForPlay (classic or
  * lesson, depending on the session) and reports finished ones with HandlePuzzleFinished.
  */
@@ -179,6 +201,48 @@ public:
 	/** Best score of one puzzle: 3 in Lessons, 1 in Campaign */
 	UFUNCTION(BlueprintPure, Category = "Campaign")
 	static int32 GetMaxPuzzleScore();
+
+	// ---- Master Mode (current mode; none in Lessons) ----
+
+	UFUNCTION(BlueprintPure, Category = "Campaign")
+	static int32 GetNumMasterStages();
+
+	/** Stage number of the first Master Mode stage: right after the final */
+	UFUNCTION(BlueprintPure, Category = "Campaign")
+	static int32 GetFirstMasterStage() { return GetNumStages(); }
+
+	UFUNCTION(BlueprintPure, Category = "Campaign")
+	static bool IsMasterStage(int32 Stage);
+
+	/** Master Mode puzzles that complete it */
+	UFUNCTION(BlueprintPure, Category = "Campaign")
+	static int32 GetMasterMaxPoints();
+
+	/** Master Mode puzzles solved to unlock a Master Mode stage */
+	UFUNCTION(BlueprintPure, Category = "Campaign")
+	static int32 GetMasterStagePointsRequired(int32 Stage);
+
+	UFUNCTION(BlueprintPure, Category = "Campaign")
+	int32 GetMasterPoints(ECampaignLesson Lesson) const;
+
+	/** Master Mode is open once the clue's final is completed (Campaign mode) */
+	UFUNCTION(BlueprintPure, Category = "Campaign")
+	bool IsMasterUnlocked(ECampaignLesson Lesson) const;
+
+	UFUNCTION(BlueprintPure, Category = "Campaign")
+	bool IsMasterCompleted(ECampaignLesson Lesson) const;
+
+	/** Master Mode is unlocked and the player has been shown it (FLessonProgress::bMasterRevealed) */
+	UFUNCTION(BlueprintPure, Category = "Campaign")
+	bool IsMasterRevealed(ECampaignLesson Lesson) const;
+
+	/** The player opened the clue from the tree: from now on its Master Mode is shown, if unlocked. Saves. */
+	UFUNCTION(BlueprintCallable, Category = "Campaign")
+	void RevealMaster(ECampaignLesson Lesson);
+
+	/** The Master Mode stage that currently counts */
+	UFUNCTION(BlueprintPure, Category = "Campaign")
+	int32 GetCurrentMasterStage(ECampaignLesson Lesson) const;
 
 	/** Stage size, difficulty and the progress needed to unlock it, for a given mode */
 	static int32 GetStageSizeFor(ECampaignMode Mode, int32 Stage);
@@ -316,6 +380,7 @@ private:
 		int32 Required;
 	};
 	static const TArray<FStage>& GetStages(ECampaignMode Mode);
+	static const TArray<FStage>& GetMasterStages(ECampaignMode Mode);
 	static const FStage& GetStage(ECampaignMode Mode, int32 Stage);
 
 	/** The current mode's progress */

@@ -12,6 +12,7 @@ class USoundBase;
 class UTextBlock;
 class UPuzzle;
 class UWidget;
+class ULessonProgressTicks;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCampaignEndScreenEvent);
 
@@ -75,6 +76,14 @@ public:
 	/** The clue's whole campaign track; a LessonProgressTicks over it marks the stages */
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UProgressBar> StageProgress;
+
+	/** The bar's label: "Campaign:", or "Master:" for a Master Mode puzzle */
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> StageLabel;
+
+	/** Tick marks over StageProgress: the campaign's stages, or Master Mode's */
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<ULessonProgressTicks> ProgressTicks;
 
 	/** "7 / 15" */
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
