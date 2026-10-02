@@ -27,14 +27,15 @@ READ_ONLY_COMMANDS = {"connect", "set_target_umg_asset", "get_target_umg_asset"}
 
 
 def changed_assets(command, params):
-    """The widget assets a command may change: the current target (and any asset it names), unless it only
-    reads. Changing a widget needs its lock (Tools/editor_gate.py lock)."""
+    """The widget asset a command may change: the current target, unless the command only reads. Other /Game
+    paths in its parameters are references (a widget class to create, a texture for a brush), not changes.
+    Changing a widget needs its lock (Tools/editor_gate.py lock)."""
     if command in READ_ONLY_COMMANDS or command.startswith(("get_", "query_", "list_")):
         return []
     target = gate.umg_target()
     if not target:
         raise gate.GateError("No UMG target recorded; call set_target_umg_asset first")
-    return [target] + gate.game_paths(params)
+    return [target]
 
 
 def send(host, port, command, params, timeout=30):

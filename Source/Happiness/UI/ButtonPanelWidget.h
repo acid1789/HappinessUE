@@ -8,7 +8,8 @@ class UWidget;
 
 /**
  * The puzzle's side button panel. When the player hasn't touched anything for a while, the hint button gives a
- * small wiggle (a little left, a little right, back), again every IdleSeconds while they stay idle.
+ * small wiggle (a little left, a little right, back), again every IdleSeconds while they stay idle, unless the
+ * player turned "Animate Hint Button" off in the options.
  */
 UCLASS(Abstract)
 class HAPPINESS_API UButtonPanelWidget : public UUserWidget
@@ -36,5 +37,8 @@ protected:
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 private:
+	/** The "Animate Hint Button" option (PC_Happiness Happiness_HintAnimation); on if the controller doesn't have it */
+	bool IsAnimationEnabled() const;
+
 	double ShownTime = 0.0;
 };

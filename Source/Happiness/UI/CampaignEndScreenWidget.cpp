@@ -1,6 +1,7 @@
 #include "UI/CampaignEndScreenWidget.h"
 #include "HappinessClassic/CampaignTree.h"
 #include "HappinessClassic/Puzzle.h"
+#include "UI/LessonProgressTicks.h"
 
 #include "Components/Button.h"
 #include "Components/ProgressBar.h"
@@ -62,7 +63,32 @@ void UCampaignEndScreenWidget::Show(UPuzzle* Puzzle, float PuzzleSeconds)
 	ExpRate = ExpFillTime > 0.f ? ExpToAdd / ExpFillTime : ExpToAdd;
 
 	// The stage Next Puzzle plays (see UCampaignSubsystem::PrepareNextLessonPuzzle)
-	NextStage = Campaign->GetCurrentStage(Result.Lesson);
+	// (Master Mode's current stage after a Master Mode puzzle; the final never leads into Master Mode)
+	const bool bNextMaster = Campaign->IsMasterUnlocked(Result.Lesson) && Result.bMaster;
+	NextStage = bNextMaster ? Campaign->GetCurrentMasterStage(Result.Lesson) : Campaign->GetCurrentStage(Result.Lesson);
+
+	// The bar: the clue's campaign track, or Master Mode's for a Master Mode puzzle
+	if (StageLabel)
+	{
+		StageLabel->SetText(Result.bMaster ? LOCTEXT("MasterLabel", "Master:") : LOCTEXT("CampaignLabel", "Campaign:"));
+	}
+	if (ProgressTicks)
+	{
+		if (Result.bMaster)
+		{
+			TArray<float> Ticks;
+			const int32 FirstMaster = UCampaignSubsystem::GetFirstMasterStage();
+			for (int32 Stage = FirstMaster + 1; Stage < FirstMaster + UCampaignSubsystem::GetNumMasterStages(); Stage++)
+			{
+				Ticks.Add(float(UCampaignSubsystem::GetMasterStagePointsRequired(Stage)) / UCampaignSubsystem::GetMasterMaxPoints());
+			}
+			ProgressTicks->SetTickFractions(Ticks);
+		}
+		else
+		{
+			ProgressTicks->ClearTickFractions();
+		}
+	}
 
 	LessonText->SetText(FText::Format(LOCTEXT("LessonStage", "{0} - {1}"),
 		UCampaignTree::GetLessonDisplayName(Result.Lesson), UCampaignSubsystem::GetStageDisplayName(Result.Stage)));
@@ -95,7 +121,9 @@ void UCampaignEndScreenWidget::Show(UPuzzle* Puzzle, float PuzzleSeconds)
 		Widget->SetVisibility(ESlateVisibility::Hidden);
 	}
 
-	NextPuzzleButton->SetVisibility(Result.bSolved && !Result.bLessonCompleted ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	// Hidden when the clue was just completed (Master Mode opens from the campaign tree) or just mastered
+	NextPuzzleButton->SetVisibility(Result.bSolved && !Result.bLessonCompleted && !Result.bMasterCompleted
+		? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 	SetButtonsEnabled(false);
 
 	SetShownProgress(Result.PreviousPoints);
@@ -262,7 +290,7 @@ void UCampaignEndScreenWidget::NativeTick(const FGeometry& MyGeometry, float InD
 void UCampaignEndScreenWidget::Finish()
 {
 	SetShownProgress(Result.TotalPoints);
-	if (Result.bStageUnlocked || Result.bLessonCompleted)
+	if (Result.bStageUnlocked || Result.bLessonCompleted || Result.bMasterCompleted)
 	{
 		ShowUnlock();
 	}
@@ -289,7 +317,7 @@ void UCampaignEndScreenWidget::ShowUnlock()
 
 void UCampaignEndScreenWidget::SetShownProgress(float Points)
 {
-	const int32 MaxPoints = UCampaignSubsystem::GetMaxPoints();
+	const int32 MaxPoints = Result.bMaster ? UCampaignSubsystem::GetMasterMaxPoints() : UCampaignSubsystem::GetMaxPoints();
 	StageProgress->SetPercent(Points / MaxPoints);
 	if (ProgressText)
 	{
@@ -331,10 +359,11 @@ FText UCampaignEndScreenWidget::GetNoteText() const
 
 FText UCampaignEndScreenWidget::GetUnlockText() const
 {
-	if (Result.bLessonCompleted)
+	if (Result.bMasterCompleted)
 	{
-		return FText::Format(LOCTEXT("ClueComplete", "{0} complete!"), UCampaignTree::GetLessonDisplayName(Result.Lesson));
+		return FText::Format(LOCTEXT("ClueMastered", "{0} mastered!"), UCampaignTree::GetLessonDisplayName(Result.Lesson));
 	}
+	// Clearing the final shows no unlock text: Master Mode is found by reopening the clue from the tree
 	if (Result.bStageUnlocked)
 	{
 		return FText::Format(LOCTEXT("StageUnlocked", "{0} unlocked!"), UCampaignSubsystem::GetStageDisplayName(NextStage));

@@ -2,6 +2,7 @@
 
 #include "Components/Widget.h"
 #include "Framework/Application/SlateApplication.h"
+#include "GameFramework/PlayerController.h"
 
 void UButtonPanelWidget::NativeConstruct()
 {
@@ -21,9 +22,10 @@ void UButtonPanelWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTi
 	const FSlateApplication& Slate = FSlateApplication::Get();
 	const double Idle = Slate.GetCurrentTime() - FMath::Max(Slate.GetLastUserInteractionTime(), ShownTime);
 
-	// A wiggle at every IdleSeconds of idle time: left, right, back to straight
+	// A wiggle at every IdleSeconds of idle time: left, right, back to straight. Off when the player turned
+	// "Animate Hint Button" off in the options.
 	float Angle = 0.f;
-	if (Idle >= IdleSeconds)
+	if (Idle >= IdleSeconds && IsAnimationEnabled())
 	{
 		const double Into = FMath::Fmod(Idle, (double)IdleSeconds);
 		if (Into < WiggleSeconds)
@@ -36,4 +38,12 @@ void UButtonPanelWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTi
 	{
 		Button_H->SetRenderTransformAngle(Angle);
 	}
+}
+
+bool UButtonPanelWidget::IsAnimationEnabled() const
+{
+	// The option lives on the player controller with the other settings (PC_Happiness, saved in SG_Settings)
+	const APlayerController* PC = GetOwningPlayer();
+	const FBoolProperty* Option = PC ? FindFProperty<FBoolProperty>(PC->GetClass(), TEXT("Happiness_HintAnimation")) : nullptr;
+	return !Option || Option->GetPropertyValue_InContainer(PC);
 }

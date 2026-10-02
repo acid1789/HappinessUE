@@ -240,3 +240,5 @@ unexplained hints. Difficulty: 0 easy, 1 normal, 2 hard. Sizes 3–8.
 
 - PIE console (`~`) command `Happiness.CompleteAllLessons` marks every lesson complete, which unlocks Campaign
   mode. Development builds only.
+- `Happiness.SolvePuzzle` fills the open puzzle with its solution and finishes it as if the player had: the
+  end screen, scoring, progress and save all run normally. Development builds only.
