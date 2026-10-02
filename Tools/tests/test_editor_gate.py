@@ -131,6 +131,16 @@ class EditorGateTests(GateTestCase):
         other = gate.canonical((self.b / "Happiness.uproject").resolve())
         self.assertEqual(upgraded["checkouts"][other]["requests"][0]["agent"], "claude-gameplay")
 
+    def test_dead_call_does_not_block_the_next(self):
+        gate.acquire()
+        with gate.transaction() as state:
+            gate.checkout(state)["operations"].append({"token": "x", "pid": 999999, "label": "killed", "started": 0})
+        with mock.patch.object(gate, "pid_alive", lambda pid: pid != 999999):
+            with gate.operation("next call"):
+                pass
+        self.assertEqual(self.entry(self.a)["operations"], [])
+        gate.release()
+
     def test_failed_call_removes_operation(self):
         gate.acquire()
         with self.assertRaises(ValueError):

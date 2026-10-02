@@ -12,6 +12,9 @@ Keep it true: when you learn something that would have saved you time, add it he
   free play, save data).
 - **The UI is UMG Widget Blueprints** in `Content/`, some with C++ parent classes in `Source/Happiness/UI/`.
 - Map of the game's systems, screens and save data: [Docs/Agents/GameStructure.md](Docs/Agents/GameStructure.md).
+- To find where something happens in the Blueprints, search the Blueprint map (`Saved/BlueprintMap`, made by
+  `python Tools/bp_map.py`) rather than reading graphs through the editor. See
+  [Blueprints.md](Docs/Agents/Blueprints.md#finding-things-the-blueprint-map).
 
 ## Hard rules
 

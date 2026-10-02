@@ -179,7 +179,9 @@ def operation(label):
     with transaction() as state:
         require_owner(state)
         entry = checkout(state)
-        # Serialize calls to this checkout's editor, even from several tool processes of the same owner.
+        # Serialize calls to this checkout's editor, even from several tool processes of the same owner. An entry
+        # whose process is gone (killed mid-call) no longer holds the editor.
+        entry["operations"] = [op for op in entry["operations"] if pid_alive(op["pid"])]
         if entry["operations"]:
             raise GateError("Another editor tool call is in progress; wait for it to finish")
         entry["operations"].append({"token": token, "pid": os.getpid(), "label": label, "started": time.time()})

@@ -12,6 +12,18 @@ G = {"refPath": "/Game/Happiness/UI/WBP_Happiness.WBP_Happiness:DoHint"}   # gra
 r = s.call("find_node_types", {"graph": G, "type_id_filter": "IsValid", "context_pins": []})
 ```
 
+## Finding things: the Blueprint map
+
+Don't crawl graphs through the editor to find where something happens (it takes minutes). Search the
+**Blueprint map** instead: every Blueprint graph as text, made by `python Tools/bp_map.py` (needs your editor;
+only re-reads Blueprints whose `.uasset` changed, so rerun it after saving or pulling).
+
+- `Saved/BlueprintMap/INDEX.md`: every Blueprint, its graphs, each function's signature and the events it handles.
+- `Saved/BlueprintMap/<asset path>/<graph>.dsl`: each graph's full `read_graph_dsl` pseudo-code.
+- Search: `grep -rn "Pause" Saved/BlueprintMap` finds every graph that calls or defines it, in seconds.
+
+It is per checkout (under `Saved/`, not committed) and reflects saved assets only.
+
 ## Reading
 
 | What | How |
