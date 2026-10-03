@@ -342,6 +342,74 @@ Prompts should be adapted to the particular asset.
 
 # 12. Asset Generation Principles
 
+Clue overlays encode puzzle rules. Preserve their functional silhouette when restyling them.
+The **span** overlay must retain a straight double-headed arrow with clear outward arrow points at
+both ends: those points tell the player the clue is bidirectional. A grouping bracket is not a valid
+replacement. Inspect the original symbol at game size before generating a replacement.
+The **not** overlay must keep its circular ring and upper-left-to-lower-right diagonal slash, with an
+open transparent interior so the excluded icon remains identifiable. `T_NotBackedPainted` includes the
+diagonal in its artwork; `Overlay_Not` in both clue widgets therefore uses a zero-degree render
+rotation. The legacy texture needed 45 degrees. Check existing widget transforms when replacing art.
+For **directly left of**, the user selected option C: a short terracotta connector at the seam between
+the two icons, with a vertical terminal on the left and one right-pointing arrowhead. It conveys
+adjacency in a fixed left-to-right order. The production texture is `T_DirectlyLeftOfBackedPainted`, used by
+`Overlay_DirectlyLeftOf` in `WBP_HorizontalClue`; the source is `output/imagegen/directly-left-of-backed-v1.png`.
+
+The **between** overlay retains horizontal ellipses over the shared icon borders: three terracotta dots
+on a compact dark umber capsule with a sandstone rim. `T_BetweenDotsPainted` is used by `Overlay_DotsL/R`.
+Its portrait source includes transparent padding to preserve the existing 30-by-60 slots; these slots
+also serve the all-apart divider, whose runtime texture override must remain intact.
+The **chain** overlay retains its two staggered right-pointing arrows and existing slot positions.
+`T_ChainArrowBackedPainted` matches the terracotta, sandstone highlights and umber edges of the span arrow.
+Its transparent lower padding keeps the arrow in the upper part of each existing slot.
+Sources and generation prompts are `output/imagegen/between-painted-v1.*` and `chain-backed-v1.*`.
+The **either/or** overlay retains two opposing curved arrows with an open transparent center.
+`T_EitherOrBackedPainted` replaces `EitherOrOverlay` in both clue widgets: the vertical clue keeps zero
+rotation, and horizontal `Overlay_EORL/R` keep 90 degrees. Preserve the existing positions and
+directions; this symbol represents alternative choices, not a closed circular action button.
+Each arrow has its own curved dark umber backing with a sandstone rim, matching the between badges;
+the open center remains transparent so the icons stay readable. The initial unbacked version was
+too difficult to distinguish from the icon artwork.
+Source and generation prompt: `output/imagegen/either-or-backed-v2.*`.
+
+The user approved the either/or backing and requested it for all previously restyled overlays.
+Span (`T_SpanArrowBackedPainted`), not, directly-left-of and chain therefore use dark umber backing
+that follows their functional silhouettes, edged with a thin sandstone rim. Keep the icon openings
+transparent and retain the existing widget slots and transforms. Sources and built-in generation
+prompts are `output/imagegen/span-backed-v1.*`, `not-backed-v1.*`, `directly-left-of-backed-v1.*`
+and `chain-backed-v1.*`. The earlier unbacked artwork remains available for reference.
+
+The **edge / not-edge** overlays retain five square boxes on one continuous dark umber badge with
+a sandstone rim. Edge fills only the two end boxes; not-edge fills the three middle boxes and leaves
+both ends hollow. These represent end columns versus interior columns, not a fixed five-column board.
+`Overlay_Edge` uses `T_EdgeBoxesPainted`; the NotEdge branch in `Populate` switches its brush to
+`T_NotEdgeBoxesPainted`. Preserve that runtime switch as well as the existing slot placement.
+Sources and built-in generation prompts: `output/imagegen/edge-boxes-painted-v1.*` and
+`not-edge-boxes-painted-v1.*`.
+
+The **gap** overlay is bidirectional: two clear outward arrowheads in front of one exaggerated hollow,
+dashed tile centered vertically in the clue. Its top edge sits behind the arrow. The empty tile means
+exactly one intervening column (`abs(C0-C1) == 2`), and distinguishes gap from span.
+`T_GapPaintedCentered` uses the same terracotta, umber backing and sandstone
+rim as the other overlays. The Gap branch in `WBP_HorizontalClue.Populate` assigns it to `Overlay_Span`;
+the widget's default brush remains `T_SpanArrowBackedPainted` for span clues. Preserve its 180-by-60
+slot and the transparent areas over the endpoint icons. Source and built-in generation prompt:
+`output/imagegen/gap-painted-v2.*`.
+
+All Apart uses `T_AllApartDividerPainted`: two straight terracotta vertical
+separators on narrow dark umber badges with sandstone rims. They keep the existing
+30x60 seam positions between the three icons, with no directional arrows.
+`Populate` switches both shared `Overlay_DotsL/R` textures for All Apart only;
+their default Between ellipsis brushes remain unchanged. Source and prompt:
+`output/imagegen/all-apart-painted-v1.png` and its `.prompt.txt` companion.
+
+The user selected the sage clue frame combined with corner accents in the same
+color family. `T_ClueSelectionSage` replaces the red selection markers in both
+`WBP_HorizontalClue` and `WBP_VerticalClue`. A transparent nine-slice Box brush
+keeps the thicker sage corners intact in either orientation; the icons stay
+uncovered. Selection remains hidden until the existing Blueprint selection logic
+shows it. Source and prompt: `output/imagegen/clue-selection-sage-v1.*`.
+
 For isolated assets:
 
 - Prefer transparent backgrounds.
