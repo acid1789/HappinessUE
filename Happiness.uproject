@@ -51,7 +51,7 @@
 		},
 		{
 			"Name": "OnlineSubsystemGooglePlay",
-			"Enabled": false
+			"Enabled": true
 		}
 	]
 }

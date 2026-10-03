@@ -100,3 +100,4 @@ enc_temp_folder/
 /output/
 
 Config/Windows/WindowsEngine.ini
+Config/UserEngine.ini

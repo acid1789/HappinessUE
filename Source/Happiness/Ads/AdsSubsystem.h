@@ -56,11 +56,14 @@ public:
 	static UAdsSubsystem* Get(const UObject* WorldContextObject);
 	static UAdsSubsystem* GetInstance() { return Instance.Get(); }
 
-	/** Whether the game shows ads (saved with the game) */
+	/** Whether the game shows ads: switched on and not removed by the Remove Ads purchase */
 	UFUNCTION(BlueprintPure, Category = "Ads")
-	bool AreAdsEnabled() const { return bAdsEnabled; }
+	bool AreAdsEnabled() const { return bAdsEnabled && !bAdsRemoved; }
 
-	/** Turn all ads on or off, and save it */
+	/** The Remove Ads purchase (UAdRemovalSubsystem) is owned: no ads */
+	void SetAdsRemoved(bool bRemoved);
+
+	/** Turn all ads on or off, and save it (testing; players remove ads by buying Remove Ads) */
 	UFUNCTION(BlueprintCallable, Category = "Ads")
 	void SetAdsEnabled(bool bEnabled);
 
@@ -103,6 +106,7 @@ private:
 	static TWeakObjectPtr<UAdsSubsystem> Instance;
 
 	bool bAdsEnabled = true;
+	bool bAdsRemoved = false;
 
 	FSimpleDelegate PendingAction;
 	bool bShowing = false;
