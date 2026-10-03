@@ -56,9 +56,13 @@ public:
 	static UAdsSubsystem* Get(const UObject* WorldContextObject);
 	static UAdsSubsystem* GetInstance() { return Instance.Get(); }
 
-	/** Whether the game shows ads: switched on and not removed by the Remove Ads purchase */
+	/**
+	 * Whether the game shows ads: on a phone (Android, iOS), switched on and not removed by the Remove Ads purchase.
+	 * Elsewhere (editor, PC) never, so nothing makes room for them; "Happiness.PreviewAdLayout 1" shows the phone's
+	 * layout there.
+	 */
 	UFUNCTION(BlueprintPure, Category = "Ads")
-	bool AreAdsEnabled() const { return bAdsEnabled && !bAdsRemoved; }
+	bool AreAdsEnabled() const;
 
 	/** The Remove Ads purchase (UAdRemovalSubsystem) is owned: no ads */
 	void SetAdsRemoved(bool bRemoved);

@@ -36,6 +36,14 @@ namespace
 	const TCHAR* TestBannerAdUnitID = TEXT("ca-app-pub-3940256099942544/6300978111");
 #endif
 
+#if !HAPPINESS_WITH_ADS
+	// Away from a phone the game has no ads; this lays the puzzle screen out as if it had (banner space)
+	TAutoConsoleVariable<bool> CVarPreviewAdLayout(
+		TEXT("Happiness.PreviewAdLayout"),
+		false,
+		TEXT("Editor/PC: lay the puzzle screen out with the banner ad's space, as on a phone with ads on"));
+#endif
+
 	// The banner hides when nothing has asked for it for this long (its screen closed)
 	const double BannerRequestTimeout = 0.25;
 	// Seconds before trying again after a banner failed to load (offline, no fill)
@@ -104,6 +112,15 @@ void UAdsSubsystem::SetAdsEnabled(bool bEnabled)
 		HideBanner();
 	}
 	UHappinessSaveGame::SaveCurrentSettings();
+}
+
+bool UAdsSubsystem::AreAdsEnabled() const
+{
+#if HAPPINESS_WITH_ADS
+	return bAdsEnabled && !bAdsRemoved;
+#else
+	return CVarPreviewAdLayout.GetValueOnGameThread() && bAdsEnabled && !bAdsRemoved;
+#endif
 }
 
 void UAdsSubsystem::SetAdsRemoved(bool bRemoved)
