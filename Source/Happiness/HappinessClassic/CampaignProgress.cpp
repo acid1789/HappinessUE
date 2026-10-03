@@ -3,6 +3,7 @@
 #include "Puzzle.h"
 #include "HappinessSaveGame.h"
 #include "FreePlaySettings.h"
+#include "DailyPuzzle.h"
 
 #include "Kismet/GameplayStatics.h"
 
@@ -338,6 +339,9 @@ void UCampaignSubsystem::RequestLessonPuzzle(ECampaignLesson Lesson, int32 Stage
 		return;
 	}
 
+	// Lessons and the daily puzzle don't mix
+	UDailySubsystem::StopDaily(this);
+
 	// A different lesson or stage abandons the open puzzle; the same one resumes it
 	if (!Data.bInSession || Data.SessionLesson != Lesson || Data.SessionStage != Stage)
 	{
@@ -573,6 +577,17 @@ void UCampaignSubsystem::InitPuzzleForPlay(const UObject* WorldContextObject, UP
 		}
 		// The lesson can't be played any more (shouldn't happen); fall back to a classic puzzle
 		Campaign->EndLessonSession();
+	}
+
+	// The daily puzzle: everything comes from its date (a reload rebuilds the same puzzle)
+	FDailyPuzzleSpec Daily;
+	const UDailySubsystem* DailySubsystem = UDailySubsystem::Get(WorldContextObject);
+	if (DailySubsystem && DailySubsystem->GetActiveSpec(Daily))
+	{
+		Puzzle->m_ExcludedClues = Daily.ExcludedClueMask;
+		Puzzle->Init(Daily.Seed, Daily.Size, Daily.Difficulty);
+		Puzzle->GetRating();
+		return;
 	}
 
 	// Free play: only the clue types the player chose

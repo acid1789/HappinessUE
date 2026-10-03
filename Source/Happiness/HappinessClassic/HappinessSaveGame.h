@@ -4,6 +4,7 @@
 #include "GameFramework/SaveGame.h"
 #include "CampaignProgress.h"
 #include "FreePlaySettings.h"
+#include "DailyPuzzle.h"
 #include "HappinessSaveGame.generated.h"
 
 /**
@@ -42,4 +43,11 @@ public:
 
 	UPROPERTY(SaveGame)
 	FFreePlaySaveData FreePlay;
+
+	UPROPERTY(SaveGame)
+	FDailySaveData Daily;
+
+	/** Ads turned off (UAdsSubsystem) */
+	UPROPERTY(SaveGame)
+	bool bAdsDisabled = false;
 };

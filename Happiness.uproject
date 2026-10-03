@@ -44,6 +44,14 @@
 		{
 			"Name": "HappinessMCPLookup",
 			"Enabled": true
+		},
+		{
+			"Name": "PloxToolsAdMob",
+			"Enabled": true
+		},
+		{
+			"Name": "OnlineSubsystemGooglePlay",
+			"Enabled": false
 		}
 	]
 }

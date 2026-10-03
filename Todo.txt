@@ -8,16 +8,6 @@ Tutorial
 iOS
 Steam
 Restoring Multiple Icons in mouse mode breaks something
-Clue Optimization
-More Useful Hints
 
-Back End DB / Server / Sign In
-Puzzle Reporting
-Average Puzzle Time
-Friends
-Daily Competition
 
-Show Puzzle Number
-
-Master Mode
-Free Play
+Usage Analytics

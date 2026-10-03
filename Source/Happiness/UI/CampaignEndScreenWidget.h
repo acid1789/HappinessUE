@@ -201,6 +201,9 @@ private:
 	void SetButtonsEnabled(bool bEnabled);
 	void PlaySound(USoundBase* Sound) const;
 
+	/** A full-screen ad first (UAdsSubsystem), then Action */
+	void PlayAdThen(TFunction<void()> Action);
+
 	FLessonPuzzleResult Result;
 	FFreePlayScore Score;
 	int32 NextStage = 0;
