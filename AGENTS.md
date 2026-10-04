@@ -67,4 +67,8 @@ Keep it true: when you learn something that would have saved you time, add it he
   Keep both: without the closing one it leaks into the next file of the unity build (warning C4426).
 - C++ widget defaults (sounds, colors) are more reliable set in the C++ constructor than on a Widget
   Blueprint's class defaults; instances placed inside other widgets keep their own saved values.
+- **Don't load Blueprint classes in a C++ constructor** (`ConstructorHelpers::FClassFinder`) when that Blueprint
+  can reach, through its references, a widget of the class being constructed: the circular load hangs the editor
+  (and the puzzle commandlet) at startup, right after loading the Happiness module. Use a `TSoftClassPtr` and
+  load it when first needed (see `UPauseMenuWidget::OptionsClass`). Sounds and textures are safe to find there.
 - Test puzzle logic changes with the headless harness (`Tools/puzzle.sh`) before handing them over.
