@@ -17,4 +17,9 @@ protected:
 	TObjectPtr<UCanvasPanel> Border_44;
 
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
+
+private:
+	bool bSavedHintLayout = false;
+	float NormalPanelTop = 0.f;
+	ESlateVisibility NormalHintVisibility = ESlateVisibility::SelfHitTestInvisible;
 };
