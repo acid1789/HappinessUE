@@ -72,3 +72,7 @@ Keep it true: when you learn something that would have saved you time, add it he
   (and the puzzle commandlet) at startup, right after loading the Happiness module. Use a `TSoftClassPtr` and
   load it when first needed (see `UPauseMenuWidget::OptionsClass`). Sounds and textures are safe to find there.
 - Test puzzle logic changes with the headless harness (`Tools/puzzle.sh`) before handing them over.
+- **After a pull that changes `Source/`, rebuild C++ before touching assets** (`Tools/puzzle.sh --build`, editor
+  closed). Pulled assets may use C++ classes your editor's DLL doesn't have yet: their Blueprints then fail to load
+  and odd errors follow elsewhere ("Could not find a variable named ...", crashes while reading graphs). Check with
+  `git log -1 --format=%cd` against the date of `Binaries/Win64/UnrealEditor-Happiness.dll`.
