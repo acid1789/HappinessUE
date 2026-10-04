@@ -37,16 +37,44 @@ void UGamePanelWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 			}
 		}
 
+		// Large puzzles use the strip normally reserved for the inline clue description.
+		UUserWidget* Screen = GetParent() ? GetParent()->GetTypedOuter<UUserWidget>() : nullptr;
+		UWidget* HintPanel = Screen ? Screen->GetWidgetFromName(TEXT("HelpPanel")) : nullptr;
+		UCanvasPanelSlot* PanelSlot = Cast<UCanvasPanelSlot>(Slot);
+		UCanvasPanelSlot* HintSlot = HintPanel ? Cast<UCanvasPanelSlot>(HintPanel->Slot) : nullptr;
+		if (PanelSlot && HintSlot)
+		{
+			if (!bSavedHintLayout)
+			{
+				NormalPanelTop = PanelSlot->GetOffsets().Top;
+				NormalHintVisibility = HintPanel->GetVisibility();
+				bSavedHintLayout = true;
+			}
+			const bool bLargePuzzle = Rows >= 7;
+			const ESlateVisibility HintVisibility = bLargePuzzle ? ESlateVisibility::Collapsed : NormalHintVisibility;
+			if (HintPanel->GetVisibility() != HintVisibility)
+			{
+				HintPanel->SetVisibility(HintVisibility);
+			}
+			FMargin PanelOffsets = PanelSlot->GetOffsets();
+			const float PanelTop = bLargePuzzle ? HintSlot->GetOffsets().Top : NormalPanelTop;
+			if (!FMath::IsNearlyEqual(PanelOffsets.Top, PanelTop))
+			{
+				PanelOffsets.Top = PanelTop;
+				PanelSlot->SetOffsets(PanelOffsets);
+			}
+		}
+
 		const FVector2D Available = Border_44->GetCachedGeometry().GetLocalSize();
 		if (Rows == 0 || Columns == 0 || Available.X <= 0.f || Available.Y <= 0.f)
 		{
 			continue;
 		}
-		// Keep both icon rows inside the painted frame, including its rounded inner corners.
+		// Let both icon rows fill the cell; the painted frame draws over their outside edges.
 		const float CellHeight = Available.Y / Rows;
-		const float FrameInset = 6.f;
+		const float FrameInset = 0.f;
 		const float IconHeight = FMath::Max(0.f, (CellHeight - FrameInset * 2.f) / 2.f);
-		const float ColumnGap = 8.f;
+		const float ColumnGap = 4.f;
 		const int32 IconsPerRow = FMath::DivideAndRoundUp(Columns, 2);
 		const float CellWidth = IconHeight * IconsPerRow + FrameInset * 2.f;
 		const float GridWidth = FMath::Min(static_cast<float>(Available.X), (CellWidth + ColumnGap) * Columns);
@@ -118,16 +146,18 @@ void UGamePanelWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 			CanvasSlot->SetAlignment(Alignment);
 			CanvasSlot->SetOffsets(Offsets);
 		}
+		// The outer column padding is only for spacing between cells, not a second border gutter.
+		const FMargin SurfaceOffsets(0.f, 0.f, FMath::Max(0.f, GridWidth - ColumnGap), 0.f);
 		for (const FName SurfaceName : {FName(TEXT("PanelSurface")), FName(TEXT("PanelFrame"))})
 		{
 			UWidget* Surface = GetWidgetFromName(SurfaceName);
 			if (UCanvasPanelSlot* SurfaceSlot = Surface ? Cast<UCanvasPanelSlot>(Surface->Slot) : nullptr)
 			{
-				if (SurfaceSlot->GetAnchors() != Anchors || SurfaceSlot->GetAlignment() != Alignment || SurfaceSlot->GetOffsets() != Offsets)
+				if (SurfaceSlot->GetAnchors() != Anchors || SurfaceSlot->GetAlignment() != Alignment || SurfaceSlot->GetOffsets() != SurfaceOffsets)
 				{
 					SurfaceSlot->SetAnchors(Anchors);
 					SurfaceSlot->SetAlignment(Alignment);
-					SurfaceSlot->SetOffsets(Offsets);
+					SurfaceSlot->SetOffsets(SurfaceOffsets);
 				}
 			}
 		}

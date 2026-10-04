@@ -410,6 +410,29 @@ keeps the thicker sage corners intact in either orientation; the icons stay
 uncovered. Selection remains hidden until the existing Blueprint selection logic
 shows it. Source and prompt: `output/imagegen/clue-selection-sage-v1.*`.
 
+Grid cells now use `T_VillaCellFrameThin`, a sandstone nine-slice frame with
+straight outer edges flush to the texture bounds. Its 1254px source has an
+approximately 39px opaque side stroke; the 78px UI texture gives about 2.4 layout
+pixels of visible border. Rounded corner cutouts remain transparent. This removes
+the old transparent gutter between adjoining row frames. Source and prompt:
+`output/imagegen/villa-cell-frame-thin-v1.*`. The game panel's outer frame uses
+the same flush texture so the outer cells do not protrude into the old frame's
+transparent gutter. Clue frames retain their existing textures.
+
+`WBP_Cell` inherits `UGameCellWidget`, which wraps candidate and resolved icon
+containers in a runtime Retainer Box. `M_CellRoundedMask` uses a rounded rectangle
+with a 6-layout-pixel radius and the cell's current dimensions, preserving square
+icons while clipping the corners. The sandstone frame draws above the masked
+content. Retainers redraw on invalidation and size changes, rather than on every
+frame. Test with a live PIE capture: the standalone offscreen widget renderer does
+not reliably draw dynamically added retained content.
+
+The inline clue description (`WBP_HelpPanel`, called the Hint Panel in the UI)
+centers its text and icons over the puzzle. `UGamePanelWidget` collapses it for
+7x7 and 8x8 boards and moves the board top to the description strip's top,
+reclaiming 35 layout pixels with the current screen offsets. Switching to a
+smaller puzzle restores the original board top and description visibility.
+
 For isolated assets:
 
 - Prefer transparent backgrounds.
