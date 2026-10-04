@@ -13,3 +13,12 @@ Restoring Multiple Icons in mouse mode breaks something
 
 Usage Analytics
 Back should background the app.
+
+Button Bar Visuals
+Options Menu Visuals
+Pause Menu Button Visuals
+Confirm Dialog Visuals
+
+Game Rules
+Clue Panel Backgrounds
+	
