@@ -1,6 +1,7 @@
 --- Beta ---
 Google Play
 Ads & Payment
+Ad mediation: set up AppLovin, Chartboost, ironSource, Meta and/or Unity Ads in AdMob (accounts, ad units, mediation groups), then turn each one back on in DefaultGame.ini (bEnable<Network>; all off since v11 to save ~15 MB of download)
 
 
 --- Release 1 ---
@@ -11,3 +12,4 @@ Restoring Multiple Icons in mouse mode breaks something
 
 
 Usage Analytics
+Back should background the app.

@@ -36,6 +36,14 @@ namespace
 	const TCHAR* TestBannerAdUnitID = TEXT("ca-app-pub-3940256099942544/6300978111");
 #endif
 
+#if !HAPPINESS_WITH_ADS
+	// Away from a phone the game has no ads; this lays the puzzle screen out as if it had (banner space)
+	TAutoConsoleVariable<bool> CVarPreviewAdLayout(
+		TEXT("Happiness.PreviewAdLayout"),
+		false,
+		TEXT("Editor/PC: lay the puzzle screen out with the banner ad's space, as on a phone with ads on"));
+#endif
+
 	// The banner hides when nothing has asked for it for this long (its screen closed)
 	const double BannerRequestTimeout = 0.25;
 	// Seconds before trying again after a banner failed to load (offline, no fill)
@@ -104,6 +112,33 @@ void UAdsSubsystem::SetAdsEnabled(bool bEnabled)
 		HideBanner();
 	}
 	UHappinessSaveGame::SaveCurrentSettings();
+}
+
+bool UAdsSubsystem::AreAdsEnabled() const
+{
+#if HAPPINESS_WITH_ADS
+	return bAdsEnabled && !bAdsRemoved;
+#else
+	return CVarPreviewAdLayout.GetValueOnGameThread() && bAdsEnabled && !bAdsRemoved;
+#endif
+}
+
+void UAdsSubsystem::SetAdsRemoved(bool bRemoved)
+{
+	if (bAdsRemoved == bRemoved)
+	{
+		return;
+	}
+	bAdsRemoved = bRemoved;
+	UE_LOG(LogHappinessAds, Log, TEXT("Ads: %s by the Remove Ads purchase"), bAdsRemoved ? TEXT("removed") : TEXT("back"));
+	if (AreAdsEnabled())
+	{
+		LoadBanner();
+	}
+	else
+	{
+		HideBanner();
+	}
 }
 
 FString UAdsSubsystem::GetInterstitialAdUnitID() const
@@ -199,7 +234,7 @@ void UAdsSubsystem::ShowInterstitialThen(FSimpleDelegate Action)
 		return;
 	}
 #if HAPPINESS_WITH_ADS
-	if (bAdsEnabled && UAdMobCPPLibrary::IsAdMobReady() && UAdMobCPPLibrary::IsInterstitialReady())
+	if (AreAdsEnabled() && UAdMobCPPLibrary::IsAdMobReady() && UAdMobCPPLibrary::IsInterstitialReady())
 	{
 		PendingAction = MoveTemp(Action);
 		bShowing = true;
@@ -245,7 +280,7 @@ void UAdsSubsystem::ShowInterstitialThen(FSimpleDelegate Action)
 	}
 
 	// Nothing to show now: try to have one ready next time
-	if (bAdsEnabled && UAdMobCPPLibrary::IsAdMobReady())
+	if (AreAdsEnabled() && UAdMobCPPLibrary::IsAdMobReady())
 	{
 		LoadInterstitial();
 	}
@@ -273,7 +308,7 @@ void UAdsSubsystem::FinishShow()
 void UAdsSubsystem::LoadBanner()
 {
 #if HAPPINESS_WITH_ADS
-	if (!bAdsEnabled || !bAdMobReady || bBannerLoading || bBannerReady || FPlatformTime::Seconds() < NextBannerLoad)
+	if (!AreAdsEnabled() || !bAdMobReady || bBannerLoading || bBannerReady || FPlatformTime::Seconds() < NextBannerLoad)
 	{
 		return;
 	}
@@ -331,7 +366,7 @@ void UAdsSubsystem::SetLargeBanner(bool bLarge)
 
 void UAdsSubsystem::RequestBanner(const FVector2D& ViewportPixel)
 {
-	if (!bAdsEnabled)
+	if (!AreAdsEnabled())
 	{
 		return;
 	}
@@ -397,7 +432,7 @@ void UAdsSubsystem::HideBanner()
 bool UAdsSubsystem::Tick(float DeltaTime)
 {
 	// Nothing asked for the banner lately: its screen closed or something covers it
-	if (bBannerShown && (!bAdsEnabled || FPlatformTime::Seconds() - LastBannerRequest > BannerRequestTimeout))
+	if (bBannerShown && (!AreAdsEnabled() || FPlatformTime::Seconds() - LastBannerRequest > BannerRequestTimeout))
 	{
 		HideBanner();
 	}

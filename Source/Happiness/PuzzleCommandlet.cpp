@@ -424,8 +424,10 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 		return 0;
 	}
 
-	// The puzzle core logs every generated clue to LogTemp; keep only errors
+	// The puzzle core logs every generated clue to LogTemp; keep only errors (Shipping builds have no logging)
+#if !NO_LOGGING
 	LogTemp.SetVerbosity(ELogVerbosity::Error);
+#endif
 
 	FErrorCounter Errors;
 	GLog->AddOutputDevice(&Errors);
