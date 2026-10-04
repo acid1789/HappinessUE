@@ -91,3 +91,9 @@ python Tools/umg.py reorder_widget_tree '{"root": "Content", "tree": "[\"TitleTe
 - **Fonts with drop shadows:** wrapping text in a `ScaleBox` dropped the text shadows in this project; set the
   font size directly instead.
 - Hidden clue widgets are removed from their panel (`RemoveFromParent`), not collapsed.
+
+- **Button texture atlases:** an `Image` brush supports `uVRegion` with normalized
+  `min`, `max`, and `bIsValid: true`. Measure each painted tile's bounds instead of
+  assuming a generated atlas has exact equal quadrants; uneven transparent margins
+  otherwise shift frames under the live labels. `T_ButtonSageCeramic` uses four
+  regions in one texture; action labels remain UMG text in the button's bottom slot.
