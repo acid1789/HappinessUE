@@ -57,6 +57,10 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Pause Menu")
 	FOnPauseMenuAction OnQuitApp;
 
+	/** The game rules screen (WBP_GameRules, a UGameRulesWidget), over the menu. Soft, like OptionsClass. */
+	UPROPERTY(EditAnywhere, Category = "Pause Menu")
+	TSoftClassPtr<UUserWidget> RulesClass;
+
 	/**
 	 * The Options screen (its Show(PC) is called when it opens). A soft reference, loaded when first opened: loading
 	 * it while this class's default object is made (at startup) loads WBP_Happiness, whose pause menu is of this
@@ -133,6 +137,13 @@ private:
 
 	/** The siblings hidden while the menu shows, with the visibility each had */
 	TMap<TWeakObjectPtr<UWidget>, ESlateVisibility> HiddenScreen;
+
+	/** Open a screen over the menu, made the first time and reused */
+	UUserWidget* OpenOverMenu(TObjectPtr<UUserWidget>& Screen, TSoftClassPtr<UUserWidget>& Class, bool& bNew);
+
+	/** The rules screen, made the first time and reused (it hides itself when closed) */
+	UPROPERTY()
+	TObjectPtr<UUserWidget> RulesWidget;
 
 	/** The Options screen, made the first time and reused (it hides itself when closed) */
 	UPROPERTY()

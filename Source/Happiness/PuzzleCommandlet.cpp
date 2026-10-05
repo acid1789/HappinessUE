@@ -1,6 +1,7 @@
 #include "PuzzleCommandlet.h"
 #include "HappinessClassic/Puzzle.h"
 #include "HappinessClassic/Clue.h"
+#include "HappinessClassic/ClueExample.h"
 #include "HappinessClassic/Hint.h"
 #include "HappinessClassic/CampaignTree.h"
 #include "HappinessClassic/CampaignProgress.h"
@@ -275,6 +276,11 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 	FParse::Value(Cmd, TEXT("out="), OutPath);
 	const bool bAll = FParse::Param(Cmd, TEXT("all"));
 	const bool bNoAuto = FParse::Param(Cmd, TEXT("noauto"));
+	// -checkexamples: every clue's FClueExample (the game rules' boards) must hold in the solution and have a broken arrangement
+	const bool bCheckExamples = FParse::Param(Cmd, TEXT("checkexamples"));
+	int32 ExamplesChecked = 0;
+	TMap<FString, int32> ExampleHoldFails;
+	TMap<FString, int32> ExampleNoBroken;
 	const bool bShow = Mode == TEXT("show") || Mode == TEXT("trace");
 	const bool bTrace = Mode == TEXT("trace");
 	// -explain: build every hint's explanation (UHint::GetExplanation) and report how many fell back to the plain action
@@ -471,6 +477,25 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 		GenTime += GenMs;
 		const int32 GenErrors = Errors.Count;
 
+		if (bCheckExamples)
+		{
+			for (UClue* C : P.m_Clues)
+			{
+				FClueExample Example;
+				if (!C || !Example.Build(*C, P))
+					continue;
+				ExamplesChecked++;
+				const FString Type = C->m_Type == eClueType::Vertical ? StaticEnum<eVerticalType>()->GetNameStringByValue((int64)C->m_VerticalType)
+					: StaticEnum<eHorizontalType>()->GetNameStringByValue((int64)C->m_HorizontalType);
+				if (!Example.Holds(Example.SolutionColumns()))
+					ExampleHoldFails.FindOrAdd(Type)++;
+				TArray<int32> Broken;
+				int32 Moved = 0;
+				if (!Example.FindBroken(Broken, Moved))
+					ExampleNoBroken.FindOrAdd(Type)++;
+			}
+		}
+
 		if (bCampaign)
 		{
 			// No clue may come from a later lesson, and the puzzle must need the lesson's clues
@@ -577,6 +602,18 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 	}
 
 	GLog->RemoveOutputDevice(&Errors);
+
+	if (bCheckExamples)
+	{
+		auto Counts = [](const TMap<FString, int32>& Map)
+		{
+			FString Text;
+			for (const TPair<FString, int32>& Pair : Map)
+				Text += FString::Printf(TEXT(" %s=%d"), *Pair.Key, Pair.Value);
+			return Text.IsEmpty() ? FString(TEXT(" none")) : Text;
+		};
+		Out += FString::Printf(TEXT("EXAMPLES checked=%d holdFails:%s noBroken:%s\n"), ExamplesChecked, *Counts(ExampleHoldFails), *Counts(ExampleNoBroken));
+	}
 
 	Out += FString::Printf(TEXT("SUMMARY n=%d analyzeFail=%d hintFail=%d withErrors=%d avgClues=%.1f avgHintSteps=%.1f avgGen=%.1fms total=%.1fs\n"),
 		Total, AnalyzeFails, HintFails, ErrorPuzzles, Total ? (double)ClueSum / Total : 0.0, Total ? (double)HintStepSum / Total : 0.0,
