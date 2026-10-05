@@ -7,6 +7,7 @@
 
 class UButton;
 class UTextBlock;
+class USizeBox;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnHappinessModeEvent);
 
@@ -65,8 +66,30 @@ public:
 
 protected:
 	virtual void NativeConstruct() override;
+	virtual void NativeDestruct() override;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UButton> RemoveAdsButton;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<USizeBox> RemoveAdsCard;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UWidget> AdsPurchaseDialog;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UButton> ClosePurchaseButton;
 
 private:
+	UFUNCTION()
+	void RefreshAdRemoval();
+
+	UFUNCTION()
+	void HandleRemoveAdsClicked();
+
+	UFUNCTION()
+	void HandleClosePurchaseClicked();
+
 	UFUNCTION()
 	void HandleClassicClicked();
 
