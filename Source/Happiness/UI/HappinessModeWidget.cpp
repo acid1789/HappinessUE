@@ -2,6 +2,8 @@
 
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
+#include "Components/SizeBox.h"
+#include "Ads/AdRemoval.h"
 #include "HappinessClassic/DailyPuzzle.h"
 
 #define LOCTEXT_NAMESPACE "HappinessMode"
@@ -26,6 +28,19 @@ void UHappinessModeWidget::NativeConstruct()
 	{
 		DailyButton->OnClicked.AddUniqueDynamic(this, &UHappinessModeWidget::HandleDailyClicked);
 	}
+	if (RemoveAdsButton)
+	{
+		RemoveAdsButton->OnClicked.AddUniqueDynamic(this, &UHappinessModeWidget::HandleRemoveAdsClicked);
+	}
+	if (ClosePurchaseButton)
+	{
+		ClosePurchaseButton->OnClicked.AddUniqueDynamic(this, &UHappinessModeWidget::HandleClosePurchaseClicked);
+	}
+	if (UAdRemovalSubsystem* AdRemoval = UAdRemovalSubsystem::Get(this))
+	{
+		AdRemoval->OnChanged.AddUniqueDynamic(this, &UHappinessModeWidget::RefreshAdRemoval);
+	}
+	RefreshAdRemoval();
 	RefreshCampaignLock();
 	RefreshDaily();
 	if (BackButton)
@@ -34,8 +49,51 @@ void UHappinessModeWidget::NativeConstruct()
 	}
 }
 
+void UHappinessModeWidget::NativeDestruct()
+{
+	if (UAdRemovalSubsystem* AdRemoval = UAdRemovalSubsystem::Get(this))
+	{
+		AdRemoval->OnChanged.RemoveDynamic(this, &UHappinessModeWidget::RefreshAdRemoval);
+	}
+	Super::NativeDestruct();
+}
+
+void UHappinessModeWidget::RefreshAdRemoval()
+{
+	const UAdRemovalSubsystem* AdRemoval = UAdRemovalSubsystem::Get(this);
+	const bool bOwned = AdRemoval && AdRemoval->AreAdsRemoved();
+	if (RemoveAdsCard)
+	{
+		// The centered horizontal layout closes the gap when the offer is removed.
+		RemoveAdsCard->SetVisibility(bOwned ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
+	}
+	if (bOwned)
+	{
+		HandleClosePurchaseClicked();
+	}
+}
+
+void UHappinessModeWidget::HandleRemoveAdsClicked()
+{
+	const UAdRemovalSubsystem* AdRemoval = UAdRemovalSubsystem::Get(this);
+	if (AdsPurchaseDialog && (!AdRemoval || !AdRemoval->AreAdsRemoved()))
+	{
+		AdsPurchaseDialog->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	}
+}
+
+void UHappinessModeWidget::HandleClosePurchaseClicked()
+{
+	if (AdsPurchaseDialog)
+	{
+		AdsPurchaseDialog->SetVisibility(ESlateVisibility::Collapsed);
+	}
+}
+
 void UHappinessModeWidget::Show()
 {
+	HandleClosePurchaseClicked();
+	RefreshAdRemoval();
 	RefreshCampaignLock();
 	RefreshDaily();
 	SetVisibility(ESlateVisibility::SelfHitTestInvisible);
@@ -46,12 +104,18 @@ void UHappinessModeWidget::RefreshCampaignLock()
 	if (CampaignButton)
 	{
 		const UCampaignSubsystem* Campaign = UCampaignSubsystem::Get(this);
-		CampaignButton->SetIsEnabled(Campaign && Campaign->IsCampaignModeUnlocked());
+		const bool bUnlocked = Campaign && Campaign->IsCampaignModeUnlocked();
+		CampaignButton->SetIsEnabled(bUnlocked);
+		if (UWidget* Note = GetWidgetFromName(TEXT("CampaignNote")))
+		{
+			Note->SetVisibility(bUnlocked ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible);
+		}
 	}
 }
 
 void UHappinessModeWidget::Hide()
 {
+	HandleClosePurchaseClicked();
 	SetVisibility(ESlateVisibility::Collapsed);
 }
 
