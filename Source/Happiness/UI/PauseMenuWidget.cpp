@@ -5,6 +5,7 @@
 #include "Components/CanvasPanelSlot.h"
 #include "Components/TextBlock.h"
 #include "HappinessClassic/Puzzle.h"
+#include "UI/GameRulesWidget.h"
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
@@ -19,6 +20,7 @@ UPauseMenuWidget::UPauseMenuWidget(const FObjectInitializer& ObjectInitializer)
 	AcceptSound = Accept.Object;
 	CancelSound = Cancel.Object;
 	OptionsClass = TSoftClassPtr<UUserWidget>(FSoftObjectPath(TEXT("/Game/Happiness/UI/WBP_Options.WBP_Options_C")));
+	RulesClass = TSoftClassPtr<UUserWidget>(FSoftObjectPath(TEXT("/Game/Happiness/UI/WBP_GameRules.WBP_GameRules_C")));
 }
 
 void UPauseMenuWidget::NativeConstruct()
@@ -137,31 +139,52 @@ void UPauseMenuWidget::HandleUnhide()
 void UPauseMenuWidget::HandleRules()
 {
 	PlaySound(AcceptSound);
+	bool bNew = false;
+	if (UGameRulesWidget* Rules = Cast<UGameRulesWidget>(OpenOverMenu(RulesWidget, RulesClass, bNew)))
+	{
+		Rules->Show(PC ? PC.Get() : GetOwningPlayer());
+	}
 	OnGameRules.Broadcast();
+}
+
+UUserWidget* UPauseMenuWidget::OpenOverMenu(TObjectPtr<UUserWidget>& Screen, TSoftClassPtr<UUserWidget>& Class, bool& bNew)
+{
+	UCanvasPanel* Canvas = Cast<UCanvasPanel>(GetRootWidget());
+	if (!Canvas)
+	{
+		return nullptr;
+	}
+	bNew = !Screen;
+	if (bNew)
+	{
+		if (UClass* Loaded = Class.LoadSynchronous())
+		{
+			Screen = CreateWidget<UUserWidget>(this, Loaded);
+		}
+		// Over the whole screen, above the menu
+		if (UCanvasPanelSlot* ScreenSlot = Screen ? Canvas->AddChildToCanvas(Screen) : nullptr)
+		{
+			ScreenSlot->SetAnchors(FAnchors(0.f, 0.f, 1.f, 1.f));
+			ScreenSlot->SetOffsets(FMargin(0.f));
+			ScreenSlot->SetZOrder(300);
+		}
+	}
+	if (Screen)
+	{
+		Screen->SetVisibility(ESlateVisibility::Visible);
+	}
+	return Screen;
 }
 
 void UPauseMenuWidget::HandleOptions()
 {
 	PlaySound(AcceptSound);
-	UCanvasPanel* Canvas = Cast<UCanvasPanel>(GetRootWidget());
-	if (!Canvas)
-	{
-		return;
-	}
-	const bool bNew = !OptionsWidget;
-	if (bNew)
-	{
-		if (UClass* Class = OptionsClass.LoadSynchronous())
-		{
-			OptionsWidget = CreateWidget<UUserWidget>(this, Class);
-		}
-	}
-	UUserWidget* Options = OptionsWidget;
+	bool bNew = false;
+	UUserWidget* Options = OpenOverMenu(OptionsWidget, OptionsClass, bNew);
 	if (!Options)
 	{
 		return;
 	}
-	Options->SetVisibility(ESlateVisibility::Visible);
 
 	// WBP_Options.Show(PC) loads the current settings into it
 	if (UFunction* ShowFunction = Options->FindFunction(TEXT("Show")))
@@ -173,14 +196,6 @@ void UPauseMenuWidget::HandleOptions()
 			PCParam->SetObjectPropertyValue_InContainer(Params, PC ? PC.Get() : GetOwningPlayer());
 		}
 		Options->ProcessEvent(ShowFunction, Params);
-	}
-
-	// Over the whole screen, above the menu
-	if (UCanvasPanelSlot* OptionsSlot = bNew ? Canvas->AddChildToCanvas(Options) : nullptr)
-	{
-		OptionsSlot->SetAnchors(FAnchors(0.f, 0.f, 1.f, 1.f));
-		OptionsSlot->SetOffsets(FMargin(0.f));
-		OptionsSlot->SetZOrder(300);
 	}
 }
 
