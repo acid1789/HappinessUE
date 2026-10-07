@@ -34,7 +34,7 @@ namespace
 	const int32 ExampleSeedTries = 40;
 
 	/** Icon Index of an icon set (DA_IconSet): its Icons array holds the textures, directly or in a struct. As UHintInfoWidget's. */
-	UTexture2D* GetIconTexture(UObject* IconSet, int32 Index)
+	UTexture2D* GetRulesIconTexture(UObject* IconSet, int32 Index)
 	{
 		const FArrayProperty* Icons = IconSet ? FindFProperty<FArrayProperty>(IconSet->GetClass(), TEXT("Icons")) : nullptr;
 		if (!Icons)
@@ -385,7 +385,7 @@ UWidget* UGameRulesWidget::MakeBoard(const FClueExample& Example, const TArray<i
 			if (PieceHere != INDEX_NONE)
 			{
 				const FClueExamplePiece& Piece = Example.Pieces[PieceHere];
-				UTexture2D* Texture = IconSets.IsValidIndex(Piece.Row) ? GetIconTexture(IconSets[Piece.Row], Piece.Icon) : nullptr;
+				UTexture2D* Texture = IconSets.IsValidIndex(Piece.Row) ? GetRulesIconTexture(IconSets[Piece.Row], Piece.Icon) : nullptr;
 				if (Texture)
 				{
 					UImage* Icon = NewObject<UImage>(this);
