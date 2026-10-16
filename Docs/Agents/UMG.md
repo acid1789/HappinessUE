@@ -99,3 +99,5 @@ python Tools/umg.py reorder_widget_tree '{"root": "Content", "tree": "[\"TitleTe
   regions in one texture; action labels remain UMG text in the button's bottom slot.
 
 - **Replacing a placed widget with a different Blueprint class:** preserve its name, `bIsVariable`, and instance options. Retarget function/delegate nodes with `BlueprintTools.retarget_node_class`, then recreate stale variable-get nodes (including getters on the control) and reconnect their wires. Retargeting does not support variable-get nodes; old pin types can survive a compile and cause incompatible-reference errors.
+
+- **EditableTextBox fonts:** set `WidgetStyle.textStyle.font`. A top-level `WidgetStyle.font` is silently ignored in UE 5.8; copy the neighboring TextBlock font into the nested text style to match it.
