@@ -97,3 +97,5 @@ python Tools/umg.py reorder_widget_tree '{"root": "Content", "tree": "[\"TitleTe
   assuming a generated atlas has exact equal quadrants; uneven transparent margins
   otherwise shift frames under the live labels. `T_ButtonSageCeramic` uses four
   regions in one texture; action labels remain UMG text in the button's bottom slot.
+
+- **Replacing a placed widget with a different Blueprint class:** preserve its name, `bIsVariable`, and instance options. Retarget function/delegate nodes with `BlueprintTools.retarget_node_class`, then recreate stale variable-get nodes (including getters on the control) and reconnect their wires. Retargeting does not support variable-get nodes; old pin types can survive a compile and cause incompatible-reference errors.
