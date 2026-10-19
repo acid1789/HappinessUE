@@ -20,5 +20,8 @@ Pause Menu Button Visuals
 Confirm Dialog Visuals
 
 Game Rules
-Clue Panel Backgrounds
-	
+Distinguish Title from Background
+
+Span Arrow a bit to big
+Finish Lesson Animation
+Collateral Animations

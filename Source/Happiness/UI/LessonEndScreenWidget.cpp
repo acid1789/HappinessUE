@@ -69,8 +69,10 @@ void ULessonEndScreenWidget::Show(UPuzzle* Puzzle, float PuzzleSeconds)
 	const int32 LessonHintPenalty = Result.bUsedLessonHint ? -1 : 0;
 	TimeText->SetText(FText::FromString(Puzzle->FormatTimeString(PuzzleSeconds)));
 	CompletionText->SetText(FText::AsNumber(Completion));
-	HintPenaltyText->SetText(FText::AsNumber(HintPenalty));
-	LessonHintPenaltyText->SetText(FText::AsNumber(LessonHintPenalty));
+	// Penalties always show their minus sign, so -0 says no cost was paid
+	const auto PenaltyText = [](int32 Penalty) { return FText::Format(LOCTEXT("Penalty", "-{0}"), FText::AsNumber(FMath::Abs(Penalty))); };
+	HintPenaltyText->SetText(PenaltyText(HintPenalty));
+	LessonHintPenaltyText->SetText(PenaltyText(LessonHintPenalty));
 	TotalText->SetText(FText::AsNumber(Result.bSolved ? Result.Score : 0));
 	if (NoteText)
 	{
