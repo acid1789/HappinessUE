@@ -1,4 +1,5 @@
 #include "Puzzle.h"
+#include "Kismet/GameplayStatics.h"
 #include "CampaignTree.h"
 #include "Clue.h"
 #include "PuzzleRow.h"
@@ -558,18 +559,23 @@ void UPuzzle::SetFinalIconWithClue(UClue* TheClue, int Row, int Col, int Icon)
 			TheClue->m_iUseCount += 5;
 
 		m_Rows[Row].m_Cells[Col].m_iFinalIcon = Icon;
+		if (m_bRecordingCollateral)
+			m_CollateralChanges.Add({ true, Row, Col, Icon, m_CollateralStep });
 
+		// The cell's other icons go with the placement; the icon leaving the rest of the row is the next step
 		for (int i = 0; i < m_iSize; i++)
 		{
 			if (i != Icon)
 				EliminateIconWithClue(TheClue, Row, Col, i);
 		}
 
+		m_CollateralStep++;
 		for (int i = 0; i < m_iSize; i++)
 		{
 			if (i != Col)
 				EliminateIconWithClue(TheClue, Row, i, Icon);
 		}
+		m_CollateralStep--;
 	}
 }
 
@@ -604,7 +610,11 @@ void UPuzzle::EliminateIconWithClue(UClue* TheClue, int Row, int Col, int Icon)
 			TheClue->m_iUseCount++;
 
 		Cell.m_bValues[Icon] = false;
+		if (m_bRecordingCollateral)
+			m_CollateralChanges.Add({ false, Row, Col, Icon, m_CollateralStep });
 
+		// Placements this leads to are the next step
+		TGuardValue<int> NextStep(m_CollateralStep, m_CollateralStep + 1);
 		if (AutoSetIcons)
 		{
 			if (Cell.m_iFinalIcon < 0)
@@ -1156,4 +1166,162 @@ int32 UPuzzle::GetCampaignScore() const
 }
 
 // Restore optimization so the "off" above doesn't carry into the next file of a unity build
+namespace
+{
+	bool SameRows(const TArray<FPuzzleRow>& A, const TArray<FPuzzleRow>& B)
+	{
+		if (A.Num() != B.Num())
+			return false;
+		for (int r = 0; r < A.Num(); r++)
+		{
+			if (A[r].m_Cells.Num() != B[r].m_Cells.Num())
+				return false;
+			for (int c = 0; c < A[r].m_Cells.Num(); c++)
+			{
+				const FPuzzleCell& CA = A[r].m_Cells[c];
+				const FPuzzleCell& CB = B[r].m_Cells[c];
+				if (CA.m_iFinalIcon != CB.m_iFinalIcon || CA.m_bValues != CB.m_bValues)
+					return false;
+			}
+		}
+		return true;
+	}
+}
+
+void UPuzzle::PlayerSetFinalIcon(int Row, int Col, int Icon, UObject* View)
+{
+	RecordPlayerMove(View, [&] { SetFinalIcon(Row, Col, Icon); });
+}
+
+void UPuzzle::PlayerEliminateIcon(int Row, int Col, int Icon, UObject* View)
+{
+	RecordPlayerMove(View, [&] { EliminateIcon(Row, Col, Icon); });
+}
+
+void UPuzzle::RecordPlayerMove(UObject* View, TFunctionRef<void()> Move)
+{
+	// A new move shows the last one's remaining steps at once: they're already on the board
+	StopCollateral();
+	m_CollateralBefore = m_Rows;
+	m_CollateralChanges.Reset();
+	m_CollateralStep = 0;
+	m_bRecordingCollateral = true;
+	Move();
+	m_bRecordingCollateral = false;
+	// What IsCompleted would tidy up next anyway, so it isn't taken for something else changing the board
+	ReEnforceFinalIcons();
+	m_CollateralAfter = m_Rows;
+
+	m_LastStep = 0;
+	for (const FCollateralChange& Change : m_CollateralChanges)
+		m_LastStep = FMath::Max(m_LastStep, Change.Step);
+	m_ShownStep = 0;
+	if (m_LastStep == 0 || CollateralDelay <= 0.f)
+		return;
+
+	m_CollateralView = View;
+	m_NextStepTime = FPlatformTime::Seconds() + CollateralDelay;
+	m_CollateralTicker = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(this, [this](float DeltaTime)
+	{
+		return TickCollateral(DeltaTime);
+	}));
+}
+
+bool UPuzzle::IsShowingCollateral() const
+{
+	return m_CollateralTicker.IsValid() && m_ShownStep < m_LastStep && SameRows(m_Rows, m_CollateralAfter);
+}
+
+void UPuzzle::StopCollateral()
+{
+	if (m_CollateralTicker.IsValid())
+	{
+		FTSTicker::GetCoreTicker().RemoveTicker(m_CollateralTicker);
+		m_CollateralTicker.Reset();
+	}
+	m_ShownStep = m_LastStep;
+}
+
+bool UPuzzle::TickCollateral(float DeltaTime)
+{
+	if (!IsShowingCollateral())
+	{
+		// Something else changed the board: it shows as it is
+		m_CollateralTicker.Reset();
+		m_ShownStep = m_LastStep;
+		return false;
+	}
+	if (FPlatformTime::Seconds() < m_NextStepTime)
+		return true;
+
+	m_ShownStep++;
+	m_NextStepTime = FPlatformTime::Seconds() + CollateralDelay;
+	const bool bMore = m_ShownStep < m_LastStep;
+	if (!bMore)
+		m_CollateralTicker.Reset();
+	PlayCollateralSound(m_ShownStep);
+	RefreshCollateralView();
+	return bMore;
+}
+
+void UPuzzle::PlayCollateralSound(int Step)
+{
+	bool bAny = false;
+	bool bSet = false;
+	for (const FCollateralChange& Change : m_CollateralChanges)
+	{
+		if (Change.Step == Step)
+		{
+			bAny = true;
+			bSet |= Change.bSet;
+		}
+	}
+	UObject* View = m_CollateralView.Get();
+	USoundBase* Sound = bAny && View ? (bSet ? CollateralSetSound : CollateralEliminateSound).LoadSynchronous() : nullptr;
+	if (Sound)
+		UGameplayStatics::PlaySound2D(View, Sound);
+}
+
+void UPuzzle::RefreshCollateralView()
+{
+	UObject* View = m_CollateralView.Get();
+	UFunction* Refresh = View ? View->FindFunction(TEXT("RefreshPuzzle")) : nullptr;
+	if (Refresh && Refresh->ParmsSize == 0)
+		View->ProcessEvent(Refresh, nullptr);
+}
+
+TArray<FPuzzleRow> UPuzzle::GetShownRows()
+{
+	if (!IsShowingCollateral())
+		return m_Rows;
+
+	TArray<FPuzzleRow> Shown = m_CollateralBefore;
+	for (const FCollateralChange& Change : m_CollateralChanges)
+	{
+		if (Change.Step > m_ShownStep)
+			continue;
+		FPuzzleCell& Cell = Shown[Change.Row].m_Cells[Change.Col];
+		if (Change.bSet)
+			Cell.m_iFinalIcon = Change.Icon;
+		else
+			Cell.m_bValues[Change.Icon] = false;
+	}
+	return Shown;
+}
+
+bool UPuzzle::IsCompletedShown()
+{
+	return !IsShowingCollateral() && IsCompleted();
+}
+
+void UPuzzle::BeginDestroy()
+{
+	if (m_CollateralTicker.IsValid())
+	{
+		FTSTicker::GetCoreTicker().RemoveTicker(m_CollateralTicker);
+		m_CollateralTicker.Reset();
+	}
+	Super::BeginDestroy();
+}
+
 #pragma optimize("", on)
