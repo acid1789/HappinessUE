@@ -111,7 +111,7 @@ TArray<FRulesSubject> UGameRulesWidget::MakeSubjects()
 
 	const FText Basics = LOCTEXT("Basics", "Basics");
 	Basic(Basics, LOCTEXT("Objective", "Objective"),
-		LOCTEXT("ObjectiveDesc", "Work out which icon goes in each column. Every row holds each of its icons exactly once."),
+		LOCTEXT("ObjectiveDesc", "Work out which icon goes in each column. Every row holds each of its icons exactly once. Use the clues to work out where each icon belongs."),
 		LOCTEXT("ObjectivePic", "A solved puzzle grid, with one row and one column highlighted"));
 	Basic(FText(), LOCTEXT("Layout", "Game Layout"),
 		LOCTEXT("LayoutDesc",
