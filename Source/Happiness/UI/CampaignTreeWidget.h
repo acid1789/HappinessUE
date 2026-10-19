@@ -2,15 +2,22 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include "Styling/SlateTypes.h"
 #include "HappinessClassic/CampaignLesson.h"
+#include "Styling/SlateTypes.h"
 #include "UI/LessonPopupWidget.h"
 #include "CampaignTreeWidget.generated.h"
 
 class UButton;
+class UBorder;
 class UCanvasPanel;
 class UCampaignTreeWidget;
 class ULessonPopupWidget;
+class UScrollBox;
+class USizeBox;
+class UTextBlock;
+class UProgressBar;
+class UTexture2D;
+class UFont;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCampaignLessonSelected, ECampaignLesson, Lesson);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCampaignTreeClosed);
@@ -31,6 +38,48 @@ protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
 };
 
+/** Opaque painted medallion and readable label, including the disabled state. */
+UCLASS()
+class HAPPINESS_API ULessonMedallion : public UWidget
+{
+	GENERATED_BODY()
+public:
+	UPROPERTY(Transient)
+	TObjectPtr<UTexture2D> Texture;
+	UPROPERTY(Transient)
+	TObjectPtr<UTexture2D> LockTexture;
+	FSlateFontInfo LabelFont;
+	ECampaignLesson Lesson = ECampaignLesson::VerticalTwo;
+	bool bLocked = false;
+	bool bCompleted = false;
+
+protected:
+	virtual TSharedRef<SWidget> RebuildWidget() override;
+};
+
+/** Bright completion seal placed on the lesson card itself, separate from its clue diagram. */
+UCLASS()
+class HAPPINESS_API ULessonCompletionBadge : public UWidget
+{
+    GENERATED_BODY()
+public:
+    bool bCompleted = false;
+protected:
+    virtual TSharedRef<SWidget> RebuildWidget() override;
+};
+
+/** Abstract, code-drawn clue diagram: its geometry reflects the lesson, independent of puzzle artwork. */
+UCLASS()
+class HAPPINESS_API ULessonClueDiagram : public UWidget
+{
+	GENERATED_BODY()
+public:
+	ECampaignLesson Lesson = ECampaignLesson::VerticalTwo;
+
+protected:
+	virtual TSharedRef<SWidget> RebuildWidget() override;
+};
+
 /** Routes one node button's click back to the tree with its lesson (UButton::OnClicked has no parameters) */
 UCLASS()
 class UCampaignTreeNodeClick : public UObject
@@ -40,14 +89,21 @@ class UCampaignTreeNodeClick : public UObject
 public:
 	ECampaignLesson Lesson = ECampaignLesson::Given;
 	TWeakObjectPtr<UCampaignTreeWidget> Tree;
+	TWeakObjectPtr<UButton> Button;
 
 	UFUNCTION()
 	void HandleClicked();
+
+	UFUNCTION()
+	void HandleHovered();
+
+	UFUNCTION()
+	void HandleUnhovered();
 };
 
 /**
  * Full-screen campaign lesson tree. Builds one button per lesson from UCampaignTree's columns inside
- * TreeCanvas, spread evenly across it left to right, and draws the connectors between columns.
+ * a horizontally draggable frosted viewport, with connectors between required lesson groups.
  * A lesson is unlocked once every lesson in the columns before it is complete.
  *
  * TreeCanvas belongs to this widget: its children are rebuilt, so put other UI (title, back button)
@@ -72,6 +128,27 @@ public:
 	/** Optional. Opened for the clicked lesson; place it on top of the tree, collapsed. */
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<ULessonPopupWidget> LessonPopup;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> OverallStatus;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UProgressBar> OverallProgress;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Campaign Tree")
+	TObjectPtr<UTexture2D> MedallionTexture;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Campaign Tree")
+	TObjectPtr<UTexture2D> GroupBadgeTexture;
+
+	UPROPERTY()
+	TObjectPtr<UTexture2D> StatusPlaqueTexture;
+
+	UPROPERTY()
+	TObjectPtr<UTexture2D> ViewportFrameTexture;
+
+	UPROPERTY()
+	TObjectPtr<UFont> LessonSerifFont;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Campaign Tree")
 	FVector2D NodeSize = FVector2D(96.f, 100.f);
@@ -121,6 +198,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Campaign Tree")
 	void Close();
 
+	virtual void SetVisibility(ESlateVisibility InVisibility) override;
+
 	/** Replace the set of completed lessons (e.g. from the save game) and refresh the nodes */
 	UFUNCTION(BlueprintCallable, Category = "Campaign Tree")
 	void SetCompletedLessons(const TArray<ECampaignLesson>& Lessons);
@@ -148,6 +227,9 @@ protected:
 	virtual void NativePreConstruct() override;
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
+	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
+	virtual FReply NativeOnPreviewMouseButtonDown(const FGeometry& InGeometry,
+												  const FPointerEvent& InMouseEvent) override;
 
 private:
 	UFUNCTION()
@@ -162,6 +244,8 @@ private:
 	void LoadProgress();
 
 	void RefreshNodeStates();
+	void RefreshOverallStatus();
+	int32 GetCurrentColumn() const;
 	UButton* FindNode(ECampaignLesson Lesson) const;
 
 	/** Full-size child of TreeCanvas, behind the nodes, that draws the connectors */
@@ -173,6 +257,36 @@ private:
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UCampaignTreeNodeClick>> NodeClicks;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UScrollBox> TreeScroll;
+
+	UPROPERTY(Transient)
+	TObjectPtr<USizeBox> ScrollContent;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UCanvasPanel> NodeCanvas;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<ULessonMedallion>> Medallions;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<ULessonCompletionBadge>> CompletionBadges;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UTextBlock>> ColumnStatusLabels;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UBorder>> ColumnStatusPanels;
+
+	float LastViewportWidth = 0.f;
+	int32 LastFirstVisible = INDEX_NONE;
+	int32 LastLastVisible = INDEX_NONE;
+	bool bCenterCurrentColumn = true;
+	bool bPanCandidate = false;
+	bool bDraggingTree = false;
+	FVector2D PanStart;
+	float PanStartOffset = 0.f;
 
 	TArray<ECampaignLesson> NodeLessons;
 	TSet<ECampaignLesson> CompletedLessons;

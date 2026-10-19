@@ -53,3 +53,35 @@ level and EXP (`HappinessLevel`, `HappinessExp`).
 Everything lives in one save slot, `HappinessSave`, written by `SG_Happiness` (parent class
 `UHappinessSaveGame`). It holds the puzzle in progress (resumed on relaunch), the lesson and campaign progress,
 the Free Play settings and pace, and the player's level.
+
+
+### Lessons tree presentation
+
+`WBP_CampaignTree` keeps the shared villa visible: its own Background is collapsed. The framed heading,
+Back button and compact OverallStatus range plaque stay fixed. `UCampaignTreeWidget::RebuildTree` creates the
+blurred horizontal viewport and all medallions inside TreeCanvas; do not place persistent children there.
+The complete viewport border stays fixed. Desktop left-drag and touch scrolling pan the tree, and it centers
+on the first unfinished group when opened, clamped to the content bounds without blank end gutters.
+A drag suppresses lesson clicks. Group unlocks still require every lesson in all preceding groups.
+
+`ULessonClueDiagram` draws abstract circle/square/triangle examples in C++; these are not puzzle icon assets.
+`ULessonMedallion` draws the opaque painted face, wrapped label and completion/lock mark, including disabled
+states. The frame and heading textures are T_LessonMedallion and T_LessonsHeading. OverallStatus shows
+the visible group range (for example, "4 - 8 of 12"); the legacy OverallProgress is collapsed.
+The active group has its own completion plaque beneath its stack.
+Its sage halo follows the actual stack and plaque bounds, with the stronger inner glow extending beyond
+the opaque medallion. Keep TreeScroll at Z=1 above the blur/tint; within NodeCanvas use connectors/glow
+at Z=0, number/count plaques at Z=1 and lesson buttons at Z=2. Equal canvas Z values can share Slate
+paint layers. Verify halo contrast in PIE over the villa; the isolated widget render has no villa background. Medallions use 292x214 design units,
+320-unit column spacing and rounded ivory/gold group brackets with flower junctions. A ScaleBox fits the complete
+888-unit design canvas to the available viewport height. Column spacing stays fixed by expanding the
+design-space X positions by the reciprocal scale, while frames, diagrams and labels scale together,
+so scroll bounds, centering, range text and hit targets remain aligned at wide phone aspect ratios.
+Painted group badges and range/count plaques use T_LessonsGroupBadge and T_LessonsStatusPlaque.
+The bundled Crimson Text Semibold font (LessonsSerif_Font) carries its OFL license beside the font assets.
+
+Locked lessons use a bottom-center cream/gold-rimmed sage badge with an ivory lock. Row spacing
+reserves room for this badge beneath each medallion; keep it clear of the next row and count plaque.
+
+The painted Back button uses T_LessonsBack. Lock badges use T_LessonsLock; the collapsed
+LessonLockArt image in WBP_CampaignTree preserves the texture reference for cooking.
