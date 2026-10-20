@@ -34,7 +34,7 @@
 
 namespace
 {
-	const FLinearColor Ink(.17f,.085f,.035f), Sage(.16f,.29f,.075f), Ivory(1.f,.95f,.8f);
+	const FLinearColor FreePlayInk(.17f,.085f,.035f), FreePlaySage(.16f,.29f,.075f), FreePlayIvory(1.f,.95f,.8f);
 }
 
 UFreePlayEndScreenWidget::UFreePlayEndScreenWidget(const FObjectInitializer& ObjectInitializer)
@@ -126,7 +126,7 @@ void UFreePlayEndScreenWidget::BuildNotebookLayout()
 		W->ColorAndOpacityDelegate.Unbind(); W->SetColorAndOpacity(Color);
 		W->SetJustification(Align); W->SetShadowOffset(FVector2D::ZeroVector);
 	};
-	auto Label=[&](const FText& Text,FVector2D P,FVector2D S,int32 Points=32,FLinearColor Color=Ink,ETextJustify::Type Align=ETextJustify::Left)
+	auto Label=[&](const FText& Text,FVector2D P,FVector2D S,int32 Points=32,FLinearColor Color=FreePlayInk,ETextJustify::Type Align=ETextJustify::Left)
 	{
 		UTextBlock* W=WidgetTree->ConstructWidget<UTextBlock>(); W->SetText(Text);
 		StyleText(W,Points,Color,Align); Place(W,P,S); return W;
@@ -134,8 +134,8 @@ void UFreePlayEndScreenWidget::BuildNotebookLayout()
 	UImage* Surface=WidgetTree->ConstructWidget<UImage>(); Surface->SetBrushFromTexture(NotebookTexture);
 	Surface->SetVisibility(ESlateVisibility::HitTestInvisible); Place(Surface,{0,0},{1600,1000},0);
 	Image(Face(false),{500,5},{600,110});
-	StyleText(ResultText,56,Ink,ETextJustify::Center); Place(ResultText,{550,18},{500,80},2);
-	StyleText(StageText,34,Ink,ETextJustify::Center); Place(StageText,{850,130},{540,75});
+	StyleText(ResultText,56,FreePlayInk,ETextJustify::Center); Place(ResultText,{550,18},{500,80},2);
+	StyleText(StageText,34,FreePlayInk,ETextJustify::Center); Place(StageText,{850,130},{540,75});
 	StageText->SetAutoWrapText(true);
 	StageText->SetText(LOCTEXT("FreePlay","Free Play"));
 	const FText Labels[]={LOCTEXT("TimeLabel","Puzzle Time"),LOCTEXT("CompletionLabel","Par Time"),
@@ -145,7 +145,7 @@ void UFreePlayEndScreenWidget::BuildNotebookLayout()
 	{
 		const float Y=245.f+I*72.f+(I==4?20.f:0.f);
 		Label(Labels[I],{280,Y},{300,65},I==4?42:32);
-		StyleText(Values[I],I==4?46:38,I>=2?Sage:Ink,ETextJustify::Right);
+		StyleText(Values[I],I==4?46:38,I>=2?FreePlaySage:FreePlayInk,ETextJustify::Right);
 		Place(Values[I],{585,Y},{160,65});
 		if (I<4) Image(FSlateRoundedBoxBrush(FLinearColor(.44f,.28f,.10f,I==3?.6f:.18f),0.f),{275,Y+66},{480,I==3?2.f:1.f});
 	}
@@ -159,8 +159,8 @@ void UFreePlayEndScreenWidget::BuildNotebookLayout()
 	ResultSeal->SetVisibility(ESlateVisibility::HitTestInvisible); Place(ResultSeal,{1015,210},{210,210});
 	UHorizontalBox* LevelRow=WidgetTree->ConstructWidget<UHorizontalBox>();
 	UTextBlock* LevelCaption=WidgetTree->ConstructWidget<UTextBlock>();
-	LevelCaption->SetText(LOCTEXT("LevelLabel","Level")); StyleText(LevelCaption,36,Ink);
-	StyleText(LevelValue,36,Ink);
+	LevelCaption->SetText(LOCTEXT("LevelLabel","Level")); StyleText(LevelCaption,36,FreePlayInk);
+	StyleText(LevelValue,36,FreePlayInk);
 	LevelRow->AddChildToHorizontalBox(LevelCaption)->SetPadding(FMargin(0,0,16,0));
 	LevelRow->AddChildToHorizontalBox(LevelValue);
 	UOverlay* LevelGroup=WidgetTree->ConstructWidget<UOverlay>();
@@ -177,9 +177,9 @@ void UFreePlayEndScreenWidget::BuildNotebookLayout()
 	ExpProgress->SetBarFillStyle(EProgressBarFillStyle::Scale);
 	ExpProgress->SetBorderPadding(FVector2D::ZeroVector);
 	Place(ExpProgress,{895,505},{450,24},2);
-	StyleText(ProgressText,30,Ink,ETextJustify::Center); Place(ProgressText,{890,545},{460,50});
+	StyleText(ProgressText,30,FreePlayInk,ETextJustify::Center); Place(ProgressText,{890,545},{460,50});
 	UnlockFrame=Image(Face(false),{870,620},{500,90});
-	StyleText(UnlockText,29,Sage,ETextJustify::Center); Place(UnlockText,{920,638},{400,60},2);
+	StyleText(UnlockText,29,FreePlaySage,ETextJustify::Center); Place(UnlockText,{920,638},{400,60},2);
 	if (UnlockText) { UnlockText->SetAutoWrapText(true); UnlockText->SetWrapTextAt(400); }
 	auto Action=[&](UButton* Button,const FText& Text,int32 Symbol,bool Primary,FVector2D Position)
 	{
@@ -193,12 +193,12 @@ void UFreePlayEndScreenWidget::BuildNotebookLayout()
 		UHorizontalBox* Row=WidgetTree->ConstructWidget<UHorizontalBox>();
 		USizeBox* IconSize=WidgetTree->ConstructWidget<USizeBox>(); IconSize->SetWidthOverride(30); IconSize->SetHeightOverride(30);
 		ULessonResultGlyph* Glyph=WidgetTree->ConstructWidget<ULessonResultGlyph>();
-		Glyph->Symbol=Symbol; Glyph->Color=Primary?Ivory:Sage; Glyph->SetVisibility(ESlateVisibility::HitTestInvisible);
+		Glyph->Symbol=Symbol; Glyph->Color=Primary?FreePlayIvory:FreePlaySage; Glyph->SetVisibility(ESlateVisibility::HitTestInvisible);
 		IconSize->AddChild(Glyph);
 		UHorizontalBoxSlot* IconSlot=Row->AddChildToHorizontalBox(IconSize);
 		IconSlot->SetVerticalAlignment(VAlign_Center); IconSlot->SetPadding(FMargin(0,0,12,0));
 		UTextBlock* TextWidget=WidgetTree->ConstructWidget<UTextBlock>(); TextWidget->SetText(Text);
-		StyleText(TextWidget,Symbol==0?29:32,Primary?Ivory:Ink,ETextJustify::Center);
+		StyleText(TextWidget,Symbol==0?29:32,Primary?FreePlayIvory:FreePlayInk,ETextJustify::Center);
 		Row->AddChildToHorizontalBox(TextWidget)->SetVerticalAlignment(VAlign_Center);
 		UButtonSlot* ContentSlot=CastChecked<UButtonSlot>(Button->AddChild(Row));
 		ContentSlot->SetHorizontalAlignment(HAlign_Center); ContentSlot->SetVerticalAlignment(VAlign_Center);
@@ -208,8 +208,8 @@ void UFreePlayEndScreenWidget::BuildNotebookLayout()
 	Action(MenuButton,LOCTEXT("MenuAction","Main Menu"),2,false,{610,845});
 	Action(NextPuzzleButton,LOCTEXT("NextAction","Next Puzzle"),1,true,{1010,845});
 	DailyFrame=Image(Face(false),{285,635},{465,95});
-	StyleText(DailyBonus,27,Sage,ETextJustify::Center); Place(DailyBonus,{325,644},{385,45},2);
-	StyleText(DailyStreak,22,Ink,ETextJustify::Center); Place(DailyStreak,{325,685},{385,40},2);
+	StyleText(DailyBonus,27,FreePlaySage,ETextJustify::Center); Place(DailyBonus,{325,644},{385,45},2);
+	StyleText(DailyStreak,22,FreePlayInk,ETextJustify::Center); Place(DailyStreak,{325,685},{385,40},2);
 }
 
 
@@ -254,7 +254,7 @@ void UFreePlayEndScreenWidget::UpdateNotebookResult()
 	{
 		const bool bIncorrect=GetGameInstance() && !UFreePlaySubsystem::GetLastFreePlayScore(this).bSolved;
 		if(ResultSeal) ResultSeal->Symbol=bIncorrect?4:3;
-		Result->SetColorAndOpacity(bIncorrect?FLinearColor(.55f,.075f,.025f):Ink);
+		Result->SetColorAndOpacity(bIncorrect?FLinearColor(.55f,.075f,.025f):FreePlayInk);
 	}
 	// The existing Blueprint owns the scoring and reveals; only the subtitle comes from the active board.
 	APlayerController* PC=UGameplayStatics::GetPlayerController(this,0);

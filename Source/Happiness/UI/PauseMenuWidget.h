@@ -8,12 +8,26 @@ class APlayerController;
 class UButton;
 class USoundBase;
 class UTextBlock;
+class UCanvasPanel;
+class UTexture2D;
+class UFont;
+
+/** Small painted-menu symbols; geometry scales with the allotted icon size. */
+UCLASS()
+class HAPPINESS_API UPauseMenuGlyph : public UWidget
+{
+	GENERATED_BODY()
+public:
+	int32 Symbol = 0;
+	FLinearColor Color = FLinearColor::White;
+protected:
+	virtual TSharedRef<SWidget> RebuildWidget() override;
+};
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPauseMenuAction);
 
 /**
- * Parent of WBP_PauseMenu2, the puzzle screen's pause menu: a column of buttons in the middle of the screen (no
- * background, no help slides). While it shows, the rest of the puzzle screen is hidden: every sibling that was
+ * Parent of WBP_PauseMenu2, the puzzle screen's framed garden pause menu. While it shows, the rest of the puzzle screen is hidden: every sibling that was
  * visible when it opened is collapsed, and restored when it closes. Dialogs opened from the menu (confirmations,
  * Options) aren't touched, as they were hidden when it opened. Each button broadcasts its event; WBP_Happiness binds them to its
  * actions (most ask for confirmation first). Options opens the Options screen over the menu itself.
@@ -76,6 +90,7 @@ public:
 	TObjectPtr<USoundBase> CancelSound;
 
 protected:
+	virtual void NativePreConstruct() override;
 	virtual void NativeConstruct() override;
 
 	/** The puzzle's time so far, set when the menu opens */
@@ -107,6 +122,13 @@ protected:
 	TObjectPtr<UButton> QuitAppButton;
 
 private:
+	void BuildGardenLayout();
+	UPROPERTY() TObjectPtr<UTexture2D> GardenTexture;
+	UPROPERTY() TObjectPtr<UTexture2D> ButtonTexture;
+	UPROPERTY() TObjectPtr<UTexture2D> QuitTexture;
+	UPROPERTY() TObjectPtr<UFont> GardenFont;
+	UPROPERTY(Transient) TObjectPtr<UCanvasPanel> GardenCanvas;
+
 	UFUNCTION()
 	void HandleResume();
 	UFUNCTION()
