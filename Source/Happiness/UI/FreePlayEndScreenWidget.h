@@ -6,6 +6,12 @@
 
 class USoundBase;
 class UWidget;
+class UCanvasPanel;
+class UTexture2D;
+class UFont;
+class UTextBlock;
+class UImage;
+class ULessonResultGlyph;
 
 /**
  * Parent of WBP_EndScreen, the Free Play end screen, which does its scoring and staging in Blueprint. Adds the daily
@@ -44,9 +50,20 @@ public:
 	void StartDailyBonus(int32 Multiplier);
 
 protected:
+	virtual void NativePreConstruct() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 private:
+	void BuildNotebookLayout();
+	void UpdateNotebookResult();
+	UPROPERTY() TObjectPtr<UTexture2D> NotebookTexture;
+	UPROPERTY() TObjectPtr<UTexture2D> ButtonTexture;
+	UPROPERTY() TObjectPtr<UFont> NotebookFont;
+	UPROPERTY(Transient) TObjectPtr<UCanvasPanel> NotebookCanvas;
+	UPROPERTY(Transient) TObjectPtr<ULessonResultGlyph> ResultSeal;
+	UPROPERTY(Transient) TObjectPtr<UImage> UnlockFrame;
+	UPROPERTY(Transient) TObjectPtr<UImage> DailyFrame;
+
 	enum class EBonusState : uint8
 	{
 		None,
