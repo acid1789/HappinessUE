@@ -178,6 +178,7 @@ void UCampaignSubsystem::SetMode(ECampaignMode NewMode)
 	Data.bInSession = false;
 	Data.bPuzzleOpen = false;
 	Data.Mode = NewMode;
+	UncelebratedLesson.Reset();
 	Save();
 	OnProgressChanged.Broadcast();
 }
@@ -474,6 +475,10 @@ FLessonPuzzleResult UCampaignSubsystem::FinishLessonPuzzle(UPuzzle* Puzzle)
 			// The final completes the lesson whatever hints were used
 			Result.bLessonCompleted = !Progress.bFinalCompleted;
 			Progress.bFinalCompleted = true;
+			if (Result.bLessonCompleted)
+			{
+				UncelebratedLesson = Result.Lesson;
+			}
 		}
 		else if (Result.Stage == GetCurrentStage(Result.Lesson) && Progress.Points < MaxPoints)
 		{
@@ -522,6 +527,17 @@ void UCampaignSubsystem::PrepareNextLessonPuzzle(const UObject* WorldContextObje
 	Difficulty = GetStageDifficulty(SaveData.SessionStage);
 }
 
+bool UCampaignSubsystem::ConsumeLessonCompletion(ECampaignLesson& Lesson)
+{
+	if (!UncelebratedLesson.IsSet())
+	{
+		return false;
+	}
+	Lesson = UncelebratedLesson.GetValue();
+	UncelebratedLesson.Reset();
+	return true;
+}
+
 void UCampaignSubsystem::EndLessonSession()
 {
 	if (Data.bInSession)
@@ -547,9 +563,45 @@ void UCampaignSubsystem::DebugCompleteAllLessons()
 	OnProgressChanged.Broadcast();
 }
 
+void UCampaignSubsystem::DebugSetLesson(ECampaignLesson Lesson, int32 Points, bool bFinalCompleted, bool bCelebrate)
+{
+	if (Data.bInSession && Data.SessionLesson == Lesson)
+	{
+		Data.bInSession = false;
+		Data.bPuzzleOpen = false;
+	}
+
+	FLessonProgress& Progress = GetMutableProgress(Lesson);
+	Progress.Points = FMath::Clamp(Points, 0, GetMaxPoints());
+	Progress.bFinalCompleted = bFinalCompleted;
+	Progress.MasterPoints = 0;
+	Progress.bMasterRevealed = false;
+	if (bCelebrate && bFinalCompleted)
+	{
+		UncelebratedLesson = Lesson;
+	}
+	else if (UncelebratedLesson.IsSet() && UncelebratedLesson.GetValue() == Lesson)
+	{
+		UncelebratedLesson.Reset();
+	}
+	Save();
+	OnProgressChanged.Broadcast();
+}
+
+void UCampaignSubsystem::DebugResetMode()
+{
+	(Data.Mode == ECampaignMode::Campaign ? Data.CampaignLessons : Data.Lessons).Reset();
+	Data.bInSession = false;
+	Data.bPuzzleOpen = false;
+	UncelebratedLesson.Reset();
+	Save();
+	OnProgressChanged.Broadcast();
+}
+
 void UCampaignSubsystem::ResetAllProgress()
 {
 	Data = FCampaignSaveData();
+	UncelebratedLesson.Reset();
 	Save();
 	OnProgressChanged.Broadcast();
 }

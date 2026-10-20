@@ -80,6 +80,12 @@ so scroll bounds, centering, range text and hit targets remain aligned at wide p
 Painted group badges and range/count plaques use T_LessonsGroupBadge and T_LessonsStatusPlaque.
 The bundled Crimson Text Semibold font (LessonsSerif_Font) carries its OFL license beside the font assets.
 
+Back from a lesson's final (first completion), the tree skips the lesson popup and celebrates instead
+(`UCampaignTreeWidget::StartCelebration`, handed the lesson once by `UCampaignSubsystem::ConsumeLessonCompletion`):
+the lesson's check pops in (small, past full size, settling) with a glow and a shimmer; then, if that completed
+its group, the halo slides to the next group while the tree scrolls to center it, and that group unlocks.
+Timings are the Lesson Completion properties on WBP_CampaignTree.
+
 Locked lessons use a bottom-center cream/gold-rimmed sage badge with an ivory lock. Row spacing
 reserves room for this badge beneath each medallion; keep it clear of the next row and count plaque.
 
