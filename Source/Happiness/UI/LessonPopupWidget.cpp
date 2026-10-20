@@ -2,21 +2,87 @@
 #include "HappinessClassic/CampaignProgress.h"
 #include "HappinessClassic/CampaignTree.h"
 #include "UI/LessonProgressTicks.h"
+#include "UI/CampaignTreeWidget.h"
 
 #include "Blueprint/WidgetTree.h"
+#include "Brushes/SlateRoundedBoxBrush.h"
+#include "Brushes/SlateNoResource.h"
+#include "Components/BackgroundBlur.h"
 #include "Components/Button.h"
 #include "Components/ButtonSlot.h"
 #include "Components/Border.h"
+#include "Components/CanvasPanel.h"
+#include "Components/CanvasPanelSlot.h"
+#include "Components/HorizontalBox.h"
 #include "Components/HorizontalBoxSlot.h"
 #include "Components/Image.h"
+#include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
 #include "Components/PanelWidget.h"
 #include "Components/ProgressBar.h"
+#include "Components/ScaleBox.h"
+#include "Components/ScrollBox.h"
+#include "Components/ScrollBoxSlot.h"
 #include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
+#include "Engine/Font.h"
+#include "Engine/Texture2D.h"
+#include "Rendering/DrawElements.h"
 #include "Styling/CoreStyle.h"
+#include "UObject/ConstructorHelpers.h"
+#include "Widgets/SLeafWidget.h"
 
 #define LOCTEXT_NAMESPACE "LessonPopup"
+
+namespace
+{
+	const FLinearColor NotebookInk(.17f, .085f, .035f);
+	const FLinearColor NotebookIvory(1.f, .95f, .80f);
+	const FLinearColor NotebookSage(.16f, .29f, .075f);
+
+	class SLessonPopupGlyph : public SLeafWidget
+	{
+	public:
+		SLATE_BEGIN_ARGS(SLessonPopupGlyph) {} SLATE_END_ARGS()
+		void Construct(const FArguments&, ULessonPopupGlyph* InOwner) { Owner = InOwner; }
+		virtual FVector2D ComputeDesiredSize(float) const override { return FVector2D(32, 32); }
+		virtual int32 OnPaint(const FPaintArgs&, const FGeometry& G, const FSlateRect&,
+			FSlateWindowElementList& Elements, int32 Layer, const FWidgetStyle&, bool) const override
+		{
+			const ULessonPopupGlyph* Glyph = Owner.Get();
+			if (!Glyph) return Layer;
+			const float Scale = FMath::Min(G.GetLocalSize().X, G.GetLocalSize().Y) / 32.f;
+			const FVector2f Origin = (FVector2f(G.GetLocalSize()) - FVector2f(32.f * Scale)) * .5f;
+			auto Line = [&](TArray<FVector2f> Points, float Width = 2.4f)
+			{
+				for (FVector2f& Point : Points) Point = Origin + Point * Scale;
+				FSlateDrawElement::MakeLines(Elements, Layer, G.ToPaintGeometry(), Points,
+					ESlateDrawEffect::None, Glyph->Color, true, Width * Scale);
+			};
+			if (Glyph->Symbol == 0)
+			{
+				Line({{16,7},{9,4},{2,6},{2,26},{9,24},{16,27},{23,24},{30,26},{30,6},{23,4},{16,7},{16,27}});
+			}
+			else if (Glyph->Symbol == 1)
+			{
+				for (int32 Y = 4; Y <= 28; ++Y)
+				{
+					const float Right = 28.f - FMath::Abs(Y - 16.f) * 20.f / 12.f;
+					Line({{8,float(Y)},{Right,float(Y)}}, 1.5f);
+				}
+			}
+			else Line({{23,5},{11,16},{23,27}}, 4.f);
+			return Layer;
+		}
+	private:
+		TWeakObjectPtr<ULessonPopupGlyph> Owner;
+	};
+}
+
+TSharedRef<SWidget> ULessonPopupGlyph::RebuildWidget()
+{
+	return SNew(SLessonPopupGlyph, this);
+}
 
 void ULessonStageClick::HandleClicked()
 {
@@ -31,11 +97,245 @@ ULessonPopupWidget::ULessonPopupWidget(const FObjectInitializer& ObjectInitializ
 {
 	StageButtonStyle = GetDefault<UButton>()->GetStyle();
 	StageFont = FCoreStyle::GetDefaultFontStyle("Bold", 16);
+	static ConstructorHelpers::FObjectFinder<UTexture2D> Book(TEXT("/Game/General/Textures/T_LessonNotebook.T_LessonNotebook"));
+	static ConstructorHelpers::FObjectFinder<UTexture2D> Buttons(TEXT("/Game/General/Textures/T_LessonNotebookButtons.T_LessonNotebookButtons"));
+	static ConstructorHelpers::FObjectFinder<UTexture2D> Lock(TEXT("/Game/General/Textures/T_LessonsLock.T_LessonsLock"));
+	static ConstructorHelpers::FObjectFinder<UFont> Font(TEXT("/Game/Happiness/UI/Fonts/LessonsSerif_Font.LessonsSerif_Font"));
+	NotebookTexture = Book.Object;
+	NotebookButtonTexture = Buttons.Object;
+	NotebookLockTexture = Lock.Object;
+	NotebookFont = Font.Object;
+}
+
+FButtonStyle ULessonPopupWidget::NotebookButtonStyle(bool bPrimary) const
+{
+	FButtonStyle Style;
+	FSlateBrush Face;
+	Face.SetResourceObject(NotebookButtonTexture);
+	Face.DrawAs = ESlateBrushDrawType::Image;
+	Face.SetUVRegion(FBox2f(FVector2f(.03f, bPrimary ? .54f : .06f), FVector2f(.98f, bPrimary ? .963f : .485f)));
+	Style.Normal = Face;
+	Style.Hovered = Face;
+	Style.Hovered.TintColor = FLinearColor(1.08f, 1.08f, 1.04f);
+	Style.Pressed = Face;
+	Style.Pressed.TintColor = FLinearColor(.83f, .88f, .78f);
+	Style.Disabled = Face;
+	Style.Disabled.TintColor = FLinearColor(.77f, .76f, .68f);
+	Style.NormalPadding = Style.PressedPadding = FMargin(30.f, 8.f);
+	return Style;
+}
+
+void ULessonPopupWidget::AddActionContent(UButton* Button, UTextBlock* Label, int32 Symbol, bool bPrimary)
+{
+	if (!Button || !Label) return;
+	Label->RemoveFromParent();
+	Button->ClearChildren();
+	Button->SetStyle(NotebookButtonStyle(bPrimary));
+	Button->SetBackgroundColor(FLinearColor::White);
+	Button->SetCursor(EMouseCursor::Hand);
+	UHorizontalBox* Row = WidgetTree->ConstructWidget<UHorizontalBox>();
+	USizeBox* IconSize = WidgetTree->ConstructWidget<USizeBox>();
+	IconSize->SetWidthOverride(32.f);
+	IconSize->SetHeightOverride(32.f);
+	ULessonPopupGlyph* Glyph = WidgetTree->ConstructWidget<ULessonPopupGlyph>();
+	Glyph->Symbol = Symbol;
+	Glyph->Color = bPrimary ? NotebookIvory : NotebookSage;
+	Glyph->SetVisibility(ESlateVisibility::HitTestInvisible);
+	IconSize->AddChild(Glyph);
+	UHorizontalBoxSlot* IconSlot = Row->AddChildToHorizontalBox(IconSize);
+	IconSlot->SetVerticalAlignment(VAlign_Center);
+	IconSlot->SetPadding(FMargin(0, 0, 14, 0));
+	Label->SetFont(FSlateFontInfo(NotebookFont, Symbol == 0 ? 30 : 34));
+	Label->SetColorAndOpacity(bPrimary ? NotebookIvory : NotebookInk);
+	Label->SetJustification(ETextJustify::Center);
+	Row->AddChildToHorizontalBox(Label)->SetVerticalAlignment(VAlign_Center);
+	UButtonSlot* ContentSlot = Cast<UButtonSlot>(Button->AddChild(Row));
+	ContentSlot->SetHorizontalAlignment(HAlign_Center);
+	ContentSlot->SetVerticalAlignment(VAlign_Center);
+}
+
+void ULessonPopupWidget::BuildNotebookLayout()
+{
+	if (NotebookCanvas || !WidgetTree || !Panel || !TitleText || !DescriptionText || !LessonProgress || !StageBox) return;
+	UCanvasPanel* Root = Cast<UCanvasPanel>(WidgetTree->RootWidget);
+	if (!Root) return;
+	UWidget* ProgressGroup = LessonProgress->GetParent();
+	UWidget* ProgressLine = ProgressText ? ProgressText->GetParent() : nullptr;
+	UTextBlock* PlayLabel = Cast<UTextBlock>(GetWidgetFromName(TEXT("PlayLabel")));
+	for (UWidget* Widget : {static_cast<UWidget*>(TitleText), static_cast<UWidget*>(DescriptionText),
+		ProgressGroup, ProgressLine, static_cast<UWidget*>(StageBox), static_cast<UWidget*>(MasterBox),
+		static_cast<UWidget*>(PlayButton), static_cast<UWidget*>(CloseButton)})
+	{
+		if (Widget) Widget->RemoveFromParent();
+	}
+	Panel->ClearChildren();
+	Panel->SetBrush(FSlateNoResource());
+	Panel->SetBrushColor(FLinearColor(.98f, .92f, .78f));
+	Panel->SetPadding(FMargin(0));
+	Panel->SetHorizontalAlignment(HAlign_Fill);
+	Panel->SetVerticalAlignment(VAlign_Fill);
+	if (UCanvasPanelSlot* PanelSlot = Cast<UCanvasPanelSlot>(Panel->Slot))
+	{
+		PanelSlot->SetAnchors(FAnchors(0,0,1,1));
+		PanelSlot->SetOffsets(FMargin(32));
+		PanelSlot->SetAlignment(FVector2D::ZeroVector);
+		PanelSlot->SetZOrder(2);
+	}
+	if (UImage* Dim = Cast<UImage>(GetWidgetFromName(TEXT("Dim"))))
+	{
+		Dim->SetColorAndOpacity(FLinearColor(0,0,0,.30f));
+		CastChecked<UCanvasPanelSlot>(Dim->Slot)->SetZOrder(1);
+	}
+	UBackgroundBlur* Blur = WidgetTree->ConstructWidget<UBackgroundBlur>();
+	Blur->SetBlurStrength(4.f);
+	Blur->SetVisibility(ESlateVisibility::HitTestInvisible);
+	UCanvasPanelSlot* BlurSlot = Root->AddChildToCanvas(Blur);
+	BlurSlot->SetAnchors(FAnchors(0,0,1,1));
+	BlurSlot->SetOffsets(FMargin(0));
+	BlurSlot->SetZOrder(0);
+	UScaleBox* Fit = WidgetTree->ConstructWidget<UScaleBox>();
+	Fit->SetStretch(EStretch::ScaleToFit);
+	Panel->AddChild(Fit);
+	NotebookSize = WidgetTree->ConstructWidget<USizeBox>();
+	NotebookSize->SetWidthOverride(1500);
+	NotebookSize->SetHeightOverride(950);
+	Fit->AddChild(NotebookSize);
+	NotebookCanvas = WidgetTree->ConstructWidget<UCanvasPanel>();
+	NotebookSize->AddChild(NotebookCanvas);
+	auto Place = [&](UWidget* Widget, FVector2D Position, FVector2D Size, int32 Z = 1)
+	{
+		UCanvasPanelSlot* LayoutSlot = NotebookCanvas->AddChildToCanvas(Widget);
+		LayoutSlot->SetPosition(Position);
+		LayoutSlot->SetSize(Size);
+		LayoutSlot->SetZOrder(Z);
+	};
+	UImage* Surface = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(), TEXT("NotebookSurface"));
+	Surface->SetBrushFromTexture(NotebookTexture, true);
+	Surface->SetVisibility(ESlateVisibility::HitTestInvisible);
+	UCanvasPanelSlot* SurfaceSlot = NotebookCanvas->AddChildToCanvas(Surface);
+	SurfaceSlot->SetAnchors(FAnchors(0,0,1,1));
+	SurfaceSlot->SetOffsets(FMargin(0));
+	SurfaceSlot->SetZOrder(0);
+	TitleText->SetFont(FSlateFontInfo(NotebookFont, 48));
+	TitleText->SetColorAndOpacity(NotebookInk);
+	TitleText->SetJustification(ETextJustify::Center);
+	TitleText->SetAutoWrapText(true);
+	TitleText->SetWrapTextAt(500);
+	Place(TitleText, FVector2D(170,100), FVector2D(500,125));
+	NotebookDiagram = WidgetTree->ConstructWidget<ULessonClueDiagram>();
+	NotebookDiagram->SetVisibility(ESlateVisibility::HitTestInvisible);
+	Place(NotebookDiagram, FVector2D(225,260), FVector2D(390,215));
+	UScrollBox* Explanation = WidgetTree->ConstructWidget<UScrollBox>();
+	Explanation->SetScrollBarVisibility(ESlateVisibility::Visible);
+	Explanation->SetScrollbarThickness(FVector2D(6,6));
+	FScrollBoxStyle PageScrollStyle = Explanation->GetWidgetStyle();
+	PageScrollStyle.TopShadowBrush = FSlateNoResource();
+	PageScrollStyle.BottomShadowBrush = FSlateNoResource();
+	PageScrollStyle.LeftShadowBrush = FSlateNoResource();
+	PageScrollStyle.RightShadowBrush = FSlateNoResource();
+	Explanation->SetWidgetStyle(PageScrollStyle);
+	FScrollBarStyle PageBarStyle = Explanation->GetWidgetBarStyle();
+	PageBarStyle.NormalThumbImage = FSlateRoundedBoxBrush(NotebookSage, 3.f);
+	PageBarStyle.HoveredThumbImage = FSlateRoundedBoxBrush(NotebookSage, 3.f);
+	PageBarStyle.DraggedThumbImage = FSlateRoundedBoxBrush(NotebookSage, 3.f);
+	PageBarStyle.VerticalBackgroundImage = FSlateRoundedBoxBrush(FLinearColor(.82f,.76f,.58f,.4f), 3.f);
+	Explanation->SetWidgetBarStyle(PageBarStyle);
+	Explanation->SetAllowOverscroll(false);
+	Explanation->SetConsumeMouseWheel(EConsumeMouseWheel::WhenScrollingPossible);
+	DescriptionText->SetFont(FSlateFontInfo(NotebookFont, 27));
+	DescriptionText->SetColorAndOpacity(NotebookInk);
+	DescriptionText->SetAutoWrapText(true);
+	DescriptionText->SetWrapTextAt(480);
+	DescriptionText->SetJustification(ETextJustify::Left);
+	Explanation->AddChild(DescriptionText);
+	Place(Explanation, FVector2D(810,120), FVector2D(500,280));
+	LearnMoreButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("LearnMoreButton"));
+	UTextBlock* LearnLabel = WidgetTree->ConstructWidget<UTextBlock>();
+	LearnLabel->SetText(LOCTEXT("LearnMore", "Learn More"));
+	AddActionContent(LearnMoreButton, LearnLabel, 0, false);
+	LearnMoreButton->OnClicked.AddUniqueDynamic(this, &ULessonPopupWidget::HandleLearnMoreClicked);
+	Place(LearnMoreButton, FVector2D(865,425), FVector2D(390,80));
+	Place(ProgressGroup, FVector2D(95,620), FVector2D(1310,30));
+	FProgressBarStyle ProgressStyle;
+	ProgressStyle.BackgroundImage = FSlateRoundedBoxBrush(FLinearColor(.80f,.75f,.61f), 12.f, FLinearColor(.65f,.42f,.12f), 2.f);
+	ProgressStyle.FillImage = FSlateRoundedBoxBrush(FLinearColor::White, 9.f);
+	LessonProgress->SetWidgetStyle(ProgressStyle);
+	LessonProgress->SetFillColorAndOpacity(FLinearColor(.30f,.47f,.12f));
+	LessonProgress->SetBorderPadding(FVector2D(5,5));
+	if (UOverlaySlot* LayoutSlot = Cast<UOverlaySlot>(LessonProgress->Slot))
+	{
+		LayoutSlot->SetHorizontalAlignment(HAlign_Fill); LayoutSlot->SetVerticalAlignment(VAlign_Fill); LayoutSlot->SetPadding(FMargin(0));
+	}
+	if (ProgressTicks)
+	{
+		ProgressTicks->TickColor = FLinearColor(.40f,.28f,.11f);
+		ProgressTicks->TickThickness = 2.f;
+		ProgressTicks->SynchronizeProperties();
+		if (UOverlaySlot* LayoutSlot = Cast<UOverlaySlot>(ProgressTicks->Slot))
+		{
+			LayoutSlot->SetHorizontalAlignment(HAlign_Fill); LayoutSlot->SetVerticalAlignment(VAlign_Fill); LayoutSlot->SetPadding(FMargin(5,4));
+		}
+	}
+	if (ProgressLine) Place(ProgressLine, FVector2D(95,660), FVector2D(1310,42));
+	if (ProgressText)
+	{
+		ProgressText->SetFont(FSlateFontInfo(NotebookFont, 28));
+		ProgressText->SetColorAndOpacity(NotebookInk);
+		ProgressText->SetJustification(ETextJustify::Center);
+	}
+	Place(StageBox, FVector2D(85,710), FVector2D(1330,104));
+	if (MasterBox) Place(MasterBox, FVector2D(450,805), FVector2D(600,100));
+	if (PlayButton)
+	{
+		if (!PlayLabel) PlayLabel = WidgetTree->ConstructWidget<UTextBlock>();
+		PlayLabel->SetText(LOCTEXT("Play", "Play"));
+		AddActionContent(PlayButton, PlayLabel, 1, true);
+		Place(PlayButton, FVector2D(775,830), FVector2D(350,88));
+	}
+	if (CloseButton)
+	{
+		if (!CloseLabel) CloseLabel = WidgetTree->ConstructWidget<UTextBlock>();
+		AddActionContent(CloseButton, CloseLabel, 2, false);
+		Place(CloseButton, FVector2D(375,830), FVector2D(350,88));
+	}
+}
+
+void ULessonPopupWidget::UpdateNotebookLayout()
+{
+	if (!NotebookCanvas || !NotebookSize) return;
+	const float Extra = MasterBox && MasterBox->GetVisibility() != ESlateVisibility::Collapsed ? 150.f : 0.f;
+	NotebookSize->SetHeightOverride(950.f + Extra);
+	auto Move = [](UWidget* Widget, float Y)
+	{
+		if (Widget)
+			if (UCanvasPanelSlot* LayoutSlot = Cast<UCanvasPanelSlot>(Widget->Slot))
+				LayoutSlot->SetPosition(FVector2D(LayoutSlot->GetPosition().X,Y));
+	};
+	Move(LessonProgress ? LessonProgress->GetParent() : nullptr, 620.f + Extra * .62f);
+	Move(ProgressText ? ProgressText->GetParent() : nullptr, 660.f + Extra * .62f);
+	Move(StageBox, 710.f + Extra * .62f);
+	Move(MasterBox, 805.f + Extra * .62f);
+	Move(PlayButton, 830.f + Extra);
+	Move(CloseButton, 830.f + Extra);
+	if (CloseButton)
+	{
+		const bool bOnlyBack = !PlayButton || PlayButton->GetVisibility() == ESlateVisibility::Collapsed;
+		if (UCanvasPanelSlot* LayoutSlot = Cast<UCanvasPanelSlot>(CloseButton->Slot))
+		{
+			LayoutSlot->SetPosition(FVector2D(bOnlyBack ? 500.f : 375.f, 830.f + Extra));
+			LayoutSlot->SetSize(FVector2D(bOnlyBack ? 500.f : 350.f,88.f));
+		}
+	}
 }
 
 void ULessonPopupWidget::NativePreConstruct()
 {
 	Super::NativePreConstruct();
+	BuildNotebookLayout();
+	StageButtonSize = FVector2D(250.f, 74.f);
+	StageFont = FSlateFontInfo(NotebookFont, UCampaignSubsystem::GetNumStages() > 5 ? 22 : 26);
+	StageButtonStyle = NotebookButtonStyle(false);
+	StageTextColor = NotebookInk;
 
 	// Also runs in the designer, where there is no campaign progress: shows an empty lesson
 	BuildStageButtons();
@@ -87,6 +387,9 @@ void ULessonPopupWidget::BuildStageButtons()
 	StageButtons.Reset();
 	MasterButtons.Reset();
 	StageClicks.Reset();
+	StageLabels.Reset();
+	StageChecks.Reset();
+	StageLocks.Reset();
 
 	// The row is sized for five stages (Lessons). More stages (Campaign) share the same width, with each name on
 	// two lines ("5x5" over "Normal") so it still fits its narrower button.
@@ -126,11 +429,16 @@ UButton* ULessonPopupWidget::AddStageButton(UPanelWidget* Box, int32 Stage, cons
 	// A size box per button keeps them a fixed size whatever panel the row is
 	USizeBox* Size = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
 	Size->SetWidthOverride(Width);
-	Size->SetHeightOverride(StageButtonSize.Y);
+	Size->SetHeightOverride(StageButtonSize.Y + 20.f);
+	UCanvasPanel* Face = WidgetTree->ConstructWidget<UCanvasPanel>();
+	Size->AddChild(Face);
 
 	UButton* Button = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
 	Button->SetStyle(StageButtonStyle);
-	Size->AddChild(Button);
+	Button->SetCursor(EMouseCursor::Hand);
+	UCanvasPanelSlot* ButtonSlot = Face->AddChildToCanvas(Button);
+	ButtonSlot->SetPosition(FVector2D(0,16));
+	ButtonSlot->SetSize(FVector2D(Width,StageButtonSize.Y));
 
 	UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
 	Label->SetText(Name);
@@ -145,12 +453,30 @@ UButton* ULessonPopupWidget::AddStageButton(UPanelWidget* Box, int32 Stage, cons
 		LabelSlot->SetHorizontalAlignment(HAlign_Center);
 		LabelSlot->SetVerticalAlignment(VAlign_Center);
 	}
+	StageLabels.Add(Label);
+	ULessonCompletionBadge* Check = WidgetTree->ConstructWidget<ULessonCompletionBadge>();
+	Check->SetVisibility(ESlateVisibility::Collapsed);
+	UCanvasPanelSlot* CheckSlot = Face->AddChildToCanvas(Check);
+	CheckSlot->SetPosition(FVector2D(Width-52.f,0));
+	CheckSlot->SetSize(FVector2D(52,52));
+	CheckSlot->SetZOrder(2);
+	StageChecks.Add(Check);
+	UImage* Lock = WidgetTree->ConstructWidget<UImage>();
+	Lock->SetBrushFromTexture(NotebookLockTexture);
+	Lock->SetVisibility(ESlateVisibility::Collapsed);
+	UCanvasPanelSlot* LockSlot = Face->AddChildToCanvas(Lock);
+	LockSlot->SetPosition(FVector2D(Width-52.f,0));
+	LockSlot->SetSize(FVector2D(52,52));
+	LockSlot->SetZOrder(2);
+	StageLocks.Add(Lock);
 
 	UPanelSlot* StageSlot = Box->AddChild(Size);
 	if (UHorizontalBoxSlot* BoxSlot = Cast<UHorizontalBoxSlot>(StageSlot))
 	{
 		BoxSlot->SetPadding(FMargin(Spacing / 2.f, 0.f));
 		BoxSlot->SetVerticalAlignment(VAlign_Center);
+		BoxSlot->SetHorizontalAlignment(HAlign_Center);
+		BoxSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
 	}
 
 	ULessonStageClick* Click = NewObject<ULessonStageClick>(this);
@@ -159,6 +485,19 @@ UButton* ULessonPopupWidget::AddStageButton(UPanelWidget* Box, int32 Stage, cons
 	Button->OnClicked.AddDynamic(Click, &ULessonStageClick::HandleClicked);
 	StageClicks.Add(Click);
 	return Button;
+}
+
+void ULessonPopupWidget::StyleStage(UButton* Button, int32 Stage, bool bUnlocked, bool bCurrent, bool bCompleted)
+{
+	Button->SetIsEnabled(bUnlocked);
+	Button->SetBackgroundColor(FLinearColor::White);
+	Button->SetStyle(NotebookButtonStyle(bCurrent));
+	if (StageLabels.IsValidIndex(Stage))
+		StageLabels[Stage]->SetColorAndOpacity(bCurrent ? NotebookIvory : NotebookInk);
+	if (StageChecks.IsValidIndex(Stage))
+		StageChecks[Stage]->SetVisibility(bCompleted ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	if (StageLocks.IsValidIndex(Stage))
+		StageLocks[Stage]->SetVisibility(!bUnlocked ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 }
 
 bool ULessonPopupWidget::IsShowingMaster() const
@@ -342,6 +681,22 @@ void ULessonPopupWidget::Refresh()
 	{
 		DescriptionText->SetText(UCampaignTree::GetLessonDescription(Lesson));
 	}
+	if (NotebookDiagram && NotebookDiagram->Lesson != Lesson)
+	{
+		// The tree's Slate diagram captures its lesson at construction; create a fresh face when switching clues.
+		UCanvasPanelSlot* OldDiagramSlot = CastChecked<UCanvasPanelSlot>(NotebookDiagram->Slot);
+		const FVector2D Position = OldDiagramSlot->GetPosition(), Size = OldDiagramSlot->GetSize();
+		NotebookDiagram->RemoveFromParent();
+		NotebookDiagram = WidgetTree->ConstructWidget<ULessonClueDiagram>();
+		NotebookDiagram->Lesson = Lesson;
+		NotebookDiagram->SetVisibility(ESlateVisibility::HitTestInvisible);
+		UCanvasPanelSlot* DiagramSlot = NotebookCanvas->AddChildToCanvas(NotebookDiagram);
+		DiagramSlot->SetPosition(Position);
+		DiagramSlot->SetSize(Size);
+		DiagramSlot->SetZOrder(1);
+		if (UScrollBox* Explanation = DescriptionText ? Cast<UScrollBox>(DescriptionText->GetParent()) : nullptr)
+			Explanation->ScrollToStart();
+	}
 	// While the reveal erases the line and shows the Master line, the animation owns the bar and the line
 	const bool bRevealOwnsLine = RevealPhase == ERevealPhase::Erase || RevealPhase == ERevealPhase::Text;
 	if (LessonProgress && !bRevealOwnsLine)
@@ -387,7 +742,7 @@ void ULessonPopupWidget::Refresh()
 	}
 	if (CloseLabel)
 	{
-		CloseLabel->SetText(!bAllDone ? LOCTEXT("Close", "Close")
+		CloseLabel->SetText(!bAllDone ? LOCTEXT("Close", "Back")
 			: (bCampaignMode ? LOCTEXT("ReturnToCampaign", "Return to Campaign") : LOCTEXT("ReturnToLessons", "Return to Lessons")));
 	}
 	if (MasterBox)
@@ -400,8 +755,7 @@ void ULessonPopupWidget::Refresh()
 		const int32 Stage = FirstMaster + i;
 		const bool bUnlocked = Campaign && Campaign->IsStageUnlocked(Lesson, Stage);
 		const bool bIsCurrent = Stage == CurrentMaster && !bMasterDone;
-		MasterButtons[i]->SetIsEnabled(bUnlocked);
-		MasterButtons[i]->SetBackgroundColor(!bUnlocked ? LockedTint : (bIsCurrent ? CurrentTint : PassedTint));
+		StyleStage(MasterButtons[i], Stage, bUnlocked, bIsCurrent, bUnlocked && !bIsCurrent);
 	}
 
 	for (int32 Stage = 0; Stage < StageButtons.Num(); Stage++)
@@ -409,9 +763,10 @@ void ULessonPopupWidget::Refresh()
 		const bool bUnlocked = Campaign ? Campaign->IsStageUnlocked(Lesson, Stage) : Stage == 0;
 		const bool bIsCurrent = Stage == CurrentStage && !(Stage == UCampaignSubsystem::GetFinalStage() && bCompleted);
 
-		StageButtons[Stage]->SetIsEnabled(bUnlocked);
-		StageButtons[Stage]->SetBackgroundColor(!bUnlocked ? LockedTint : (bIsCurrent ? CurrentTint : PassedTint));
+		StyleStage(StageButtons[Stage], Stage, bUnlocked, bIsCurrent,
+			bCompleted || (bUnlocked && Stage < CurrentStage));
 	}
+	UpdateNotebookLayout();
 }
 
 void ULessonPopupWidget::ChooseStage(int32 Stage)
@@ -445,6 +800,11 @@ void ULessonPopupWidget::HandlePlayClicked()
 void ULessonPopupWidget::HandleCloseClicked()
 {
 	Close();
+}
+
+void ULessonPopupWidget::HandleLearnMoreClicked()
+{
+	OnLearnMoreRequested.Broadcast(Lesson);
 }
 
 void ULessonPopupWidget::HandleProgressChanged()

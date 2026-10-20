@@ -85,3 +85,12 @@ reserves room for this badge beneath each medallion; keep it clear of the next r
 
 The painted Back button uses T_LessonsBack. Lock badges use T_LessonsLock; the collapsed
 LessonLockArt image in WBP_CampaignTree preserves the texture reference for cooking.
+
+`WBP_LessonPopup` now uses the option-B notebook presentation, built by
+`ULessonPopupWidget::BuildNotebookLayout` around its existing bound widgets. T_LessonNotebook and
+T_LessonNotebookButtons supply the blank surfaces; all labels, progress, stage states and actions stay live.
+The right page scrolls long descriptions. The design canvas grows when the Campaign Master row appears,
+preserving the existing reveal animation and stage/replay routing. The shared ULessonClueDiagram captures
+its lesson when its Slate widget is constructed: recreate it when changing the notebook to another clue.
+Learn More broadcasts `OnLearnMoreRequested(ECampaignLesson)`; the future clue-specific rules navigation
+is intentionally left for its consumer to connect. It does not open a separate rules screen yet.
