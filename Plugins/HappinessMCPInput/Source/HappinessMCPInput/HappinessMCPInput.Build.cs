@@ -19,7 +19,8 @@ public class HappinessMCPInput : ModuleRules
 		{
 			"LevelEditor",
 			"Slate",
-			"SlateCore"
+			"SlateCore",
+			"UnrealEd"
 		});
 	}
 }

@@ -52,6 +52,14 @@
 		{
 			"Name": "OnlineSubsystemGooglePlay",
 			"Enabled": true
+		},
+		{
+			"Name": "NiagaraToolsets",
+			"Enabled": true
+		},
+		{
+			"Name": "NiagaraUIRenderer",
+			"Enabled": true
 		}
 	]
 }

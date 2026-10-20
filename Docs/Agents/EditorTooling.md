@@ -243,3 +243,58 @@ unexplained hints. Difficulty: 0 easy, 1 normal, 2 hard. Sizes 3–8.
   mode. Development builds only.
 - `Happiness.SolvePuzzle` fills the open puzzle with its solution and finishes it as if the player had: the
   end screen, scoring, progress and save all run normally. Development builds only.
+
+### Driving PIE from a tool
+
+Start PIE, run console commands in it, click, capture what's on screen, and stop it, all without the editor UI:
+
+```bash
+A=EditorToolset.EditorAppToolset
+I=HappinessMCPInput.HappinessMCPInputToolset
+python Tools/mcp_call.py $A StartPIE '{"options": {"bSimulate": false, "playMode": "PlayMode_InViewPort"}}'
+python Tools/mcp_call.py $A IsPIERunning '{}'          # poll until true, then give the game a few seconds to load
+python Tools/mcp_call.py $I ExecPIECommand '{"command": "Happiness.SolvePuzzle"}'
+python Tools/mcp_call.py $I ClickViewport '{"x": 0.18, "y": 0.08, "button": "Left"}'   # normalized viewport coords
+python Tools/mcp_call.py $A CaptureEditorImage '{}'    # the whole editor window as a base64 PNG ("data")
+python Tools/mcp_call.py $A StopPIE '{}'
+```
+
+- **`ExecPIECommand`** runs a console command in the PIE world, as if typed in the game's console (`~`): the game's
+  dev commands, engine commands (`slomo 0.5`, `stat fps`), console variables (`Happiness.PreviewAdLayout 1`) and
+  log verbosity (`log LogTemp Verbose`). It returns false when PIE isn't running.
+- **The game's dev commands** (development builds only): `Happiness.SolvePuzzle`, `Happiness.CompleteAllLessons`,
+  `Happiness.DailyDate`, `Happiness.ResetDaily`, `Happiness.PreviewAdLayout`, `Happiness.Ads`,
+  `Happiness.LargeBanner`, `Happiness.RemoveAdsToken`, `Happiness.TestAd`. Find them all with
+  `grep -rhn 'TEXT("Happiness\.' Source/Happiness`.
+- **`CaptureEditorImage` is for screens, not motion.** Each capture takes long enough that an animation or effect
+  lasting under a second or so is over before it's taken: a 0.5 s Niagara pulse never showed in any capture. Check
+  short effects in the logs, or ask the user to look.
+- **`ClickViewport`** uses coordinates normalized to the PIE viewport (0 to 1). To aim from a capture, subtract the
+  viewport's top-left corner in the capture and divide by the viewport's size there.
+- Moves made this way change the player's save. Undo them before stopping PIE.
+- Stop PIE before saving assets. Dev test code must not keep PIE objects alive past PIE (a global
+  `TStrongObjectPtr` to a widget in the play world): ending PIE then fails with a fatal "world leaked" error.
+
+### Niagara effects in UMG
+
+Niagara draws inside widgets through `Plugins/NiagaraUIRenderer`, a **project fork** of Epic's experimental UE 5.8
+plugin. It has the same name, so it replaces the engine copy. The fork adds a material user parameter binding to
+the UI sprite renderer (each component can draw with its own material instance), exports `UNiagaraUIWidget` with
+`SetNiagaraSystem` / `GetNiagaraComponent`, fixes sprite sizes (scaled to the screen, and full size rather than
+double), and takes `SpriteRotation` in degrees like the other renderers (the engine version used radians). Each change is marked "Happiness fork" in the source; reapply them if the plugin is updated from the
+engine.
+
+The engine's `NiagaraToolsets` plugin (enabled, editor-only) adds MCP tools to create and edit Niagara systems
+(`NiagaraToolsets.NiagaraToolset_System.*`). Its guidance lives in
+`Engine/Plugins/Experimental/Toolsets/NiagaraToolsets/Content/Python/skills/`. Example: `NS_IconPulse`, the
+icon pulse each grid cell plays when its icon is set (`UGameCellWidget`).
+
+- A UI sprite needs a **UI-domain** material, or nothing is drawn and nothing is reported.
+- Templates made from `DirectionalBurst` and similar systems play **once for 1 s**: check the system's Loop
+  Behavior and Loop Duration.
+- `UNiagaraComponent::ResetSystem` doesn't restart a component that has finished; use `Activate(true)`.
+- **`AddSetParameterEntry` crashed the editor** (assertion `!IsRooted()` in `UNiagaraNodeAssignment::GenerateScript`)
+  when adding to an existing SetParameters module. Add a new SetParameters module with `AddSetParametersModule` instead.
+- The particle VM has no integer `%`: use `x - n * floor(x / n)` on floats in HLSL expressions.
+- Examples: `NS_IconShatter` breaks an eliminated candidate icon into a 6×6 grid of falling, spinning pieces (SubUV
+  tiles of the icon).
