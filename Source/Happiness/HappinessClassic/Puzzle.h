@@ -2,6 +2,8 @@
 
 #include <CoreMinimal.h>
 #include <UObject/Object.h>
+#include <Containers/Ticker.h>
+#include <Sound/SoundBase.h>
 #include "Clue.h"
 #include "PuzzleRow.h"
 #include "Hint.h"
@@ -67,6 +69,20 @@ public:
 
 	UPROPERTY(BlueprintReadWrite)
 	bool AutoSetIcons = true;
+
+	// Player moves (PlayerSetFinalIcon, PlayerEliminateIcon): seconds between showing a change and showing the
+	// changes it causes (the last icon left in a cell or a row being set, a set icon leaving the rest of its row, ...).
+	// 0: all at once.
+	UPROPERTY(BlueprintReadWrite)
+	float CollateralDelay = 0.25f;
+
+	// Played for each step of a player move's changes, as for the player's own moves: SetSound when the step sets an
+	// icon, else EliminateSound
+	UPROPERTY(EditAnywhere)
+	TSoftObjectPtr<USoundBase> CollateralSetSound = TSoftObjectPtr<USoundBase>(FSoftObjectPath(TEXT("/Game/General/Audio/Cues/MenuAccept.MenuAccept")));
+
+	UPROPERTY(EditAnywhere)
+	TSoftObjectPtr<USoundBase> CollateralEliminateSound = TSoftObjectPtr<USoundBase>(FSoftObjectPath(TEXT("/Game/General/Audio/Cues/MenuCancel.MenuCancel")));
 
 	// Set by InitCampaign: clue generation is limited to lessons up to m_CampaignLesson
 	UPROPERTY(BlueprintReadOnly)
@@ -194,6 +210,24 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void EliminateIconWithClue(UClue* clue, int Row, int Col, int Icon);
 
+	// The player's moves. The board changes at once, like SetFinalIcon and EliminateIcon, but GetShownRows shows the
+	// changes in steps, CollateralDelay apart: first the move, then what it caused, then what that caused, ... After
+	// each step, View's RefreshPuzzle (a function without parameters: WBP_Happiness's) is called to show it.
+	UFUNCTION(BlueprintCallable)
+	void PlayerSetFinalIcon(int Row, int Col, int Icon, UObject* View);
+
+	UFUNCTION(BlueprintCallable)
+	void PlayerEliminateIcon(int Row, int Col, int Icon, UObject* View);
+
+	// The board as the player should see it: m_Rows, or while a player move's changes are still being shown, the
+	// board up to the current step. Anything else changing the board (an undo, a fix, a hint) ends the steps.
+	UFUNCTION(BlueprintCallable, BlueprintPure)
+	TArray<FPuzzleRow> GetShownRows();
+
+	// IsCompleted, once every step of the last player move is shown
+	UFUNCTION(BlueprintCallable, BlueprintPure)
+	bool IsCompletedShown();
+
 	// The best hint from all the clues, hidden or not; on a tie, one of the clues on screen (VisibleClues) wins.
 	// Counts as a hint used.
 	UFUNCTION(BlueprintCallable)
@@ -253,4 +287,37 @@ private:
 
 	void SetMarker();
 	void RestoreMarker();
+
+	virtual void BeginDestroy() override;
+
+	// One change of a player move, and how many causes away from the move it is (0: the move itself)
+	struct FCollateralChange
+	{
+		bool bSet;	// set Icon as the final icon; else eliminate it
+		int Row;
+		int Col;
+		int Icon;
+		int Step;
+	};
+
+	// While a player move is applied: its changes are recorded, Step being the current depth
+	bool m_bRecordingCollateral = false;
+	int m_CollateralStep = 0;
+	TArray<FCollateralChange> m_CollateralChanges;
+	// The board before and after the move, the step shown, and when the next is
+	TArray<FPuzzleRow> m_CollateralBefore;
+	TArray<FPuzzleRow> m_CollateralAfter;
+	int m_ShownStep = 0;
+	int m_LastStep = 0;
+	double m_NextStepTime = 0.0;
+	FTSTicker::FDelegateHandle m_CollateralTicker;
+	TWeakObjectPtr<UObject> m_CollateralView;
+
+	void RecordPlayerMove(UObject* View, TFunctionRef<void()> Move);
+	// Still showing steps of the last move: there are steps left and nothing else has changed the board since
+	bool IsShowingCollateral() const;
+	void StopCollateral();
+	bool TickCollateral(float DeltaTime);
+	void RefreshCollateralView();
+	void PlayCollateralSound(int Step);
 };
