@@ -280,8 +280,8 @@ python Tools/mcp_call.py $A StopPIE '{}'
 Niagara draws inside widgets through `Plugins/NiagaraUIRenderer`, a **project fork** of Epic's experimental UE 5.8
 plugin. It has the same name, so it replaces the engine copy. The fork adds a material user parameter binding to
 the UI sprite renderer (each component can draw with its own material instance), exports `UNiagaraUIWidget` with
-`SetNiagaraSystem` / `GetNiagaraComponent`, and fixes sprite sizes (scaled to the screen, and full size rather than
-double). Each change is marked "Happiness fork" in the source; reapply them if the plugin is updated from the
+`SetNiagaraSystem` / `GetNiagaraComponent`, fixes sprite sizes (scaled to the screen, and full size rather than
+double), and takes `SpriteRotation` in degrees like the other renderers (the engine version used radians). Each change is marked "Happiness fork" in the source; reapply them if the plugin is updated from the
 engine.
 
 The engine's `NiagaraToolsets` plugin (enabled, editor-only) adds MCP tools to create and edit Niagara systems
@@ -293,3 +293,8 @@ icon pulse each grid cell plays when its icon is set (`UGameCellWidget`).
 - Templates made from `DirectionalBurst` and similar systems play **once for 1 s**: check the system's Loop
   Behavior and Loop Duration.
 - `UNiagaraComponent::ResetSystem` doesn't restart a component that has finished; use `Activate(true)`.
+- **`AddSetParameterEntry` crashed the editor** (assertion `!IsRooted()` in `UNiagaraNodeAssignment::GenerateScript`)
+  when adding to an existing SetParameters module. Add a new SetParameters module with `AddSetParametersModule` instead.
+- The particle VM has no integer `%`: use `x - n * floor(x / n)` on floats in HLSL expressions.
+- Examples: `NS_IconShatter` breaks an eliminated candidate icon into a 6×6 grid of falling, spinning pieces (SubUV
+  tiles of the icon).

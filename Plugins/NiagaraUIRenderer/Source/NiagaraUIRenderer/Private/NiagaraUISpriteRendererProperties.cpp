@@ -294,8 +294,10 @@ void UNiagaraUISpriteRendererProperties::ExecuteRender(const FNiagaraUIRenderCon
 			FVector2f(SpritePackedUV.X, SpritePackedUV.W),
 		};
 
-		const float CosRot = FMath::Cos(SpriteRotation);
-		const float SinRot = FMath::Sin(SpriteRotation);
+		// Happiness fork: SpriteRotation is in degrees, as in the other sprite renderers and the rotation modules; the
+		// engine version took it as radians
+		const float CosRot = FMath::Cos(FMath::DegreesToRadians(SpriteRotation));
+		const float SinRot = FMath::Sin(FMath::DegreesToRadians(SpriteRotation));
 
 		const FVector2f Position = RenderContext.PositionToScreen(SpritePosition);
 
