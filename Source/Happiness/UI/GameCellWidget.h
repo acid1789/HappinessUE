@@ -37,7 +37,9 @@ struct FCellEffect
 
 /**
  * Clips candidate and resolved icons to the cell's rounded frame, and plays Niagara effects over its icons, in an
- * overlay over the game viewport (above everything, the icons themselves left as they are):
+ * overlay over the whole screen (the icons themselves left as they are). The overlay goes in the root canvas of
+ * the screen holding the board (UGamePanelWidget) at EffectZOrder (WBP_Happiness: over the board, under the end
+ * screens and dialogs), or over everything in the game viewport if there's no such canvas:
  * - when its icon is set, a pulse (PulseSystem): the icon grows to PulseScale and back over PulseDuration;
  * - when a candidate icon is eliminated, it breaks into pieces that fall (ShatterSystem, over ShatterDuration).
  * Nothing plays for what the cell shows when it first appears.
@@ -81,6 +83,10 @@ public:
 	/** The break: user parameters IconMaterial, IconSize, ShatterDuration (NS_IconShatter) */
 	UPROPERTY(EditAnywhere, Category = "Shatter")
 	TObjectPtr<UNiagaraSystem> ShatterSystem;
+
+	/** Z order of the effects' overlay in the screen's root canvas: above the board (0), below the ad banner (5) */
+	UPROPERTY(EditAnywhere, Category = "Pulse")
+	int32 EffectZOrder = 1;
 protected:
 	virtual void NativePreConstruct() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
@@ -100,8 +106,12 @@ protected:
 
 	UPROPERTY(Transient)
 	TArray<FCellEffect> Effects;
-	/** The canvas over the game viewport the effects play in */
+	/** The canvas over the screen the effects play in */
 	TSharedPtr<class SCanvas> EffectOverlay;
+
+	/** Holds EffectOverlay in the screen's root canvas; null when the overlay is in the game viewport */
+	UPROPERTY(Transient)
+	TObjectPtr<class UNativeWidgetHost> EffectHost;
 
 	/** What showed last tick: the final icon, and each candidate icon; unknown until the first tick */
 	bool bKnowsShown = false;
