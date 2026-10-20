@@ -37,6 +37,8 @@ UGameCellWidget::UGameCellWidget(const FObjectInitializer& ObjectInitializer)
 	PulseMaterial = PulseIcon.Object;
 	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> Shatter(TEXT("/Game/Happiness/UI/Effects/NS_IconShatter.NS_IconShatter"));
 	ShatterSystem = Shatter.Object;
+	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> Firework(TEXT("/Game/Happiness/UI/Effects/NS_IconFirework.NS_IconFirework"));
+	FireworkSystem = Firework.Object;
 }
 
 void UGameCellWidget::NativePreConstruct()
@@ -122,6 +124,55 @@ namespace
 			return Cast<UTexture>(AsBorder->Background.GetResourceObject());
 		}
 		return nullptr;
+	}
+}
+
+namespace
+{
+	// Effects[] slot of the firework, after the pulse (0) and every candidate icon's shatter (1 + n)
+	constexpr int32 FireworkEffect = 32;
+}
+
+void UGameCellWidget::PrepareFirework()
+{
+	UWidget* FinalIcon = GetWidgetFromName(TEXT("Image_FinalIcon"));
+	if (IsShown(FinalIcon))
+	{
+		PlayEffect(FireworkEffect, FireworkSystem, ImageTexture(FinalIcon), *FinalIcon);
+	}
+}
+
+bool UGameCellWidget::PlayFirework()
+{
+	UWidget* FinalIcon = GetWidgetFromName(TEXT("Image_FinalIcon"));
+	if (!IsShown(FinalIcon))
+	{
+		return false;
+	}
+	UNiagaraComponent* Burst = PlayEffect(FireworkEffect, FireworkSystem, ImageTexture(FinalIcon), *FinalIcon);
+	if (!Burst)
+	{
+		return false;
+	}
+	Burst->SetVariableFloat(TEXT("ShatterDuration"), FireworkDuration);
+	Burst->Activate(true);
+	FinalIcon->SetRenderOpacity(0.f);
+	if (IconRetainer)
+	{
+		IconRetainer->RequestRender();
+	}
+	return true;
+}
+
+void UGameCellWidget::EndFirework()
+{
+	if (UWidget* FinalIcon = GetWidgetFromName(TEXT("Image_FinalIcon")))
+	{
+		FinalIcon->SetRenderOpacity(1.f);
+	}
+	if (IconRetainer)
+	{
+		IconRetainer->RequestRender();
 	}
 }
 

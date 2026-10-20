@@ -305,4 +305,8 @@ icon pulse each grid cell plays when its icon is set (`UGameCellWidget`).
   when adding to an existing SetParameters module. Add a new SetParameters module with `AddSetParametersModule` instead.
 - The particle VM has no integer `%`: use `x - n * floor(x / n)` on floats in HLSL expressions.
 - Examples: `NS_IconShatter` breaks an eliminated candidate icon into a 6Ã—6 grid of falling, spinning pieces (SubUV
-  tiles of the icon).
+  tiles of the icon). `NS_IconFirework`, a copy of it on a 10×10 grid, bursts a solved puzzle's icons outward (velocity away from
+  the icon's center, a Drag module ending the burst) and lets them fall slowly as confetti (gravity over drag sets
+  the fall speed; each piece's width swings with a cosine so it seems to flip).
+- **Unity builds put several `.cpp` files in one translation unit,** so names in their anonymous namespaces can
+  clash (C2374 "redefinition"): two end screens both defined `Ink`. Give file-level constants distinctive names.

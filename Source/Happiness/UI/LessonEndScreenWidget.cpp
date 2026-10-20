@@ -34,7 +34,7 @@
 
 namespace
 {
-	const FLinearColor Ink(.17f,.085f,.035f), Sage(.16f,.29f,.075f), Ivory(1.f,.95f,.8f);
+	const FLinearColor LessonInk(.17f,.085f,.035f), LessonSage(.16f,.29f,.075f), LessonIvory(1.f,.95f,.8f);
 	const FLinearColor PenaltyInk(.55f,.075f,.025f);
 	class SLessonResultGlyph : public SLeafWidget
 	{
@@ -65,7 +65,7 @@ namespace
 				};
 				Disc(15.8f,FLinearColor(.12f,.065f,.025f,.3f),0);
 				Disc(15.3f,FLinearColor(.88f,.48f,.065f),1);
-				Disc(14.6f,Ivory,2);
+				Disc(14.6f,LessonIvory,2);
 				Disc(13.7f,FLinearColor(.62f,.32f,.035f),3);
 				Disc(13.2f,Glyph->Symbol==3?FLinearColor(.018f,.065f,.13f):FLinearColor(.35f,.065f,.025f),4);
 				Disc(12.2f,Glyph->Symbol==3?FLinearColor(.032f,.105f,.20f):FLinearColor(.48f,.11f,.045f),5);
@@ -85,12 +85,12 @@ namespace
 						FSlateDrawElement::MakeCustomVerts(E,Layer+Z,Resource,Vertices,Indices,nullptr,0,0);
 					};
 					FillCheck({0,.55f},FLinearColor(.006f,.018f,.04f),6);
-					FillCheck({0,0},Ivory,7);
+					FillCheck({0,0},LessonIvory,7);
 				}
 				else
 				{
-					Line({{11,11},{21,21}},2.3f,Ivory,7);
-					Line({{21,11},{11,21}},2.3f,Ivory,7);
+					Line({{11,11},{21,21}},2.3f,LessonIvory,7);
+					Line({{21,11},{11,21}},2.3f,LessonIvory,7);
 				}
 			}
 			else if (Glyph->Symbol==0)
@@ -198,7 +198,7 @@ void ULessonEndScreenWidget::BuildNotebookLayout()
 		W->SetFont(FSlateFontInfo(NotebookFont,Points)); W->SetColorAndOpacity(Color);
 		W->SetJustification(Align); W->SetShadowOffset(FVector2D::ZeroVector);
 	};
-	auto Label=[&](const FText& Text,FVector2D P,FVector2D S,int32 Points=32,FLinearColor Color=Ink,ETextJustify::Type Align=ETextJustify::Left)
+	auto Label=[&](const FText& Text,FVector2D P,FVector2D S,int32 Points=32,FLinearColor Color=LessonInk,ETextJustify::Type Align=ETextJustify::Left)
 	{
 		UTextBlock* W=WidgetTree->ConstructWidget<UTextBlock>(); W->SetText(Text);
 		StyleText(W,Points,Color,Align); Place(W,P,S); return W;
@@ -206,8 +206,8 @@ void ULessonEndScreenWidget::BuildNotebookLayout()
 	UImage* Surface=WidgetTree->ConstructWidget<UImage>(); Surface->SetBrushFromTexture(NotebookTexture);
 	Surface->SetVisibility(ESlateVisibility::HitTestInvisible); Place(Surface,{0,0},{1600,1000},0);
 	Image(Face(false),{500,5},{600,110});
-	StyleText(ResultText,56,Ink,ETextJustify::Center); Place(ResultText,{550,18},{500,80},2);
-	StyleText(LessonText,34,Ink,ETextJustify::Center); Place(LessonText,{850,130},{540,75});
+	StyleText(ResultText,56,LessonInk,ETextJustify::Center); Place(ResultText,{550,18},{500,80},2);
+	StyleText(LessonText,34,LessonInk,ETextJustify::Center); Place(LessonText,{850,130},{540,75});
 	LessonText->SetAutoWrapText(true);
 	const FText Labels[]={LOCTEXT("TimeLabel","Time"),LOCTEXT("CompletionLabel","Completion"),
 		LOCTEXT("HintsLabel","Hints"),LOCTEXT("LessonHintLabel","Lesson Hint"),LOCTEXT("TotalLabel","Total")};
@@ -216,7 +216,7 @@ void ULessonEndScreenWidget::BuildNotebookLayout()
 	{
 		const float Y=245.f+I*72.f+(I==4?20.f:0.f);
 		Label(Labels[I],{280,Y},{330,65},I==4?42:34);
-		StyleText(Values[I],I==4?46:38,I==1||I==4?Sage:Ink,ETextJustify::Right);
+		StyleText(Values[I],I==4?46:38,I==1||I==4?LessonSage:LessonInk,ETextJustify::Right);
 		Place(Values[I],{620,Y},{125,65});
 		if (I<4) Image(FSlateRoundedBoxBrush(FLinearColor(.44f,.28f,.10f,I==3?.6f:.18f),0.f),{275,Y+66},{480,I==3?2.f:1.f});
 	}
@@ -226,12 +226,12 @@ void ULessonEndScreenWidget::BuildNotebookLayout()
 	}
 	if (NoteText)
 	{
-		StyleText(NoteText,22,Ink); NoteText->SetAutoWrapText(true); NoteText->SetWrapTextAt(410);
+		StyleText(NoteText,22,LessonInk); NoteText->SetAutoWrapText(true); NoteText->SetWrapTextAt(410);
 		Place(NoteText,{335,625},{410,85});
 	}
 	ResultSeal=WidgetTree->ConstructWidget<ULessonResultGlyph>(); ResultSeal->Symbol=3;
 	ResultSeal->SetVisibility(ESlateVisibility::HitTestInvisible); Place(ResultSeal,{1015,210},{210,210});
-	Label(LOCTEXT("ProgressLabel","Lesson Progress"),{880,435},{480,55},36,Ink,ETextJustify::Center);
+	Label(LOCTEXT("ProgressLabel","Lesson Progress"),{880,435},{480,55},36,LessonInk,ETextJustify::Center);
 	// Keep the frame separate: ProgressBar border padding clips its fill instead of insetting it.
 	Image(FSlateRoundedBoxBrush(FLinearColor(.80f,.75f,.61f),17.f,FLinearColor(.65f,.42f,.12f),2.f),
 		{890,500},{460,34});
@@ -249,9 +249,9 @@ void ULessonEndScreenWidget::BuildNotebookLayout()
 	StageTicks->SetVisibility(ESlateVisibility::HitTestInvisible);
 	Place(StageTicks,{895,509},{450,16},3);
 	StageTicks->SynchronizeProperties();
-	StyleText(ProgressText,30,Ink,ETextJustify::Center); Place(ProgressText,{890,545},{460,50});
+	StyleText(ProgressText,30,LessonInk,ETextJustify::Center); Place(ProgressText,{890,545},{460,50});
 	UnlockFrame=Image(Face(false),{870,620},{500,90});
-	StyleText(UnlockText,29,Sage,ETextJustify::Center); Place(UnlockText,{920,638},{400,60},2);
+	StyleText(UnlockText,29,LessonSage,ETextJustify::Center); Place(UnlockText,{920,638},{400,60},2);
 	if (UnlockText) { UnlockText->SetAutoWrapText(true); UnlockText->SetWrapTextAt(400); }
 	auto Action=[&](UButton* Button,const FText& Text,int32 Symbol,bool Primary,FVector2D Position)
 	{
@@ -265,12 +265,12 @@ void ULessonEndScreenWidget::BuildNotebookLayout()
 		UHorizontalBox* Row=WidgetTree->ConstructWidget<UHorizontalBox>();
 		USizeBox* IconSize=WidgetTree->ConstructWidget<USizeBox>(); IconSize->SetWidthOverride(30); IconSize->SetHeightOverride(30);
 		ULessonResultGlyph* Glyph=WidgetTree->ConstructWidget<ULessonResultGlyph>();
-		Glyph->Symbol=Symbol; Glyph->Color=Primary?Ivory:Sage; Glyph->SetVisibility(ESlateVisibility::HitTestInvisible);
+		Glyph->Symbol=Symbol; Glyph->Color=Primary?LessonIvory:LessonSage; Glyph->SetVisibility(ESlateVisibility::HitTestInvisible);
 		IconSize->AddChild(Glyph);
 		UHorizontalBoxSlot* IconSlot=Row->AddChildToHorizontalBox(IconSize);
 		IconSlot->SetVerticalAlignment(VAlign_Center); IconSlot->SetPadding(FMargin(0,0,12,0));
 		UTextBlock* TextWidget=WidgetTree->ConstructWidget<UTextBlock>(); TextWidget->SetText(Text);
-		StyleText(TextWidget,Symbol==0?29:32,Primary?Ivory:Ink,ETextJustify::Center);
+		StyleText(TextWidget,Symbol==0?29:32,Primary?LessonIvory:LessonInk,ETextJustify::Center);
 		Row->AddChildToHorizontalBox(TextWidget)->SetVerticalAlignment(VAlign_Center);
 		UButtonSlot* ContentSlot=CastChecked<UButtonSlot>(Button->AddChild(Row));
 		ContentSlot->SetHorizontalAlignment(HAlign_Center); ContentSlot->SetVerticalAlignment(VAlign_Center);
@@ -279,7 +279,7 @@ void ULessonEndScreenWidget::BuildNotebookLayout()
 	Action(RestartButton,LOCTEXT("RestartAction","Restart Puzzle"),0,false,{210,845});
 	Action(ReturnButton,LOCTEXT("LessonsAction","Lessons"),2,false,{610,845});
 	Action(NextPuzzleButton,LOCTEXT("NextAction","Next Puzzle"),1,true,{1010,845});
-	StyleText(NextPuzzleText,27,Ink,ETextJustify::Center); Place(NextPuzzleText,{1010,795},{380,45});
+	StyleText(NextPuzzleText,27,LessonInk,ETextJustify::Center); Place(NextPuzzleText,{1010,795},{380,45});
 }
 
 void ULessonEndScreenWidget::UpdateNotebookActions()
@@ -352,7 +352,7 @@ void ULessonEndScreenWidget::Show(UPuzzle* Puzzle, float PuzzleSeconds)
 		UCampaignTree::GetLessonDisplayName(Result.Lesson), UCampaignSubsystem::GetStageDisplayName(Result.Stage)));
 
 	ResultText->SetText(Result.bSolved ? LOCTEXT("Solved", "Success!") : LOCTEXT("Incorrect", "Incorrect"));
-	ResultText->SetColorAndOpacity(Result.bSolved ? Ink : PenaltyInk);
+	ResultText->SetColorAndOpacity(Result.bSolved ? LessonInk : PenaltyInk);
 	if (ResultSeal) ResultSeal->Symbol=Result.bSolved?3:4;
 	if (UnlockFrame) UnlockFrame->SetVisibility(ESlateVisibility::Hidden);
 
@@ -368,8 +368,8 @@ void ULessonEndScreenWidget::Show(UPuzzle* Puzzle, float PuzzleSeconds)
 	LessonHintPenaltyText->SetText(PenaltyText(LessonHintPenalty));
 	const int32 Total=Result.bSolved?Result.Score:0;
 	TotalText->SetText(Total>0 ? FText::Format(LOCTEXT("PositiveScore", "+{0}"),Total) : FText::AsNumber(Total));
-	HintPenaltyText->SetColorAndOpacity(HintPenalty<0?PenaltyInk:Ink);
-	LessonHintPenaltyText->SetColorAndOpacity(LessonHintPenalty<0?PenaltyInk:Ink);
+	HintPenaltyText->SetColorAndOpacity(HintPenalty<0?PenaltyInk:LessonInk);
+	LessonHintPenaltyText->SetColorAndOpacity(LessonHintPenalty<0?PenaltyInk:LessonInk);
 	if (NoteText)
 	{
 		NoteText->SetText(GetNoteText());

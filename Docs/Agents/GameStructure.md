@@ -36,6 +36,14 @@ functions (`GetNumStages`, `GetStageSize`, `GetMaxPoints`, ...) follow it.
 | `Happiness/UI/WBP_CampaignEndScreen` | `UI/CampaignEndScreenWidget` | Campaign end screen: Free Play scoring plus campaign progress |
 | `Happiness/UI/WBP_PauseMenu`, `WBP_ConfirmDialog`, `WBP_CellDialog`, `WBP_HelpPanel` | — | Overlays in the puzzle screen |
 
+A correctly solved puzzle celebrates before its end screen. `WBP_Happiness.RefreshPuzzle` asks the board
+(`UGamePanelWidget::PlaySolvedFireworks`) first: if it returns true, every icon bursts into confetti
+(`NS_IconFirework`) in a random order, spread evenly over `FireworksDuration` (1 s). `EndScreenDelay` (0.5 s) after
+the first burst the board fires
+`OnFireworksFinished`, bound in `WBP_Happiness`'s Construct chain to call `RefreshPuzzle` again, which then shows
+the end screen; the remaining bursts go off behind it. The burst icons stay hidden until the puzzle is no longer complete
+(restart or a new puzzle). A board with mistakes shows its end screen at once.
+
 The player controller `General/Blueprints/PC_Happiness` starts, loads and saves puzzles and holds the player's
 level and EXP (`HappinessLevel`, `HappinessExp`).
 
