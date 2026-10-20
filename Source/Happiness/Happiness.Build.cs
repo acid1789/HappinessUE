@@ -14,7 +14,7 @@ public class Happiness : ModuleRules
 		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "UMG", "Slate", "SlateCore" });
 
 		// Ads (PloxTools AdMob, a Fab plugin installed in the engine)
-		PrivateDependencyModuleNames.AddRange(new string[] { "PloxToolsAdMob", "OnlineSubsystem", "Json" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "PloxToolsAdMob", "OnlineSubsystem", "Json", "Niagara", "NiagaraUIRenderer" });
 		if (Target.Platform == UnrealTargetPlatform.Android)
 		{
 			// The ads code reads the screen's size and density from Java (FAndroidApplication)

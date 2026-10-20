@@ -1,6 +1,9 @@
 #include "HappinessMCPInputToolset.h"
 
+#include "Editor.h"
+#include "Engine/LocalPlayer.h"
 #include "Framework/Application/SlateApplication.h"
+#include "GameFramework/PlayerController.h"
 #include "Input/Events.h"
 #include "LevelEditor.h"
 #include "SLevelViewport.h"
@@ -73,4 +76,20 @@ bool UHappinessMCPInputToolset::ClickViewport(float X, float Y, const FString& B
 	SlateApplication.ProcessMouseButtonUpEvent(FPointerEvent(
 		0, 0, ScreenPosition, ScreenPosition, TSet<FKey>(), MouseButton, 0.f, Modifiers));
 	return true;
+}
+
+bool UHappinessMCPInputToolset::ExecPIECommand(const FString& Command)
+{
+	UWorld* World = GEditor ? GEditor->PlayWorld.Get() : nullptr;
+	if (!World || Command.IsEmpty())
+	{
+		return false;
+	}
+	// Through the player controller when there is one, like typing it in the game's console
+	if (APlayerController* PC = World->GetFirstPlayerController())
+	{
+		PC->ConsoleCommand(Command, true);
+		return true;
+	}
+	return GEngine->Exec(World, *Command);
 }
