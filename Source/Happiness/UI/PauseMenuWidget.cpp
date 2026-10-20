@@ -16,6 +16,9 @@
 #include "Engine/Font.h"
 #include "Engine/Texture2D.h"
 #include "Rendering/DrawElements.h"
+#include "Rendering/SlateRenderer.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Styling/CoreStyle.h"
 #include "Widgets/SLeafWidget.h"
 #include "UI/LessonEndScreenWidget.h"
 #include "UI/LessonPopupWidget.h"
@@ -59,6 +62,32 @@ namespace
 				{ const float A=I*2.f*PI/40.f; Points.Add({X+R*FMath::Cos(A),Y+R*FMath::Sin(A)}); }
 				Line(Points,Width);
 			};
+			// Filled silhouettes with a transparent edge fringe stay smooth at phone scale.
+			auto Fill=[&](const TArray<FVector2f>& Points,const TArray<SlateIndex>& Triangles)
+			{
+				TArray<FSlateVertex> Vertices;
+				TArray<SlateIndex> Indices=Triangles;
+				const int32 Count=Points.Num();
+				const FColor Solid=Glyph->Color.ToFColor(true);
+				FColor Clear=Solid; Clear.A=0;
+				const float Feather=.8f/FMath::Max(.1f,G.GetAccumulatedLayoutTransform().GetScale());
+				for(const FVector2f& Point:Points)
+					Vertices.Add(FSlateVertex::Make<ESlateVertexRounding::Disabled>(G.GetAccumulatedRenderTransform(),
+						Origin+Point*Scale,FVector2f(.5f,.5f),Solid));
+				for(int32 I=0;I<Count;++I)
+				{
+					const FVector2f Before=(Points[I]-Points[(I+Count-1)%Count]).GetSafeNormal();
+					const FVector2f After=(Points[(I+1)%Count]-Points[I]).GetSafeNormal();
+					const FVector2f N1(Before.Y,-Before.X),N2(After.Y,-After.X);
+					const FVector2f Normal=(N1+N2).GetSafeNormal();
+					const FVector2f Outer=Origin+Points[I]*Scale+Normal*Feather/FMath::Max(.3f,FVector2f::DotProduct(Normal,N2));
+					Vertices.Add(FSlateVertex::Make<ESlateVertexRounding::Disabled>(G.GetAccumulatedRenderTransform(),Outer,FVector2f(.5f,.5f),Clear));
+					const SlateIndex A=I,B=(I+1)%Count;
+					Indices.Append({A,B,SlateIndex(B+Count),A,SlateIndex(B+Count),SlateIndex(A+Count)});
+				}
+				const FSlateResourceHandle Resource=FSlateApplication::Get().GetRenderer()->GetResourceHandle(*FCoreStyle::Get().GetBrush(TEXT("WhiteBrush")));
+				FSlateDrawElement::MakeCustomVerts(E,Layer,Resource,Vertices,Indices,nullptr,0,0);
+			};
 			switch(Glyph->Symbol)
 			{
 			case 0: Circle(16,16,12); Line({{16,7},{16,16},{22,19}},2.5f); break;
@@ -77,12 +106,12 @@ namespace
 						{16+13*FMath::Cos(A),16+13*FMath::Sin(A)}},5.f);
 				} break;
 			case 4:
-				Line({{3,15},{16,4},{29,15}},3.f);
-				Line({{7,13},{7,28},{13,28},{13,19},{19,19},{19,28},{25,28},{25,13}},3.f); break;
-			default:
-				Line({{16,4},{5,4},{5,28},{16,28}},2.5f);
-				Line({{16,4},{19,7},{19,25},{16,28}},2.5f);
-				Line({{13,16},{29,16},{24,11}},2.5f); Line({{29,16},{24,21}},2.5f); break;
+				Fill({{3,14},{16,3},{29,14},{24,14},{24,28},{19,28},{19,20},{13,20},{13,28},{8,28},{8,14}},{10,0,1,1,2,3,10,1,3,3,4,5,3,5,6,10,3,6,10,6,7,10,7,8,8,9,10}); break;
+			case 5:
+				Fill({{4,4},{17,4},{17,7},{7,7},{7,25},{17,25},{17,28},{4,28}},{0,1,2,0,2,3,7,0,3,7,3,4,7,4,5,5,6,7});
+				Fill({{13,14},{24,14},{24,10},{31,16},{24,22},{24,18},{13,18}},{6,0,1,1,2,3,6,1,3,3,4,5,3,5,6}); break;
+			case 8:
+				Fill({{8,4},{28,16},{8,28}},{0,1,2}); break;
 			}
 			return Layer;
 		}
@@ -153,7 +182,7 @@ void UPauseMenuWidget::BuildGardenLayout()
 		FSlateBrush Brush; Brush.DrawAs=ESlateBrushDrawType::Image;
 		Brush.SetResourceObject(Style==2?QuitTexture:ButtonTexture);
 		if(Style==2) Brush.SetUVRegion(FBox2f(FVector2f(.024f,.19f),FVector2f(.976f,.782f)));
-		else Brush.SetUVRegion(FBox2f(FVector2f(.03f,Style==1?.54f:.06f),FVector2f(.98f,Style==1?.963f:.485f)));
+		else Brush.SetUVRegion(FBox2f(FVector2f(.03f,Style==1?.50f:.06f),FVector2f(.98f,Style==1?.985f:.485f)));
 		return Brush;
 	};
 	auto Image=[&](FSlateBrush Brush,FVector2D Position,FVector2D Extent,int32 Z=1)
@@ -202,8 +231,8 @@ void UPauseMenuWidget::BuildGardenLayout()
 		UWidget* Icon=nullptr;
 		if(Symbol==6)
 		{ ULessonResultGlyph* Glyph=WidgetTree->ConstructWidget<ULessonResultGlyph>(); Glyph->Symbol=0; Glyph->Color=Color; Icon=Glyph; }
-		else if(Symbol==7 || Symbol==8)
-		{ ULessonPopupGlyph* Glyph=WidgetTree->ConstructWidget<ULessonPopupGlyph>(); Glyph->Symbol=Symbol==7?0:1; Glyph->Color=Color; Icon=Glyph; }
+		else if(Symbol==7)
+		{ ULessonPopupGlyph* Glyph=WidgetTree->ConstructWidget<ULessonPopupGlyph>(); Glyph->Symbol=0; Glyph->Color=Color; Icon=Glyph; }
 		else
 		{ UPauseMenuGlyph* Glyph=WidgetTree->ConstructWidget<UPauseMenuGlyph>(); Glyph->Symbol=Symbol; Glyph->Color=Color; Icon=Glyph; }
 		Icon->SetVisibility(ESlateVisibility::HitTestInvisible); IconSize->AddChild(Icon);
