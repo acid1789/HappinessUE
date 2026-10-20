@@ -15,9 +15,28 @@ class UImage;
 class ULessonProgressTicks;
 class ULessonPopupWidget;
 class UCampaignSubsystem;
+class UCanvasPanel;
+class USizeBox;
+class UTexture2D;
+class UFont;
+class ULessonClueDiagram;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnLessonStageChosen, ECampaignLesson, Lesson, int32, Stage);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnLessonPopupClosed);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnLessonLearnMoreRequested, ECampaignLesson, Lesson);
+
+/** Small line-art symbols used by the notebook's live action buttons. */
+UCLASS()
+class HAPPINESS_API ULessonPopupGlyph : public UWidget
+{
+	GENERATED_BODY()
+public:
+	int32 Symbol = 0;
+	FLinearColor Color = FLinearColor::White;
+
+protected:
+	virtual TSharedRef<SWidget> RebuildWidget() override;
+};
 
 /** Routes one stage button's click to the popup (UButton::OnClicked has no parameters) */
 UCLASS()
@@ -114,6 +133,13 @@ public:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> CloseLabel;
 
+	UPROPERTY(BlueprintReadOnly, Transient, Category = "Lesson Popup")
+	TObjectPtr<UButton> LearnMoreButton;
+
+	/** Future rules navigation receives the clue belonging to this notebook. */
+	UPROPERTY(BlueprintAssignable, Category = "Lesson Popup")
+	FOnLessonLearnMoreRequested OnLearnMoreRequested;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lesson Popup")
 	FVector2D StageButtonSize = FVector2D(150.f, 60.f);
 
@@ -180,10 +206,18 @@ private:
 	void HandleCloseClicked();
 
 	UFUNCTION()
+	void HandleLearnMoreClicked();
+
+	UFUNCTION()
 	void HandleProgressChanged();
 
 	UCampaignSubsystem* GetCampaign() const;
 	void BuildStageButtons();
+	void BuildNotebookLayout();
+	void UpdateNotebookLayout();
+	void StyleStage(UButton* Button, int32 Stage, bool bUnlocked, bool bCurrent, bool bCompleted);
+	FButtonStyle NotebookButtonStyle(bool bPrimary) const;
+	void AddActionContent(UButton* Button, UTextBlock* Label, int32 Symbol, bool bPrimary);
 	UButton* AddStageButton(UPanelWidget* Box, int32 Stage, const FText& Name, float Width, float Spacing);
 
 	/** Master Mode is open and revealed for the shown clue: the bar, text and Play button follow it */
@@ -207,6 +241,36 @@ private:
 	void HideEraser();
 
 	ECampaignLesson Lesson = ECampaignLesson::VerticalTwo;
+
+	UPROPERTY()
+	TObjectPtr<UTexture2D> NotebookTexture;
+
+	UPROPERTY()
+	TObjectPtr<UTexture2D> NotebookButtonTexture;
+
+	UPROPERTY()
+	TObjectPtr<UTexture2D> NotebookLockTexture;
+
+	UPROPERTY()
+	TObjectPtr<UFont> NotebookFont;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UCanvasPanel> NotebookCanvas;
+
+	UPROPERTY(Transient)
+	TObjectPtr<USizeBox> NotebookSize;
+
+	UPROPERTY(Transient)
+	TObjectPtr<ULessonClueDiagram> NotebookDiagram;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UTextBlock>> StageLabels;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UWidget>> StageChecks;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UImage>> StageLocks;
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UButton>> StageButtons;
