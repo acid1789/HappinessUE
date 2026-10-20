@@ -25,11 +25,14 @@
 #include "Engine/Font.h"
 #include "Framework/Application/SlateApplication.h"
 #include "InputCoreTypes.h"
+#include "Kismet/GameplayStatics.h"
 #include "Rendering/DrawElements.h"
 #include "Rendering/SlateRenderer.h"
+#include "Sound/SoundBase.h"
 #include "Styling/CoreStyle.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Widgets/SLeafWidget.h"
+
 
 namespace
 {
@@ -118,12 +121,17 @@ namespace
     class SLessonCompletionBadge : public SLeafWidget
     {
     public:
-        SLATE_BEGIN_ARGS(SLessonCompletionBadge) {} SLATE_END_ARGS()
-        void Construct(const FArguments&) {}
+        SLATE_BEGIN_ARGS(SLessonCompletionBadge) {}
+        SLATE_ARGUMENT(TWeakObjectPtr<ULessonCompletionBadge>, Owner)
+        SLATE_END_ARGS()
+        void Construct(const FArguments& Args) { Owner = Args._Owner; }
         virtual FVector2D ComputeDesiredSize(float) const override { return FVector2D(52,52); }
         virtual int32 OnPaint(const FPaintArgs&,const FGeometry& G,const FSlateRect&,FSlateWindowElementList& E,
                              int32 Layer,const FWidgetStyle&,bool) const override
         {
+            const ULessonCompletionBadge* Badge=Owner.Get();
+            const float Shimmer=Badge ? Badge->Shimmer : -1.f;
+            const float Glow=Badge ? Badge->Glow : 0.f;
             const FVector2f Center(26,26);
             auto Disc=[&](float Radius,FLinearColor Color,int32 Offset)
             {
@@ -132,18 +140,60 @@ namespace
                     G.ToPaintGeometry(FVector2f(Radius*2),FSlateLayoutTransform(Center-FVector2f(Radius))),
                     &Brush,ESlateDrawEffect::None,Color);
             };
-            Disc(25,FLinearColor(.008f,.018f,.035f,.72f),0);
-            Disc(23,FLinearColor(.94f,.62f,.15f),1);
-            Disc(20,FLinearColor(1.f,.96f,.81f),2);
-            Disc(17,FLinearColor(.025f,.075f,.15f),3);
-            Disc(14,FLinearColor(.055f,.20f,.38f),4);
+            if (Glow>0.f)
+            {
+                Disc(25.f+12.f*Glow,FLinearColor(1.f,.84f,.40f,.22f*Glow),0);
+                Disc(25.f+6.f*Glow,FLinearColor(1.f,.90f,.56f,.32f*Glow),0);
+            }
+            Disc(25,FLinearColor(.008f,.018f,.035f,.72f),1);
+            Disc(23,FLinearColor(.94f,.62f,.15f),2);
+            Disc(20,FLinearColor(1.f,.96f,.81f),3);
+            Disc(17,FLinearColor(.025f,.075f,.15f),4);
+            Disc(14,FLinearColor(.055f,.20f,.38f),5);
+            // The shimmer: a soft diagonal band of light, made of chords of the seal, sweeping from top left to bottom right
+            const FVector2f Across(.7071f,.7071f), Along(.7071f,-.7071f);
+            const float BandAt=FMath::Lerp(-34.f,34.f,Shimmer);
+            if (Shimmer>=0.f)
+            {
+                for (int32 K=-7;K<=7;++K)
+                {
+                    const float Offset=BandAt+K*1.5f, Radius=22.5f;
+                    if (FMath::Abs(Offset)>=Radius)
+                        continue;
+                    const float Half=FMath::Sqrt(Radius*Radius-Offset*Offset);
+                    const FVector2f Mid=Center+Across*Offset;
+                    TArray<FVector2f> Chord={Mid-Along*Half,Mid+Along*Half};
+                    FSlateDrawElement::MakeLines(E,Layer+6,G.ToPaintGeometry(),Chord,ESlateDrawEffect::None,
+                        FLinearColor(1.f,.97f,.86f,.42f*FMath::Exp(-FMath::Square(K/3.5f))),true,1.8f);
+                }
+            }
             TArray<FVector2f> Check={FVector2f(14,26),FVector2f(21,33),FVector2f(37,16)};
-            FSlateDrawElement::MakeLines(E,Layer+5,G.ToPaintGeometry(),Check,ESlateDrawEffect::None,
+            FSlateDrawElement::MakeLines(E,Layer+7,G.ToPaintGeometry(),Check,ESlateDrawEffect::None,
                 FLinearColor(.008f,.025f,.055f),true,5.4f);
-            FSlateDrawElement::MakeLines(E,Layer+6,G.ToPaintGeometry(),Check,ESlateDrawEffect::None,
+            FSlateDrawElement::MakeLines(E,Layer+8,G.ToPaintGeometry(),Check,ESlateDrawEffect::None,
                 FLinearColor(1.f,.99f,.88f),true,3.5f);
-            return Layer+6;
+            if (Shimmer>=0.f)
+            {
+                // Where the band crosses the check, it shines
+                TArray<FVector2f> Points;
+                TArray<FLinearColor> Colors;
+                for (int32 Segment=0;Segment<2;++Segment)
+                {
+                    for (int32 I=Segment==0 ? 0 : 1;I<=12;++I)
+                    {
+                        const FVector2f P=FMath::Lerp(Check[Segment],Check[Segment+1],I/12.f);
+                        Points.Add(P);
+                        const float Distance=FVector2f::DotProduct(P-Center,Across)-BandAt;
+                        Colors.Add(FLinearColor(1.f,1.f,1.f,FMath::Exp(-FMath::Square(Distance/5.f))));
+                    }
+                }
+                FSlateDrawElement::MakeLines(E,Layer+9,G.ToPaintGeometry(),Points,Colors,ESlateDrawEffect::None,
+                    FLinearColor::White,true,5.f);
+            }
+            return Layer+9;
         }
+    private:
+        TWeakObjectPtr<ULessonCompletionBadge> Owner;
     };
 
 	// Abstract lesson diagrams use the same three entities throughout: circle, square, triangle.
@@ -419,7 +469,7 @@ TSharedRef<SWidget> ULessonMedallion::RebuildWidget()
 
 TSharedRef<SWidget> ULessonCompletionBadge::RebuildWidget()
 {
-    return SNew(SLessonCompletionBadge);
+    return SNew(SLessonCompletionBadge).Owner(this);
 }
 
 TSharedRef<SWidget> ULessonClueDiagram::RebuildWidget()
@@ -466,6 +516,8 @@ UCampaignTreeWidget::UCampaignTreeWidget(const FObjectInitializer& ObjectInitial
 	GroupBadgeTexture = Badge.Object;
 	StatusPlaqueTexture = Plaque.Object;
 	ViewportFrameTexture = Frame.Object;
+	static ConstructorHelpers::FObjectFinder<USoundBase> Check(TEXT("/Game/General/Audio/Cues/Happiness.Happiness"));
+	CheckSound = Check.Object;
 	// Retain the public style properties for existing Blueprint references.
 	NodeStyle = GetDefault<UButton>()->GetStyle();
 
@@ -515,8 +567,19 @@ void UCampaignTreeWidget::ShowForLessonSession()
 	LoadProgress();
 	SetVisibility(ESlateVisibility::Visible);
 
-	const UCampaignSubsystem* Campaign =
+	UCampaignSubsystem* Campaign =
 		GetGameInstance() ? GetGameInstance()->GetSubsystem<UCampaignSubsystem>() : nullptr;
+	ECampaignLesson Completed;
+	if (Campaign && Campaign->ConsumeLessonCompletion(Completed) && IsLessonCompleted(Completed))
+	{
+		// Back from the lesson's final: the lesson is done, so instead of its popup the tree celebrates it
+		if (LessonPopup)
+		{
+			LessonPopup->SetVisibility(ESlateVisibility::Collapsed);
+		}
+		StartCelebration(Completed);
+		return;
+	}
 	if (LessonPopup && Campaign && Campaign->IsInLessonSession())
 	{
 		// Reopened after a puzzle, not by the player: a newly unlocked Master Mode stays hidden
@@ -560,6 +623,10 @@ void UCampaignTreeWidget::SetVisibility(ESlateVisibility InVisibility)
 		bCenterCurrentColumn = true;
 	}
 	Super::SetVisibility(InVisibility);
+	if (InVisibility == ESlateVisibility::Collapsed || InVisibility == ESlateVisibility::Hidden)
+	{
+		EndCelebration();
+	}
 }
 
 void UCampaignTreeWidget::Close()
@@ -786,7 +853,8 @@ void UCampaignTreeWidget::RefreshNodeStates()
 	for (int32 I = 0; I < NodeButtons.Num(); ++I)
 	{
 		const auto L = NodeLessons[I];
-		const bool bCompleted = IsLessonCompleted(L), bUnlocked = IsLessonUnlocked(L);
+		const bool bCompleted = IsLessonShownCompleted(L);
+		const bool bUnlocked = UCampaignTree::GetLessonColumn(L) <= GetShownColumn();
 		NodeButtons[I]->SetIsEnabled(bUnlocked);
 		NodeButtons[I]->SetBackgroundColor(FLinearColor::White);
 		NodeButtons[I]->SetToolTipText(
@@ -810,10 +878,11 @@ void UCampaignTreeWidget::RefreshNodeStates()
 	{
 		int32 Count = 0;
 		for (auto L : Columns[C])
-			Count += IsLessonCompleted(L) ? 1 : 0;
-		const bool bCurrent = C == GetCurrentColumn();
+			Count += IsLessonShownCompleted(L) ? 1 : 0;
+		const bool bCurrent = C == GetShownColumn();
 		ColumnStatusPanels[C]->SetVisibility(bCurrent ? ESlateVisibility::HitTestInvisible
 													  : ESlateVisibility::Collapsed);
+		ColumnStatusPanels[C]->SetRenderOpacity(1.f);
 		const FText CountText = FText::Format(NSLOCTEXT("Lessons", "GroupCompletion", "{0} / {1} complete"),
 											  FText::AsNumber(Count), FText::AsNumber(Columns[C].Num()));
 		ColumnStatusLabels[C]->SetText(CountText);
@@ -849,7 +918,7 @@ FReply UCampaignTreeWidget::NativeOnPreviewMouseButtonDown(const FGeometry& G, c
 	bDraggingTree = false;
 	bPanCandidate = Event.GetEffectingButton() == EKeys::LeftMouseButton && TreeScroll &&
 					TreeScroll->GetCachedGeometry().IsUnderLocation(Event.GetScreenSpacePosition()) &&
-					(!LessonPopup || !LessonPopup->IsVisible());
+					(!LessonPopup || !LessonPopup->IsVisible()) && !IsCelebrating();
 	if (bPanCandidate)
 	{
 		PanStart = Event.GetScreenSpacePosition();
@@ -906,9 +975,10 @@ void UCampaignTreeWidget::NativeTick(const FGeometry& G, float Delta)
 	{
 		const float End = FMath::Max(0.f, ContentWidth - Width);
 		TreeScroll->SetScrollOffset(
-			FMath::Clamp((GetCurrentColumn() + .5f) * LessonColumnSpacing - Width * .5f, 0.f, End));
+			FMath::Clamp((GetShownColumn() + .5f) * LessonColumnSpacing - Width * .5f, 0.f, End));
 		bCenterCurrentColumn = false;
 	}
+	UpdateCelebration(Delta, Width, FMath::Max(0.f, ContentWidth - Width));
 	if (bPanCandidate && FSlateApplication::IsInitialized())
 	{
 		auto& Slate = FSlateApplication::Get();
@@ -974,9 +1044,149 @@ bool UCampaignTreeWidget::IsLessonUnlocked(ECampaignLesson Lesson) const
 	return true;
 }
 
+bool UCampaignTreeWidget::IsLessonShownCompleted(ECampaignLesson Lesson) const
+{
+	return IsLessonCompleted(Lesson) && !(IsCelebrating() && Lesson == CelebrationLesson && !bCelebrationCheckShown);
+}
+
+int32 UCampaignTreeWidget::GetShownColumn() const
+{
+	return IsCelebrating() ? CelebrationFromColumn : GetCurrentColumn();
+}
+
+void UCampaignTreeWidget::StartCelebration(ECampaignLesson Lesson)
+{
+	EndCelebration();
+	const int32 Column = UCampaignTree::GetLessonColumn(Lesson);
+	if (Column == INDEX_NONE || !NodeLessons.Contains(Lesson))
+	{
+		return;
+	}
+	CelebrationLesson = Lesson;
+	CelebrationFromColumn = Column;
+	// The group the glow moves on to: the next one, if this lesson completed its group
+	CelebrationToColumn = FMath::Max(Column, GetCurrentColumn());
+	CelebrationTime = 0.f;
+	bCelebrationCheckShown = false;
+	bCelebrationMoving = false;
+	GlowMove = 0.f;
+	// Shown as before the lesson was completed, centered on its group
+	RefreshNodeStates();
+}
+
+void UCampaignTreeWidget::UpdateCelebration(float DeltaTime, float ViewportWidth, float ScrollEnd)
+{
+	if (!IsCelebrating())
+	{
+		return;
+	}
+	CelebrationTime += DeltaTime;
+	const int32 Index = NodeLessons.IndexOfByKey(CelebrationLesson);
+	ULessonCompletionBadge* Badge = CompletionBadges.IsValidIndex(Index) ? CompletionBadges[Index].Get() : nullptr;
+
+	// The check pops in: from small it grows past its size, then springs back and settles, a shimmer sweeping across
+	const float CheckTime = (CelebrationTime - CheckDelay) / FMath::Max(CheckDuration, .01f);
+	if (CheckTime >= 0.f && !bCelebrationCheckShown)
+	{
+		bCelebrationCheckShown = true;
+		RefreshNodeStates();
+		if (CheckSound)
+		{
+			UGameplayStatics::PlaySound2D(this, CheckSound, 1.f, 1.f, 0.f, nullptr, nullptr, true);
+		}
+	}
+	if (Badge && CheckTime >= 0.f)
+	{
+		const float T = FMath::Min(CheckTime, 1.f);
+		constexpr float Grow = .45f;
+		float Scale;
+		if (T < Grow)
+		{
+			Scale = FMath::Lerp(CheckStartScale, CheckPeakScale, 1.f - FMath::Pow(1.f - T / Grow, 3.f));
+		}
+		else
+		{
+			const float Settle = (T - Grow) / (1.f - Grow);
+			Scale = 1.f + (CheckPeakScale - 1.f) * FMath::Cos(1.5f * PI * Settle) * FMath::Exp(-4.f * Settle);
+		}
+		Badge->SetRenderScale(FVector2D(T < 1.f ? Scale : 1.f));
+		Badge->SetRenderOpacity(FMath::Clamp(T / .12f, 0.f, 1.f));
+		Badge->Shimmer = T < 1.f && T >= .3f ? (T - .3f) / .7f : -1.f;
+		Badge->Glow = T < 1.f ? FMath::Sin(PI * T) : 0.f;
+		if (const TSharedPtr<SWidget> Slate = Badge->GetCachedWidget())
+		{
+			Slate->Invalidate(EInvalidateWidgetReason::Paint);
+		}
+	}
+	if (CheckTime < 1.f)
+	{
+		return;
+	}
+	if (CelebrationToColumn == CelebrationFromColumn)
+	{
+		EndCelebration();
+		return;
+	}
+
+	// The group's complete: its glow moves on to the next group, and the tree scrolls to center it
+	const float MoveTime = (CelebrationTime - CheckDelay - CheckDuration - GlowMoveDelay) / FMath::Max(GlowMoveDuration, .01f);
+	if (MoveTime < 0.f || !TreeScroll)
+	{
+		return;
+	}
+	if (!bCelebrationMoving)
+	{
+		bCelebrationMoving = true;
+		CelebrationScrollFrom = TreeScroll->GetScrollOffset();
+		CelebrationScrollTo =
+			FMath::Clamp((CelebrationToColumn + .5f) * LessonColumnSpacing - ViewportWidth * .5f, 0.f, ScrollEnd);
+	}
+	const float T = FMath::Min(MoveTime, 1.f);
+	GlowMove = FMath::InterpEaseInOut(0.f, 1.f, T, 2.f);
+	TreeScroll->SetScrollOffset(FMath::Lerp(CelebrationScrollFrom, CelebrationScrollTo, GlowMove));
+	// The plaque fades out under the old group and in under the new one
+	if (ColumnStatusPanels.IsValidIndex(CelebrationFromColumn) && ColumnStatusPanels.IsValidIndex(CelebrationToColumn))
+	{
+		ColumnStatusPanels[CelebrationFromColumn]->SetRenderOpacity(FMath::Clamp(1.f - 2.f * T, 0.f, 1.f));
+		ColumnStatusPanels[CelebrationToColumn]->SetVisibility(ESlateVisibility::HitTestInvisible);
+		ColumnStatusPanels[CelebrationToColumn]->SetRenderOpacity(FMath::Clamp(2.f * T - 1.f, 0.f, 1.f));
+	}
+	if (Lines)
+	{
+		if (const TSharedPtr<SWidget> Slate = Lines->GetCachedWidget())
+		{
+			Slate->Invalidate(EInvalidateWidgetReason::Paint);
+		}
+	}
+	if (MoveTime >= 1.f)
+	{
+		// The glow's arrived: the new group unlocks
+		EndCelebration();
+	}
+}
+
+void UCampaignTreeWidget::EndCelebration()
+{
+	if (!IsCelebrating())
+	{
+		return;
+	}
+	const int32 Index = NodeLessons.IndexOfByKey(CelebrationLesson);
+	if (ULessonCompletionBadge* Badge = CompletionBadges.IsValidIndex(Index) ? CompletionBadges[Index].Get() : nullptr)
+	{
+		Badge->SetRenderScale(FVector2D(1.f));
+		Badge->SetRenderOpacity(1.f);
+		Badge->Shimmer = -1.f;
+		Badge->Glow = 0.f;
+	}
+	CelebrationTime = -1.f;
+	GlowMove = 0.f;
+	RefreshNodeStates();
+}
+
 void UCampaignTreeWidget::NotifyNodeClicked(ECampaignLesson Lesson)
 {
-	if (!bDraggingTree && IsLessonUnlocked(Lesson))
+	if (!bDraggingTree && !IsCelebrating() && IsLessonUnlocked(Lesson))
 	{
 		if (LessonPopup)
 		{
@@ -1021,16 +1231,32 @@ int32 UCampaignTreeWidget::PaintConnectors(const FGeometry& AllottedGeometry, FS
 
 	const FPaintGeometry PaintGeometry = AllottedGeometry.ToPaintGeometry();
     const TArray<TArray<ECampaignLesson>>& Columns = UCampaignTree::GetColumns();
-    const int32 ActiveColumn=FMath::Clamp(GetCurrentColumn(),0,Columns.Num()-1);
-    FNodeEdges ActiveEdges;
-    if (!Columns.IsEmpty() && !Columns[ActiveColumn].IsEmpty() && GetEdges(Columns[ActiveColumn][0],ActiveEdges))
+    // The halo's center and height around a group's stack and completion plaque
+    auto GroupHalo=[&](int32 Column,FVector2f& OutCenter,float& OutHeight)
     {
-        const int32 LessonCount=Columns[ActiveColumn].Num();
+        Column=FMath::Clamp(Column,0,Columns.Num()-1);
+        FNodeEdges Edges;
+        if (Columns.IsEmpty() || Columns[Column].IsEmpty() || !GetEdges(Columns[Column][0],Edges))
+            return false;
+        const int32 LessonCount=Columns[Column].Num();
         const float FirstNodeY=64.f+(3-LessonCount)*127.f;
         const float GroupTop=FirstNodeY-66.f;
         const float GroupBottom=FirstNodeY+(LessonCount-1)*254.f+314.f;
-        const FVector2f Center((ActiveEdges.Left.X+ActiveEdges.Right.X)*.5f,(GroupTop+GroupBottom)*.5f);
-        const float GroupHeight=GroupBottom-GroupTop;
+        OutCenter=FVector2f((Edges.Left.X+Edges.Right.X)*.5f,(GroupTop+GroupBottom)*.5f);
+        OutHeight=GroupBottom-GroupTop;
+        return true;
+    };
+    FVector2f Center, ToCenter;
+    float GroupHeight, ToHeight;
+    const bool bGlowMoving=IsCelebrating() && GlowMove>0.f;
+    if (GroupHalo(bGlowMoving ? CelebrationFromColumn : GetShownColumn(),Center,GroupHeight))
+    {
+        // While the glow moves on to the next group, it slides across and fits itself to that group
+        if (bGlowMoving && GroupHalo(CelebrationToColumn,ToCenter,ToHeight))
+        {
+            Center=FMath::Lerp(Center,ToCenter,GlowMove);
+            GroupHeight=FMath::Lerp(GroupHeight,ToHeight,GlowMove);
+        }
         // A compact sage halo follows this group's actual lesson stack and completion plaque.
         for(int32 Ring=0;Ring<12;++Ring)
         {

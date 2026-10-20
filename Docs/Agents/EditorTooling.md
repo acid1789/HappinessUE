@@ -79,7 +79,7 @@ checkout's editor or a recorded tool process is running. Never reclaim merely be
 ## File locks
 
 Each checkout has its own copy of every file, and git can't merge two checkouts' edits to the same `.uasset`.
-So before changing a file, lock it. Locks live in the same gate database and are shared by every checkout;
+So before changing an asset, lock it. Text files (source, docs, config) merge like any code: don't lock them. Locks live in the same gate database and are shared by every checkout;
 each is held by one agent identity.
 
 ```bash
@@ -96,8 +96,7 @@ python Tools/editor_gate.py unlock /Game/Happiness/UI/WBP_Happiness
   unless the tool only reads (names starting `get`/`find`/`read`/`list`/`describe`/`search`/`query`/`is`, plus
   `RenderWidget` and the PIE tools). An import (`folder_path` + `asset_name`) needs the lock on the new asset.
   `umg.py` refuses commands that change a widget unless you hold the lock on the current
-  `set_target_umg_asset` target; reading the tree and querying properties are free. Other files (source,
-  docs) aren't enforced: lock them when another agent might edit them too.
+  `set_target_umg_asset` target; reading the tree and querying properties are free.
 - **Keep the lock until your change is shared.** `unlock` refuses while the file has uncommitted or unpushed
   changes in your checkout, so the next agent never edits a stale copy. The user commits; unlock after the
   commit is pushed. `unlock --force` drops a lock regardless (for an abandoned change you've reverted).
@@ -241,6 +240,15 @@ unexplained hints. Difficulty: 0 easy, 1 normal, 2 hard. Sizes 3–8.
 
 - PIE console (`~`) command `Happiness.CompleteAllLessons` marks every lesson complete, which unlocks Campaign
   mode. Development builds only.
+- `Happiness.Lessons.*` set lesson progress in the current mode (the full list and arguments are at the top of
+  `Source/Happiness/HappinessClassic/CampaignDebugCommands.cpp`): `List`, `Reset`, `Clear <Lesson>`,
+  `Points <Lesson> <N>`, `Stage <Lesson> <Stage>`, `ToFinal [Lesson]`, `Complete [Lesson]`, `ToColumn <Column>`.
+  A lesson is its enum name (`NextTo`) or number; left out, the first unfinished one. `Complete` with the lessons
+  screen open plays the completion animation, as if back from its final. They save the progress: back up
+  `Saved/SaveGames/HappinessSave.sav` first if it matters. Development builds only.
+- To see a fast UI animation, slow it on the live PIE widget (`ObjectTools.set_properties` on its transient path
+  from `obj list class=<Class>`) and take screenshots with the PIE console command `shot showui`: full
+  resolution, in `Saved/Screenshots/WindowsEditor/`, far faster than `CaptureEditorImage` (~3.5 s per call).
 - `Happiness.SolvePuzzle` fills the open puzzle with its solution and finishes it as if the player had: the
   end screen, scoring, progress and save all run normally. Development builds only.
 
@@ -262,7 +270,7 @@ python Tools/mcp_call.py $A StopPIE '{}'
 - **`ExecPIECommand`** runs a console command in the PIE world, as if typed in the game's console (`~`): the game's
   dev commands, engine commands (`slomo 0.5`, `stat fps`), console variables (`Happiness.PreviewAdLayout 1`) and
   log verbosity (`log LogTemp Verbose`). It returns false when PIE isn't running.
-- **The game's dev commands** (development builds only): `Happiness.SolvePuzzle`, `Happiness.CompleteAllLessons`,
+- **The game's dev commands** (development builds only): `Happiness.SolvePuzzle`, `Happiness.CompleteAllLessons`, `Happiness.Lessons.*`,
   `Happiness.DailyDate`, `Happiness.ResetDaily`, `Happiness.PreviewAdLayout`, `Happiness.Ads`,
   `Happiness.LargeBanner`, `Happiness.RemoveAdsToken`, `Happiness.TestAd`. Find them all with
   `grep -rhn 'TEXT("Happiness\.' Source/Happiness`.

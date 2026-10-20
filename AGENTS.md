@@ -21,12 +21,12 @@ Keep it true: when you learn something that would have saved you time, add it he
 1. **Never modify the engine.** `E:\HappinessUE\Engine` is a symlink to Epic's installed engine
    (`E:\UE4\UE_5.8\Engine`). Anything under it is Epic's. Project tooling belongs in `Plugins/` or `Tools/`.
 2. **Don't commit.** The user reviews and commits their own changes.
-3. **Lock a file before changing it.** Each checkout has its own copy of every file, and git can't merge two
-   checkouts' edits to the same `.uasset`. Before changing an asset (or any file another agent might edit),
-   run `python Tools/editor_gate.py lock <path> --task "..."`; if another agent holds it, pick other work
+3. **Lock an asset before changing it.** Each checkout has its own copy of every file, and git can't merge two
+   checkouts' edits to the same `.uasset`. Before changing an asset, run `python Tools/editor_gate.py lock <path> --task "..."`; if another agent holds it, pick other work
    or ask the user. The editor tools refuse to change an asset you haven't locked. Keep the lock until the
    user has committed and pushed your change (`unlock` refuses before that), and pull before locking a file
    that changed upstream. `.uasset` files are binary: change them only through the editor, never as files.
+   Text files (source, docs, config) merge, so they need no lock.
    See [EditorTooling.md](Docs/Agents/EditorTooling.md#file-locks).
 4. **Each checkout runs its own editor; one owner per editor.** Agents in different checkouts work at the
    same time, each in its own editor with its own MCP port. Set `HAPPINESS_AGENT_ID` to your unique session

@@ -18,6 +18,7 @@ class UTextBlock;
 class UProgressBar;
 class UTexture2D;
 class UFont;
+class USoundBase;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCampaignLessonSelected, ECampaignLesson, Lesson);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCampaignTreeClosed);
@@ -64,6 +65,10 @@ class HAPPINESS_API ULessonCompletionBadge : public UWidget
     GENERATED_BODY()
 public:
     bool bCompleted = false;
+    /** While it's celebrated: where a band of light sweeping across it is (0 to 1), or below 0 for none */
+    float Shimmer = -1.f;
+    /** While it's celebrated: how strongly it glows (0 to 1) */
+    float Glow = 0.f;
 protected:
     virtual TSharedRef<SWidget> RebuildWidget() override;
 };
@@ -178,6 +183,34 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Campaign Tree")
 	float LineThickness = 6.f;
 
+	/**
+	 * Lesson completion, played when the tree reopens after a lesson's final: the lesson's check pops in, starting
+	 * small, growing past its size and settling, with a shimmer across it. Then if its group is complete, the
+	 * group's glow moves on to the next group while the tree scrolls to center it, and that group unlocks.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lesson Completion")
+	float CheckDelay = 0.35f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lesson Completion")
+	float CheckDuration = 0.8f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lesson Completion")
+	float CheckStartScale = 0.2f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lesson Completion")
+	float CheckPeakScale = 1.4f;
+
+	/** Seconds between the check settling and the glow moving on */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lesson Completion")
+	float GlowMoveDelay = 0.25f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lesson Completion")
+	float GlowMoveDuration = 1.f;
+
+	/** Played as the check starts to pop in */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lesson Completion")
+	TObjectPtr<USoundBase> CheckSound;
+
 	/** Fired when the player picks an unlocked lesson */
 	UPROPERTY(BlueprintAssignable, Category = "Campaign Tree")
 	FOnCampaignLessonSelected OnLessonSelected;
@@ -243,6 +276,16 @@ private:
 
 	void LoadProgress();
 
+	/** Plays the lesson completion for Lesson (already completed in the progress) */
+	void StartCelebration(ECampaignLesson Lesson);
+	void UpdateCelebration(float DeltaTime, float ViewportWidth, float ScrollEnd);
+	void EndCelebration();
+	bool IsCelebrating() const { return CelebrationTime >= 0.f; }
+	/** Completed, as shown: the celebrated lesson only once its check appears */
+	bool IsLessonShownCompleted(ECampaignLesson Lesson) const;
+	/** The group shown as current (glowing, unlocked last, centered): the celebrated one until the glow moves on */
+	int32 GetShownColumn() const;
+
 	void RefreshNodeStates();
 	void RefreshOverallStatus();
 	int32 GetCurrentColumn() const;
@@ -278,6 +321,18 @@ private:
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UBorder>> ColumnStatusPanels;
+
+	/** The lesson completion playing: seconds into it (below 0: none) */
+	float CelebrationTime = -1.f;
+	ECampaignLesson CelebrationLesson = ECampaignLesson::Given;
+	int32 CelebrationFromColumn = 0;
+	int32 CelebrationToColumn = 0;
+	bool bCelebrationCheckShown = false;
+	bool bCelebrationMoving = false;
+	float CelebrationScrollFrom = 0.f;
+	float CelebrationScrollTo = 0.f;
+	/** How far the glow has moved from CelebrationFromColumn to CelebrationToColumn (0 to 1, eased) */
+	float GlowMove = 0.f;
 
 	float LastViewportWidth = 0.f;
 	int32 LastFirstVisible = INDEX_NONE;

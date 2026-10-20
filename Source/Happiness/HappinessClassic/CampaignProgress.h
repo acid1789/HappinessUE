@@ -332,6 +332,12 @@ public:
 	FLessonPuzzleResult GetLastResult() const { return LastResult; }
 
 	/**
+	 * The lesson just completed for the first time (its final solved), if the lessons tree hasn't celebrated it yet.
+	 * Returns it once.
+	 */
+	bool ConsumeLessonCompletion(ECampaignLesson& Lesson);
+
+	/**
 	 * Before playing the session's next puzzle: the session moves on to the stage that currently earns points (the
 	 * final once all points are earned). Returns the size and difficulty of the stage to play.
 	 */
@@ -340,6 +346,16 @@ public:
 
 	/** Debug: complete every lesson (unlocks Campaign mode). Console: Happiness.CompleteAllLessons */
 	void DebugCompleteAllLessons();
+
+	/**
+	 * Debug: set a lesson's progress in the current mode (Points clamped to 0..GetMaxPoints()), its Master Mode
+	 * progress cleared. A session on the lesson ends. bCelebrate: the lessons tree celebrates it as just completed.
+	 * Saves. Console: Happiness.Lessons.* (CampaignDebugCommands.cpp)
+	 */
+	void DebugSetLesson(ECampaignLesson Lesson, int32 Points, bool bFinalCompleted, bool bCelebrate = false);
+
+	/** Debug: clear the current mode's progress, leaving the other mode's alone. Saves. */
+	void DebugResetMode();
 
 	/** Debug: wipe all campaign progress */
 	UFUNCTION(BlueprintCallable, Category = "Campaign")
@@ -391,5 +407,6 @@ private:
 	FCampaignSaveData Data;
 
 	FLessonPuzzleResult LastResult;
+	TOptional<ECampaignLesson> UncelebratedLesson;
 	static TWeakObjectPtr<UCampaignSubsystem> Instance;
 };
