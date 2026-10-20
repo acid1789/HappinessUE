@@ -1,5 +1,8 @@
 #include "GamePanelWidget.h"
+#include "GameCellWidget.h"
+#include "HappinessClassic/Puzzle.h"
 
+#include "Blueprint/WidgetTree.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/GridPanel.h"
@@ -9,9 +12,125 @@
 #include "Components/ScaleBox.h"
 #include "Components/VerticalBoxSlot.h"
 
+bool UGamePanelWidget::PlaySolvedFireworks(UPuzzle* Puzzle)
+{
+	if (Fireworks == EFireworks::Playing)
+	{
+		return true;
+	}
+	if (Fireworks == EFireworks::Finished && FireworksPuzzle == Puzzle)
+	{
+		// Back from the fireworks: the end screen now (a restart and solve plays them again)
+		Fireworks = EFireworks::None;
+		return false;
+	}
+	if (!Puzzle || !Puzzle->IsSolved())
+	{
+		return false;
+	}
+
+	EndFireworks();
+	WidgetTree->ForEachWidget([this](UWidget* Widget)
+	{
+		if (UGameCellWidget* Cell = Cast<UGameCellWidget>(Widget))
+		{
+			FireworkCells.Add(Cell);
+		}
+	});
+	for (int32 i = FireworkCells.Num() - 1; i > 0; i--)
+	{
+		FireworkCells.Swap(i, FMath::RandRange(0, i));
+	}
+	for (const TWeakObjectPtr<UGameCellWidget>& Cell : FireworkCells)
+	{
+		Cell->PrepareFirework();
+	}
+	bFireworksPrepared = false;
+	Fireworks = EFireworks::Playing;
+	FireworksPuzzle = Puzzle;
+	FireworksTime = 0.f;
+	FireworksInterval = FireworkCells.Num() > 0 ? FireworksDuration / FireworkCells.Num() : 0.f;
+	NumFired = 0;
+	bBursting = true;
+	return true;
+}
+
+bool UGamePanelWidget::IsFireworksPuzzleComplete() const
+{
+	const UPuzzle* Puzzle = FireworksPuzzle.Get();
+	if (!Puzzle)
+	{
+		return false;
+	}
+	for (const FPuzzleRow& Row : Puzzle->m_Rows)
+	{
+		if (!Row.IsCompleted())
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+void UGamePanelWidget::EndFireworks()
+{
+	for (const TWeakObjectPtr<UGameCellWidget>& Cell : FiredCells)
+	{
+		if (Cell.IsValid())
+		{
+			Cell->EndFirework();
+		}
+	}
+	FireworkCells.Reset();
+	FiredCells.Reset();
+	bBursting = false;
+}
+
+void UGamePanelWidget::UpdateFireworks(float DeltaTime)
+{
+	if (!bFireworksPrepared)
+	{
+		bFireworksPrepared = true;
+		return;
+	}
+
+	// The icons go off one after another, evenly spread over FireworksDuration: the first at once, the next
+	// FireworksInterval later, and so on
+	while (FireworkCells.Num() > 0 && FireworksTime >= NumFired * FireworksInterval)
+	{
+		NumFired++;
+		UGameCellWidget* Cell = FireworkCells.Pop().Get();
+		if (Cell && Cell->PlayFirework())
+		{
+			FiredCells.Add(Cell);
+		}
+	}
+
+	FireworksTime += DeltaTime;
+	if (FireworkCells.Num() == 0 && FireworksTime >= FireworksDuration)
+	{
+		// All gone off. The icons stay gone until the puzzle changes (NativeTick).
+		bBursting = false;
+	}
+	if (Fireworks == EFireworks::Playing && FireworksTime >= EndScreenDelay)
+	{
+		Fireworks = EFireworks::Finished;
+		OnFireworksFinished.Broadcast();
+	}
+}
+
 void UGamePanelWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
+	if (bBursting)
+	{
+		UpdateFireworks(InDeltaTime);
+	}
+	else if (FiredCells.Num() > 0 && !IsFireworksPuzzleComplete())
+	{
+		// Restarted or another puzzle: the board shows its icons again
+		EndFireworks();
+	}
 	if (!Border_44)
 	{
 		return;

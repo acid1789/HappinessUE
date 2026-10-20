@@ -1,4 +1,5 @@
 #include "GameCellWidget.h"
+#include "GamePanelWidget.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "Components/CanvasPanel.h"
@@ -6,6 +7,7 @@
 #include "Blueprint/SlateBlueprintLibrary.h"
 #include "Components/Border.h"
 #include "Components/Image.h"
+#include "Components/NativeWidgetHost.h"
 #include "Components/PanelWidget.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/World.h"
@@ -35,6 +37,8 @@ UGameCellWidget::UGameCellWidget(const FObjectInitializer& ObjectInitializer)
 	PulseMaterial = PulseIcon.Object;
 	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> Shatter(TEXT("/Game/Happiness/UI/Effects/NS_IconShatter.NS_IconShatter"));
 	ShatterSystem = Shatter.Object;
+	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> Firework(TEXT("/Game/Happiness/UI/Effects/NS_IconFirework.NS_IconFirework"));
+	FireworkSystem = Firework.Object;
 }
 
 void UGameCellWidget::NativePreConstruct()
@@ -123,6 +127,55 @@ namespace
 	}
 }
 
+namespace
+{
+	// Effects[] slot of the firework, after the pulse (0) and every candidate icon's shatter (1 + n)
+	constexpr int32 FireworkEffect = 32;
+}
+
+void UGameCellWidget::PrepareFirework()
+{
+	UWidget* FinalIcon = GetWidgetFromName(TEXT("Image_FinalIcon"));
+	if (IsShown(FinalIcon))
+	{
+		PlayEffect(FireworkEffect, FireworkSystem, ImageTexture(FinalIcon), *FinalIcon);
+	}
+}
+
+bool UGameCellWidget::PlayFirework()
+{
+	UWidget* FinalIcon = GetWidgetFromName(TEXT("Image_FinalIcon"));
+	if (!IsShown(FinalIcon))
+	{
+		return false;
+	}
+	UNiagaraComponent* Burst = PlayEffect(FireworkEffect, FireworkSystem, ImageTexture(FinalIcon), *FinalIcon);
+	if (!Burst)
+	{
+		return false;
+	}
+	Burst->SetVariableFloat(TEXT("ShatterDuration"), FireworkDuration);
+	Burst->Activate(true);
+	FinalIcon->SetRenderOpacity(0.f);
+	if (IconRetainer)
+	{
+		IconRetainer->RequestRender();
+	}
+	return true;
+}
+
+void UGameCellWidget::EndFirework()
+{
+	if (UWidget* FinalIcon = GetWidgetFromName(TEXT("Image_FinalIcon")))
+	{
+		FinalIcon->SetRenderOpacity(1.f);
+	}
+	if (IconRetainer)
+	{
+		IconRetainer->RequestRender();
+	}
+}
+
 void UGameCellWidget::UpdateEffects()
 {
 	// WBP_Cell's ApplyPuzzleCell shows Image_FinalIcon when the cell has its icon, and its candidate icons otherwise
@@ -187,12 +240,41 @@ UNiagaraComponent* UGameCellWidget::PlayEffect(int32 Index, UNiagaraSystem* Syst
 	{
 		return nullptr;
 	}
-	// The effects play in a canvas over the whole game screen, above everything (not in the cell, where the Niagara
-	// UI widget doesn't show, and where neighbouring cells would cover what goes past the cell)
+	// The effects play in a canvas over the whole screen (not in the cell, where the Niagara UI widget doesn't show,
+	// and where neighbouring cells would cover what goes past the cell): in the screen's root canvas under its end
+	// screens and dialogs, or failing that over everything in the game viewport
 	if (!EffectOverlay.IsValid())
 	{
 		EffectOverlay = SNew(SCanvas).Visibility(EVisibility::HitTestInvisible);
-		Viewport->AddViewportWidgetContent(EffectOverlay.ToSharedRef(), 100);
+
+		// The screen: the widget holding the board (the game panel) this cell is in
+		UUserWidget* Screen = nullptr;
+		bool bInBoard = false;
+		for (UObject* Outer = GetOuter(); Outer && !Screen; Outer = Outer->GetOuter())
+		{
+			if (Outer->IsA<UGamePanelWidget>())
+			{
+				bInBoard = true;
+			}
+			else if (bInBoard && Outer->IsA<UUserWidget>())
+			{
+				Screen = Cast<UUserWidget>(Outer);
+			}
+		}
+		if (UCanvasPanel* Root = Screen ? Cast<UCanvasPanel>(Screen->GetRootWidget()) : nullptr)
+		{
+			EffectHost = NewObject<UNativeWidgetHost>(this);
+			EffectHost->SetContent(EffectOverlay.ToSharedRef());
+			EffectHost->SetVisibility(ESlateVisibility::HitTestInvisible);
+			UCanvasPanelSlot* HostSlot = Root->AddChildToCanvas(EffectHost);
+			HostSlot->SetAnchors(FAnchors(0.f, 0.f, 1.f, 1.f));
+			HostSlot->SetOffsets(FMargin(0.f));
+			HostSlot->SetZOrder(EffectZOrder);
+		}
+		else
+		{
+			Viewport->AddViewportWidgetContent(EffectOverlay.ToSharedRef(), 100);
+		}
 	}
 	if (Effects.Num() <= Index)
 	{
@@ -225,11 +307,21 @@ UNiagaraComponent* UGameCellWidget::PlayEffect(int32 Index, UNiagaraSystem* Syst
 		return nullptr;
 	}
 
-	// Where the widget is on the viewport; sizes in the overlay's units
+	// Where the widget is in the overlay, in its units: in its host, or on the viewport (also the host's space
+	// while the host hasn't been laid out yet, as it fills the screen)
 	const FGeometry& Geometry = Over.GetCachedGeometry();
 	FVector2D Pixel, TopLeft, BottomRight;
-	USlateBlueprintLibrary::LocalToViewport(this, Geometry, FVector2D::ZeroVector, Pixel, TopLeft);
-	USlateBlueprintLibrary::LocalToViewport(this, Geometry, Geometry.GetLocalSize(), Pixel, BottomRight);
+	const FGeometry HostGeometry = EffectHost ? EffectHost->GetCachedGeometry() : FGeometry();
+	if (EffectHost && HostGeometry.GetLocalSize().X > 0.f)
+	{
+		TopLeft = HostGeometry.AbsoluteToLocal(Geometry.LocalToAbsolute(FVector2D::ZeroVector));
+		BottomRight = HostGeometry.AbsoluteToLocal(Geometry.LocalToAbsolute(Geometry.GetLocalSize()));
+	}
+	else
+	{
+		USlateBlueprintLibrary::LocalToViewport(this, Geometry, FVector2D::ZeroVector, Pixel, TopLeft);
+		USlateBlueprintLibrary::LocalToViewport(this, Geometry, Geometry.GetLocalSize(), Pixel, BottomRight);
+	}
 	Effect.Rect = FBox2D(TopLeft, BottomRight);
 	const FVector2D Size = Effect.Rect.GetSize();
 
@@ -241,14 +333,19 @@ UNiagaraComponent* UGameCellWidget::PlayEffect(int32 Index, UNiagaraSystem* Syst
 
 void UGameCellWidget::RemoveEffects()
 {
-	if (EffectOverlay.IsValid())
+	if (EffectHost)
+	{
+		EffectHost->RemoveFromParent();
+		EffectHost = nullptr;
+	}
+	else if (EffectOverlay.IsValid())
 	{
 		if (UGameViewportClient* Viewport = GetWorld() ? GetWorld()->GetGameViewport() : nullptr)
 		{
 			Viewport->RemoveViewportWidgetContent(EffectOverlay.ToSharedRef());
 		}
-		EffectOverlay.Reset();
 	}
+	EffectOverlay.Reset();
 	for (FCellEffect& Effect : Effects)
 	{
 		if (Effect.Widget)

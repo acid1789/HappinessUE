@@ -37,9 +37,12 @@ struct FCellEffect
 
 /**
  * Clips candidate and resolved icons to the cell's rounded frame, and plays Niagara effects over its icons, in an
- * overlay over the game viewport (above everything, the icons themselves left as they are):
+ * overlay over the whole screen (the icons themselves left as they are). The overlay goes in the root canvas of
+ * the screen holding the board (UGamePanelWidget) at EffectZOrder (WBP_Happiness: over the board, under the end
+ * screens and dialogs), or over everything in the game viewport if there's no such canvas:
  * - when its icon is set, a pulse (PulseSystem): the icon grows to PulseScale and back over PulseDuration;
- * - when a candidate icon is eliminated, it breaks into pieces that fall (ShatterSystem, over ShatterDuration).
+ * - when a candidate icon is eliminated, it breaks into pieces that fall (ShatterSystem, over ShatterDuration);
+ * - when the puzzle is solved, its icon bursts into confetti (FireworkSystem; started by UGamePanelWidget).
  * Nothing plays for what the cell shows when it first appears.
  */
 UCLASS(Abstract)
@@ -81,6 +84,30 @@ public:
 	/** The break: user parameters IconMaterial, IconSize, ShatterDuration (NS_IconShatter) */
 	UPROPERTY(EditAnywhere, Category = "Shatter")
 	TObjectPtr<UNiagaraSystem> ShatterSystem;
+
+	/** Seconds the confetti of a solved puzzle's icon lasts (each piece 70-100% of it) */
+	UPROPERTY(EditAnywhere, Category = "Firework")
+	float FireworkDuration = 1.8f;
+
+	/** The solved puzzle's burst: user parameters IconMaterial, IconSize, ShatterDuration (NS_IconFirework) */
+	UPROPERTY(EditAnywhere, Category = "Firework")
+	TObjectPtr<UNiagaraSystem> FireworkSystem;
+
+	/**
+	 * Makes the firework's effect widget and places it over the icon, ready to play: a new effect widget is drawn at
+	 * the top left of the screen for the frame it's added in, so it's made at least a frame before PlayFirework.
+	 */
+	void PrepareFirework();
+
+	/** The cell's icon bursts into confetti and is hidden. False if it shows no icon. */
+	bool PlayFirework();
+
+	/** Shows the icon PlayFirework hid */
+	void EndFirework();
+
+	/** Z order of the effects' overlay in the screen's root canvas: above the board (0), below the ad banner (5) */
+	UPROPERTY(EditAnywhere, Category = "Pulse")
+	int32 EffectZOrder = 1;
 protected:
 	virtual void NativePreConstruct() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
@@ -100,8 +127,12 @@ protected:
 
 	UPROPERTY(Transient)
 	TArray<FCellEffect> Effects;
-	/** The canvas over the game viewport the effects play in */
+	/** The canvas over the screen the effects play in */
 	TSharedPtr<class SCanvas> EffectOverlay;
+
+	/** Holds EffectOverlay in the screen's root canvas; null when the overlay is in the game viewport */
+	UPROPERTY(Transient)
+	TObjectPtr<class UNativeWidgetHost> EffectHost;
 
 	/** What showed last tick: the final icon, and each candidate icon; unknown until the first tick */
 	bool bKnowsShown = false;
