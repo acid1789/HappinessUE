@@ -151,6 +151,9 @@ void UGameCellWidget::UpdateEffects()
 		// Over the cell: the final icon has only just been shown, so it has no place on screen yet
 		if (UNiagaraComponent* Pulse = PlayEffect(0, PulseSystem, ImageTexture(FinalIcon), *this))
 		{
+			// Only the picture pulses, not the frame painted around it
+			Effects[0].Material->SetScalarParameterValue(TEXT("FrameInset"), PulseFrameInset);
+			Effects[0].Material->SetScalarParameterValue(TEXT("FrameChamfer"), PulseFrameChamfer);
 			Pulse->SetVariableFloat(TEXT("PulseScale"), PulseScale);
 			Pulse->SetVariableFloat(TEXT("PulseDuration"), PulseDuration);
 			// Start over (ResetSystem alone doesn't start it again once the last one has finished)

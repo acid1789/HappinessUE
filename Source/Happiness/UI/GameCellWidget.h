@@ -60,6 +60,16 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Pulse")
 	TObjectPtr<UNiagaraSystem> PulseSystem;
 
+	/**
+	 * The pulse leaves out the icon's frame: what's outside an octagon this far in from each edge (a fraction of the
+	 * icon's size), with corners cut by PulseFrameChamfer (M_IconPulse's FrameInset and FrameChamfer). 0: all of it.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Pulse")
+	float PulseFrameInset = 0.065f;
+
+	UPROPERTY(EditAnywhere, Category = "Pulse")
+	float PulseFrameChamfer = 0.12f;
+
 	/** The effects' material: a dynamic instance of it per effect, its Icon texture the effect's icon */
 	UPROPERTY(EditAnywhere, Category = "Pulse")
 	TObjectPtr<UMaterialInterface> PulseMaterial;
