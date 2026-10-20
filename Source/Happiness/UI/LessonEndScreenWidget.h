@@ -6,11 +6,27 @@
 #include "LessonEndScreenWidget.generated.h"
 
 class UButton;
+class UCanvasPanel;
+class UImage;
+class UFont;
+class UTexture2D;
 class UProgressBar;
 class USoundBase;
 class UTextBlock;
 class UPuzzle;
 class UWidget;
+
+/** Resolution-independent symbols used by the results notebook. */
+UCLASS()
+class HAPPINESS_API ULessonResultGlyph : public UWidget
+{
+	GENERATED_BODY()
+public:
+	int32 Symbol = 0;
+	FLinearColor Color = FLinearColor::White;
+protected:
+	virtual TSharedRef<SWidget> RebuildWidget() override;
+};
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnLessonEndScreenEvent);
 
@@ -143,10 +159,20 @@ public:
 	FLessonPuzzleResult GetResult() const { return Result; }
 
 protected:
+	virtual void NativePreConstruct() override;
 	virtual void NativeConstruct() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 private:
+	void BuildNotebookLayout();
+	void UpdateNotebookActions();
+	UPROPERTY() TObjectPtr<UTexture2D> NotebookTexture;
+	UPROPERTY() TObjectPtr<UTexture2D> ButtonTexture;
+	UPROPERTY() TObjectPtr<UFont> NotebookFont;
+	UPROPERTY(Transient) TObjectPtr<UCanvasPanel> NotebookCanvas;
+	UPROPERTY(Transient) TObjectPtr<ULessonResultGlyph> ResultSeal;
+	UPROPERTY(Transient) TObjectPtr<UImage> UnlockFrame;
+
 	enum class EAnimState : uint8
 	{
 		Idle,
