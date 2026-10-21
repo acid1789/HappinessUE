@@ -10,6 +10,7 @@
 #include "Components/Image.h"
 #include "Components/PanelWidget.h"
 #include "Components/ScaleBox.h"
+#include "Components/ScrollBox.h"
 #include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
 #include "Components/UniformGridPanel.h"
@@ -180,6 +181,29 @@ void UGameRulesWidget::Show(APlayerController* PlayerController)
 		// The examples need the player controller's icon sets
 		Select(Selected == INDEX_NONE ? 0 : Selected);
 	}
+}
+
+void UGameRulesWidget::ShowLesson(APlayerController* PlayerController, ECampaignLesson Lesson)
+{
+	if (Subjects.Num() == 0)
+	{
+		Subjects = MakeSubjects();
+		BuildIndex();
+	}
+	// The first lesson (Game Basics) teaches the game itself, so it opens at the Basics' Objective, not its clue
+	const int32 Subject = Lesson == ECampaignLesson::VerticalTwo ? INDEX_NONE : FindLessonSubject(Lesson);
+	Selected = Subject == INDEX_NONE ? 0 : Subject;
+	Show(PlayerController);
+	if (UScrollBox* Index = Cast<UScrollBox>(SubjectList->GetParent()); Index && EntryButtons.IsValidIndex(Selected))
+	{
+		// The section header above the first clue of a section scrolls in with it
+		Index->ScrollWidgetIntoView(EntryButtons[Selected], false, EDescendantScrollDestination::Center);
+	}
+}
+
+int32 UGameRulesWidget::FindLessonSubject(ECampaignLesson Lesson) const
+{
+	return Subjects.IndexOfByPredicate([Lesson](const FRulesSubject& Subject) { return Subject.bClue && Subject.Lesson == Lesson; });
 }
 
 void UGameRulesWidget::HandleClose()

@@ -211,6 +211,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lesson Completion")
 	TObjectPtr<USoundBase> CheckSound;
 
+	/** The game rules screen (WBP_GameRules, a UGameRulesWidget) the lesson popup's Learn More opens over the tree */
+	UPROPERTY(EditAnywhere, Category = "Campaign Tree")
+	TSoftClassPtr<UUserWidget> RulesClass;
+
 	/** Fired when the player picks an unlocked lesson */
 	UPROPERTY(BlueprintAssignable, Category = "Campaign Tree")
 	FOnCampaignLessonSelected OnLessonSelected;
@@ -274,6 +278,10 @@ private:
 	UFUNCTION()
 	void HandlePopupStageChosen(ECampaignLesson Lesson, int32 Stage);
 
+	/** Learn More: the rules, open at the lesson's clue */
+	UFUNCTION()
+	void HandleLearnMore(ECampaignLesson Lesson);
+
 	void LoadProgress();
 
 	/** Plays the lesson completion for Lesson (already completed in the progress) */
@@ -297,6 +305,10 @@ private:
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UButton>> NodeButtons;
+
+	/** Made on the first Learn More */
+	UPROPERTY(Transient)
+	TObjectPtr<UUserWidget> RulesWidget;
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UCampaignTreeNodeClick>> NodeClicks;
@@ -335,8 +347,7 @@ private:
 	float GlowMove = 0.f;
 
 	float LastViewportWidth = 0.f;
-	int32 LastFirstVisible = INDEX_NONE;
-	int32 LastLastVisible = INDEX_NONE;
+	int32 LastCompletedColumns = INDEX_NONE;
 	bool bCenterCurrentColumn = true;
 	bool bPanCandidate = false;
 	bool bDraggingTree = false;

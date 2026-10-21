@@ -23,7 +23,10 @@ Game Rules
 Distinguish Title from Background
 
 Span Arrow a bit to big
-Finish Lesson Animation
-Collateral Animations
-
 Quit to lessons?
+
+Notifications
+Streak Saver
+
+Lessons Glow not behind properly
+Hint Window & Clue Info

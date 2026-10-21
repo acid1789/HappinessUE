@@ -66,7 +66,7 @@ the Free Play settings and pace, and the player's level.
 ### Lessons tree presentation
 
 `WBP_CampaignTree` keeps the shared villa visible: its own Background is collapsed. The framed heading,
-Back button and compact OverallStatus range plaque stay fixed. `UCampaignTreeWidget::RebuildTree` creates the
+Back button and compact OverallStatus progress plaque stay fixed. `UCampaignTreeWidget::RebuildTree` creates the
 blurred horizontal viewport and all medallions inside TreeCanvas; do not place persistent children there.
 The complete viewport border stays fixed. Desktop left-drag and touch scrolling pan the tree, and it centers
 on the first unfinished group when opened, clamped to the content bounds without blank end gutters.
@@ -75,7 +75,7 @@ A drag suppresses lesson clicks. Group unlocks still require every lesson in all
 `ULessonClueDiagram` draws abstract circle/square/triangle examples in C++; these are not puzzle icon assets.
 `ULessonMedallion` draws the opaque painted face, wrapped label and completion/lock mark, including disabled
 states. The frame and heading textures are T_LessonMedallion and T_LessonsHeading. OverallStatus shows
-the visible group range (for example, "4 - 8 of 12"); the legacy OverallProgress is collapsed.
+how many groups are fully completed (for example, "3 / 12 complete"); the legacy OverallProgress is collapsed.
 The active group has its own completion plaque beneath its stack.
 Its sage halo follows the actual stack and plaque bounds, with the stronger inner glow extending beyond
 the opaque medallion. Keep TreeScroll at Z=1 above the blur/tint; within NodeCanvas use connectors/glow
@@ -84,8 +84,8 @@ paint layers. Verify halo contrast in PIE over the villa; the isolated widget re
 320-unit column spacing and rounded ivory/gold group brackets with flower junctions. A ScaleBox fits the complete
 888-unit design canvas to the available viewport height. Column spacing stays fixed by expanding the
 design-space X positions by the reciprocal scale, while frames, diagrams and labels scale together,
-so scroll bounds, centering, range text and hit targets remain aligned at wide phone aspect ratios.
-Painted group badges and range/count plaques use T_LessonsGroupBadge and T_LessonsStatusPlaque.
+so scroll bounds, centering, and hit targets remain aligned at wide phone aspect ratios.
+Painted group badges and progress/count plaques use T_LessonsGroupBadge and T_LessonsStatusPlaque.
 The bundled Crimson Text Semibold font (LessonsSerif_Font) carries its OFL license beside the font assets.
 
 Back from a lesson's final (first completion), the tree skips the lesson popup and celebrates instead
@@ -106,5 +106,7 @@ T_LessonNotebookButtons supply the blank surfaces; all labels, progress, stage s
 The right page scrolls long descriptions. The design canvas grows when the Campaign Master row appears,
 preserving the existing reveal animation and stage/replay routing. The shared ULessonClueDiagram captures
 its lesson when its Slate widget is constructed: recreate it when changing the notebook to another clue.
-Learn More broadcasts `OnLearnMoreRequested(ECampaignLesson)`; the future clue-specific rules navigation
-is intentionally left for its consumer to connect. It does not open a separate rules screen yet.
+Learn More broadcasts `OnLearnMoreRequested(ECampaignLesson)`. `UCampaignTreeWidget::HandleLearnMore` opens
+WBP_GameRules (`RulesClass`) over the tree and popup (Z 300 in its root canvas), selected at that clue's subject
+with the index scrolled to it (`UGameRulesWidget::ShowLesson`); its Close returns to the popup. A clue type with
+no rules subject, and Game Basics (VerticalTwo, which teaches the game itself), open at Basics > Objective.

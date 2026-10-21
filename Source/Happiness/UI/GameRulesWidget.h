@@ -58,6 +58,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Game Rules")
 	void Show(APlayerController* PlayerController);
 
+	/** Show the rules open at a clue type's subject (the lessons' Learn More); Game Basics (VerticalTwo), or a clue with none, opens at Objective */
+	UFUNCTION(BlueprintCallable, Category = "Game Rules")
+	void ShowLesson(APlayerController* PlayerController, ECampaignLesson Lesson);
+
 	/** Look of the index entries */
 	UPROPERTY(EditAnywhere, Category = "Game Rules")
 	FButtonStyle EntryStyle;
@@ -143,6 +147,8 @@ private:
 
 	void BuildIndex();
 	void Select(int32 Index);
+	/** The clue subject of this type, or INDEX_NONE */
+	int32 FindLessonSubject(ECampaignLesson Lesson) const;
 	/** A clue widget showing a clue of this type, or null */
 	UUserWidget* MakeExample(ECampaignLesson Lesson);
 	/** A generated puzzle with a clue of this type in it */

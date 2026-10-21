@@ -2,6 +2,7 @@
 
 #include "HappinessClassic/CampaignProgress.h"
 #include "HappinessClassic/CampaignTree.h"
+#include "UI/GameRulesWidget.h"
 #include "UI/LessonPopupWidget.h"
 
 #include "Blueprint/WidgetTree.h"
@@ -504,6 +505,7 @@ void UCampaignTreeNodeClick::HandleClicked()
 
 UCampaignTreeWidget::UCampaignTreeWidget(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
+	RulesClass = TSoftClassPtr<UUserWidget>(FSoftObjectPath(TEXT("/Game/Happiness/UI/WBP_GameRules.WBP_GameRules_C")));
 	static ConstructorHelpers::FObjectFinder<UTexture2D> Medallion(
 		TEXT("/Game/General/Textures/T_LessonMedallion.T_LessonMedallion"));
 	MedallionTexture = Medallion.Object;
@@ -547,6 +549,7 @@ void UCampaignTreeWidget::NativeConstruct()
 	if (LessonPopup)
 	{
 		LessonPopup->OnStageChosen.AddUniqueDynamic(this, &UCampaignTreeWidget::HandlePopupStageChosen);
+		LessonPopup->OnLearnMoreRequested.AddUniqueDynamic(this, &UCampaignTreeWidget::HandleLearnMore);
 	}
 
 	if (UCampaignSubsystem* Campaign =
@@ -560,6 +563,39 @@ void UCampaignTreeWidget::NativeConstruct()
 void UCampaignTreeWidget::HandlePopupStageChosen(ECampaignLesson Lesson, int32 Stage)
 {
 	OnLessonStageChosen.Broadcast(Lesson, Stage);
+}
+
+void UCampaignTreeWidget::HandleLearnMore(ECampaignLesson Lesson)
+{
+	if (!RulesWidget)
+	{
+		UClass* Loaded = RulesClass.LoadSynchronous();
+		RulesWidget = Loaded ? CreateWidget<UUserWidget>(this, Loaded) : nullptr;
+		if (!RulesWidget)
+		{
+			return;
+		}
+		// Over the whole screen, above the tree and the popup; closing it returns to the popup
+		UCanvasPanel* Root = Cast<UCanvasPanel>(GetRootWidget());
+		if (UCanvasPanelSlot* RulesSlot = Root ? Root->AddChildToCanvas(RulesWidget) : nullptr)
+		{
+			RulesSlot->SetAnchors(FAnchors(0.f, 0.f, 1.f, 1.f));
+			RulesSlot->SetOffsets(FMargin(0.f));
+			RulesSlot->SetZOrder(300);
+		}
+		else
+		{
+			RulesWidget->AddToViewport(300);
+		}
+	}
+	if (UGameRulesWidget* Rules = Cast<UGameRulesWidget>(RulesWidget))
+	{
+		Rules->ShowLesson(GetOwningPlayer(), Lesson);
+	}
+	else
+	{
+		RulesWidget->SetVisibility(ESlateVisibility::Visible);
+	}
 }
 
 void UCampaignTreeWidget::ShowForLessonSession()
@@ -651,8 +687,7 @@ void UCampaignTreeWidget::RebuildTree()
 	ColumnStatusLabels.Reset();
 	ColumnStatusPanels.Reset();
 	LastViewportWidth = 0.f;
-	LastFirstVisible = INDEX_NONE;
-	LastLastVisible = INDEX_NONE;
+	LastCompletedColumns = INDEX_NONE;
 	bCenterCurrentColumn = true;
 	bPanCandidate = false;
 	bDraggingTree = false;
@@ -893,24 +928,20 @@ void UCampaignTreeWidget::RefreshNodeStates()
 
 void UCampaignTreeWidget::RefreshOverallStatus()
 {
-	const int32 NumColumns = UCampaignTree::GetNumColumns();
-	int32 First = 0, Last = 0;
-	if (TreeScroll && LastViewportWidth > 0.f)
+	// Progress, not position: the groups whose every lesson shows completed (a celebrated one once its check appears)
+	const TArray<TArray<ECampaignLesson>>& Columns = UCampaignTree::GetColumns();
+	int32 Completed = 0;
+	for (const TArray<ECampaignLesson>& Column : Columns)
 	{
-		const float Offset = TreeScroll->GetScrollOffset();
-		const float Spacing = LessonColumnSpacing;
-		// Report the groups whose centers are visible; clipped neighboring medallions hint at more content.
-		First = FMath::Clamp(FMath::CeilToInt(Offset / Spacing - .5f), 0, NumColumns - 1);
-		Last = FMath::Clamp(FMath::FloorToInt((Offset + LastViewportWidth) / Spacing - .5f), First, NumColumns - 1);
+		if (!Column.ContainsByPredicate([this](ECampaignLesson Lesson) { return !IsLessonShownCompleted(Lesson); }))
+			Completed++;
 	}
-	if (First == LastFirstVisible && Last == LastLastVisible)
+	if (Completed == LastCompletedColumns)
 		return;
-	LastFirstVisible = First;
-	LastLastVisible = Last;
+	LastCompletedColumns = Completed;
 	if (OverallStatus)
-		OverallStatus->SetText(
-			FText::Format(NSLOCTEXT("Lessons", "VisibleGroupRange", "{0} \u2013 {1} of {2}"),
-						  FText::AsNumber(First + 1), FText::AsNumber(Last + 1), FText::AsNumber(NumColumns)));
+		OverallStatus->SetText(FText::Format(NSLOCTEXT("Lessons", "OverallCompletion", "{0} / {1} complete"),
+											 FText::AsNumber(Completed), FText::AsNumber(Columns.Num())));
 }
 
 FReply UCampaignTreeWidget::NativeOnPreviewMouseButtonDown(const FGeometry& G, const FPointerEvent& Event)
@@ -968,7 +999,7 @@ void UCampaignTreeWidget::NativeTick(const FGeometry& G, float Delta)
             if (USizeBox* DesignSize = Cast<USizeBox>(NodeCanvas->GetParent()->GetParent()))
                 DesignSize->SetWidthOverride(ContentWidth / Scale);
         }
-		LastFirstVisible = LastLastVisible = INDEX_NONE;
+		LastCompletedColumns = INDEX_NONE;
 		bCenterCurrentColumn = true;
 	}
 	if (bCenterCurrentColumn)
