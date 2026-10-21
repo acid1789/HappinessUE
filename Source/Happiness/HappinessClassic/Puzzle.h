@@ -180,8 +180,13 @@ public:
 
 	static void RandomDistribution(FRandomStream& Rand, TArray<int>& Rands);
 
+	// A new start: the board as dealt and no hints used (Restart from an end screen)
 	UFUNCTION(BlueprintCallable)
 	void Reset();
+
+	// The board as dealt, keeping the hints used: the player's reset (pause menu, completed with mistakes)
+	UFUNCTION(BlueprintCallable)
+	void ResetBoard();
 
 	UFUNCTION(BlueprintCallable)
 	void ResetRow(int Row);

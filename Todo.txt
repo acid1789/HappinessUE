@@ -30,3 +30,6 @@ Streak Saver
 
 Lessons Glow not behind properly
 Hint Window & Clue Info
+Finish Lessons
+
+Puzzle Failed Art

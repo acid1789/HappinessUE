@@ -34,6 +34,7 @@ functions (`GetNumStages`, `GetStageSize`, `GetMaxPoints`, ...) follow it.
 | `Happiness/UI/WBP_EndScreen` | — | Free Play end screen: times, EXP, level bar |
 | `Happiness/UI/WBP_LessonEndScreen` | `UI/LessonEndScreenWidget` | Lessons end screen: points breakdown, lesson progress |
 | `Happiness/UI/WBP_CampaignEndScreen` | `UI/CampaignEndScreenWidget` | Campaign end screen: Free Play scoring plus campaign progress |
+| (`PuzzleFailed` in `WBP_Happiness`) | `UI/PuzzleFailedWidget` | Completed with mistakes: Undo / Restart over the board |
 | `Happiness/UI/WBP_PauseMenu`, `WBP_ConfirmDialog`, `WBP_CellDialog`, `WBP_HelpPanel` | — | Overlays in the puzzle screen |
 
 A correctly solved puzzle celebrates before its end screen. `WBP_Happiness.RefreshPuzzle` asks the board
@@ -42,7 +43,13 @@ A correctly solved puzzle celebrates before its end screen. `WBP_Happiness.Refre
 the first burst the board fires
 `OnFireworksFinished`, bound in `WBP_Happiness`'s Construct chain to call `RefreshPuzzle` again, which then shows
 the end screen; the remaining bursts go off behind it. The burst icons stay hidden until the puzzle is no longer complete
-(restart or a new puzzle). A board with mistakes shows its end screen at once.
+(restart or a new puzzle).
+
+A board completed **with mistakes** gets no end screen and records no result. `RefreshPuzzle` shows `PuzzleFailed`
+(`UI/PuzzleFailedWidget`, Z 20), `ShowFinalErrors` marks the wrong icons (if that option is on) and `UnhideClues` brings back every hidden clue. It is a small
+translucent panel over the bottom clue strip; the rest of it is clear but blocks the board. Undo (`OnUndo`) runs
+`Undo` then `RefreshPuzzle`, so with nothing to undo it simply shows again; Restart (`OnRestart`) resets like the pause menu's Reset Puzzle. A **reset** (`UPuzzle::ResetBoard`) keeps the clock and the hints used; only an end screen's Restart (`RestartPuzzle`, `UPuzzle::Reset`) starts over at 0:00 with no hints.
+The widget builds its own layout in C++ (`RebuildWidget`); its look is the Puzzle Failed properties.
 
 The player controller `General/Blueprints/PC_Happiness` starts, loads and saves puzzles and holds the player's
 level and EXP (`HappinessLevel`, `HappinessExp`).

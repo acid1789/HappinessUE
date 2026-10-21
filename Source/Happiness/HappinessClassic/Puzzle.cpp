@@ -466,6 +466,14 @@ void UPuzzle::Reset()
 	m_HintsUsed = m_LessonHintsUsed = 0;
 }
 
+void UPuzzle::ResetBoard()
+{
+	const int32 HintsUsed = m_HintsUsed, LessonHintsUsed = m_LessonHintsUsed;
+	Reset();
+	m_HintsUsed = HintsUsed;
+	m_LessonHintsUsed = LessonHintsUsed;
+}
+
 void UPuzzle::ResetRow(int Row)
 {
 	for (int i = 0; i < m_iSize; i++)
