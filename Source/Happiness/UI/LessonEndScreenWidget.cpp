@@ -184,7 +184,7 @@ void ULessonEndScreenWidget::BuildNotebookLayout()
 	auto Face=[&](bool Primary)
 	{
 		FSlateBrush Brush; Brush.SetResourceObject(ButtonTexture); Brush.DrawAs=ESlateBrushDrawType::Image;
-		Brush.SetUVRegion(FBox2f(FVector2f(.03f,Primary?.54f:.06f),FVector2f(.98f,Primary?.963f:.485f)));
+		Brush.SetUVRegion(FBox2f(FVector2f(.03f,Primary?.50f:.06f),FVector2f(.98f,Primary?.985f:.485f)));
 		return Brush;
 	};
 	auto Image=[&](FSlateBrush Brush,FVector2D P,FVector2D S)
@@ -207,7 +207,7 @@ void ULessonEndScreenWidget::BuildNotebookLayout()
 	Surface->SetVisibility(ESlateVisibility::HitTestInvisible); Place(Surface,{0,0},{1600,1000},0);
 	Image(Face(false),{500,5},{600,110});
 	StyleText(ResultText,56,LessonInk,ETextJustify::Center); Place(ResultText,{550,18},{500,80},2);
-	StyleText(LessonText,34,LessonInk,ETextJustify::Center); Place(LessonText,{850,130},{540,75});
+	StyleText(LessonText,32,LessonInk,ETextJustify::Center); Place(LessonText,{850,120},{540,110});
 	LessonText->SetAutoWrapText(true);
 	const FText Labels[]={LOCTEXT("TimeLabel","Time"),LOCTEXT("CompletionLabel","Completion"),
 		LOCTEXT("HintsLabel","Hints"),LOCTEXT("LessonHintLabel","Lesson Hint"),LOCTEXT("TotalLabel","Total")};
@@ -230,7 +230,7 @@ void ULessonEndScreenWidget::BuildNotebookLayout()
 		Place(NoteText,{335,625},{410,85});
 	}
 	ResultSeal=WidgetTree->ConstructWidget<ULessonResultGlyph>(); ResultSeal->Symbol=3;
-	ResultSeal->SetVisibility(ESlateVisibility::HitTestInvisible); Place(ResultSeal,{1015,210},{210,210});
+	ResultSeal->SetVisibility(ESlateVisibility::HitTestInvisible); Place(ResultSeal,{1025,235},{190,190});
 	Label(LOCTEXT("ProgressLabel","Lesson Progress"),{880,435},{480,55},36,LessonInk,ETextJustify::Center);
 	// Keep the frame separate: ProgressBar border padding clips its fill instead of insetting it.
 	Image(FSlateRoundedBoxBrush(FLinearColor(.80f,.75f,.61f),17.f,FLinearColor(.65f,.42f,.12f),2.f),
@@ -250,8 +250,8 @@ void ULessonEndScreenWidget::BuildNotebookLayout()
 	Place(StageTicks,{895,509},{450,16},3);
 	StageTicks->SynchronizeProperties();
 	StyleText(ProgressText,30,LessonInk,ETextJustify::Center); Place(ProgressText,{890,545},{460,50});
-	UnlockFrame=Image(Face(false),{870,620},{500,90});
-	StyleText(UnlockText,29,LessonSage,ETextJustify::Center); Place(UnlockText,{920,638},{400,60},2);
+	UnlockFrame=Image(Face(false),{870,600},{500,90});
+	StyleText(UnlockText,29,LessonSage,ETextJustify::Center); Place(UnlockText,{920,618},{400,60},2);
 	if (UnlockText) { UnlockText->SetAutoWrapText(true); UnlockText->SetWrapTextAt(400); }
 	auto Action=[&](UButton* Button,const FText& Text,int32 Symbol,bool Primary,FVector2D Position)
 	{
@@ -298,7 +298,7 @@ void ULessonEndScreenWidget::NativePreConstruct()
 	if (!GetGameInstance() && NotebookCanvas)
 	{
 		ResultText->SetText(LOCTEXT("PreviewSuccess","Success!"));
-		LessonText->SetText(LOCTEXT("PreviewStage","Span - 3x3 Normal"));
+		LessonText->SetText(LOCTEXT("PreviewStage","Not Same Column\n4x4 Easy"));
 		TimeText->SetText(FText::FromString(TEXT("2:14")));
 		CompletionText->SetText(FText::FromString(TEXT("+3")));
 		HintPenaltyText->SetText(FText::FromString(TEXT("-1"))); HintPenaltyText->SetColorAndOpacity(PenaltyInk);
@@ -348,7 +348,7 @@ void ULessonEndScreenWidget::Show(UPuzzle* Puzzle, float PuzzleSeconds)
 	// The stage Next Puzzle plays: the one that currently earns points (see UCampaignSubsystem::PrepareNextLessonPuzzle)
 	NextStage = Campaign->GetCurrentStage(Result.Lesson);
 
-	LessonText->SetText(FText::Format(LOCTEXT("LessonStage", "{0} - {1}"),
+	LessonText->SetText(FText::Format(LOCTEXT("LessonStageRows", "{0}\n{1}"),
 		UCampaignTree::GetLessonDisplayName(Result.Lesson), UCampaignSubsystem::GetStageDisplayName(Result.Stage)));
 
 	ResultText->SetText(Result.bSolved ? LOCTEXT("Solved", "Success!") : LOCTEXT("Incorrect", "Incorrect"));
