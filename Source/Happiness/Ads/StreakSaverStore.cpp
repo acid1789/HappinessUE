@@ -24,11 +24,11 @@ namespace
 {
 	// Seconds after startup before the first store check: after Remove Ads' own (UAdRemovalSubsystem), so the two
 	// don't ask the store at the same moment
-	const double FirstCheckDelay = 8.0;
+	const double SaverFirstCheckDelay = 8.0;
 
 	const EStreakSaverTier AllTiers[] = { EStreakSaverTier::OneDay, EStreakSaverTier::SevenDays, EStreakSaverTier::ThirtyDays };
 
-	bool IsProduct(const FString& OfferId, const FString& ProductId)
+	bool IsSaverProduct(const FString& OfferId, const FString& ProductId)
 	{
 		// Google Play may report it with its type in front ("inapp:streak_saver_7")
 		return OfferId == ProductId || OfferId.EndsWith(TEXT(":") + ProductId);
@@ -49,7 +49,7 @@ void UStreakSaverStoreSubsystem::Initialize(FSubsystemCollectionBase& Collection
 {
 	Collection.InitializeDependency<UDailySubsystem>();
 	Super::Initialize(Collection);
-	NextCheck = FPlatformTime::Seconds() + FirstCheckDelay;
+	NextCheck = FPlatformTime::Seconds() + SaverFirstCheckDelay;
 	TickHandle = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateUObject(this, &UStreakSaverStoreSubsystem::Tick), 1.f);
 }
 
@@ -90,7 +90,7 @@ bool UStreakSaverStoreSubsystem::FindTier(const FString& OfferId, EStreakSaverTi
 {
 	for (EStreakSaverTier Tier : AllTiers)
 	{
-		if (IsProduct(OfferId, GetProductId(Tier)))
+		if (IsSaverProduct(OfferId, GetProductId(Tier)))
 		{
 			OutTier = Tier;
 			return true;

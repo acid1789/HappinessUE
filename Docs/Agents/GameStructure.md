@@ -80,6 +80,21 @@ store: buying grants the days at once. The mode screen makes the Streak Saver bu
 panel itself (`UHappinessModeWidget::MakeStreakSaverButton`); a `StreakSaverButton` in the layout replaces the made one.
 Test with `Happiness.DailyDate` (a later date = missed days) and `Happiness.StreakSaver.Set <days>`.
 
+## Daily reminder
+
+`UDailyReminderSubsystem` (`HappinessClassic/DailyReminder`) schedules a phone notification for each of the next
+`DaysAhead` (7) days at `ReminderHour:ReminderMinute` local time (1:00; config `[/Script/Happiness.DailyReminderSubsystem]`
+in `DefaultGame.ini`), using the engine's local notifications (`UBlueprintPlatformLibrary`). It reschedules on startup,
+on coming back to the foreground and on `UDailySubsystem::OnChanged`, so a solved day gets no reminder and reminders
+stop a week after the app was last opened. The first one says "Keep your N-day streak going!" while the streak is
+still going. With a streak of 8+ days (`EveningMinStreak`) it also schedules an evening reminder at
+20:00 (`EveningHour`) on the next day not yet solved; solving that day reschedules and drops it. Permission is asked once, after the first daily solve (`bAskedPermission` in GameUserSettings): iOS asks
+itself (alerts and sound, no push); Android 13+ asks for `POST_NOTIFICATIONS` through
+`AndroidThunkJava_Happiness_RequestNotifications` in `Happiness_UPL.xml`, which also declares the permission.
+`bRestoreNotificationsOnReboot` brings Android's back after a restart. On Android the small icon is the
+`ic_notification` drawable if there is one, else the app icon. Test on a phone with `Happiness.Reminder.Test [seconds]`.
+Android and iOS only; it does nothing in the editor.
+
 ## Save data
 
 Everything lives in one save slot, `HappinessSave`, written by `SG_Happiness` (parent class

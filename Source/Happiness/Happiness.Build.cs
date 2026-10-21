@@ -22,6 +22,11 @@ public class Happiness : ModuleRules
 			// Manifest additions (the game category)
 			AdditionalPropertiesForReceipt.Add("AndroidPlugin", System.IO.Path.Combine(ModuleDirectory, "Happiness_UPL.xml"));
 		}
+		else if (Target.Platform == UnrealTargetPlatform.IOS)
+		{
+			// The daily puzzle reminder asks for notification permission itself (UDailyReminderSubsystem)
+			PublicFrameworks.Add("UserNotifications");
+		}
 
 		// Uncomment if you are using Slate UI
 		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });

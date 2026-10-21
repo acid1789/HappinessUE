@@ -26,10 +26,10 @@ Span Arrow a bit to big
 Quit to lessons?
 
 Notifications
-Streak Saver
 
 Lessons Glow not behind properly
 Hint Window & Clue Info
 Finish Lessons
 
 Puzzle Failed Art
+Streak Saver Art
