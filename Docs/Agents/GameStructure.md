@@ -63,6 +63,23 @@ level and EXP (`HappinessLevel`, `HappinessExp`).
   "reason, then result".
 - `CampaignTree.*`, `CampaignProgress.*`, `FreePlaySettings.*`, `HappinessSaveGame.*`: modes and progress.
 
+## Streak savers
+
+Bought days that cover missed daily puzzles (`UDailySubsystem`, `Ads/StreakSaverStore.*`, `UI/StreakSaverPanel.*`).
+Days missed since the streak's last day use saver days up first: a broken streak comes back (the missed days don't
+count toward it) and what's left protects later misses. Saver days are only used when there are enough for every
+missed day; otherwise the streak stays broken, the mode screen says it can be saved, and more days still bring it
+back until the next daily solve starts a new streak (the saver days left then protect that one). Saved in
+`FDailySaveData`: `SaverDays`, `CoveredThrough` (the last day savers covered), `SaverTransactions` (purchases already
+granted, so a purchase the store reports again isn't counted twice).
+
+Products are consumables `streak_saver_1`, `streak_saver_7`, `streak_saver_30` (1, 7, 30 days; ids are config on
+`UStreakSaverStoreSubsystem`, prices come from the stores). A purchase is granted, then consumed (Google Play) or
+finished (StoreKit); unfinished ones are picked up on the next store check. Editor and PC development builds have no
+store: buying grants the days at once. The mode screen makes the Streak Saver button (just above the Daily tile, never over a tile) and the
+panel itself (`UHappinessModeWidget::MakeStreakSaverButton`); a `StreakSaverButton` in the layout replaces the made one.
+Test with `Happiness.DailyDate` (a later date = missed days) and `Happiness.StreakSaver.Set <days>`.
+
 ## Save data
 
 Everything lives in one save slot, `HappinessSave`, written by `SG_Happiness` (parent class

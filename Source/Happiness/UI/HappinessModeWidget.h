@@ -6,6 +6,7 @@
 #include "HappinessModeWidget.generated.h"
 
 class UButton;
+class UStreakSaverPanel;
 class UTextBlock;
 class USizeBox;
 
@@ -80,6 +81,18 @@ protected:
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UButton> ClosePurchaseButton;
 
+	/** Opens the streak saver shop. Made in the Daily button's canvas, just above it, unless the layout has one. */
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UButton> StreakSaverButton;
+
+	/** Its label: the saver days left, once there are some */
+	UPROPERTY(Transient)
+	TObjectPtr<UTextBlock> StreakSaverLabel;
+
+	/** The streak saver shop, over the whole screen (made the first time it's needed) */
+	UPROPERTY(Transient)
+	TObjectPtr<UStreakSaverPanel> StreakSaverPanel;
+
 private:
 	UFUNCTION()
 	void RefreshAdRemoval();
@@ -102,7 +115,14 @@ private:
 	UFUNCTION()
 	void HandleDailyClicked();
 
+	UFUNCTION()
 	void RefreshStreak();
+
+	/** Make the Streak Saver button if the layout has none */
+	void MakeStreakSaverButton();
+
+	UFUNCTION()
+	void HandleStreakSaverClicked();
 
 	/** The Daily button (disabled once today's is solved) and the streak line */
 	void RefreshDaily();

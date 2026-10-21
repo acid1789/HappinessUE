@@ -105,14 +105,86 @@ FDailyPuzzleSpec UDailySubsystem::GetSpec(int32 Date)
 	return Spec;
 }
 
+UDailySubsystem::FStreakState UDailySubsystem::GetStreakState(int32 Date) const
+{
+	FStreakState State;
+	State.SaverDays = Data.SaverDays;
+	if (Data.Streak <= 0 || Data.LastSolvedDate <= 0 || !IsValidDate(Data.LastSolvedDate))
+	{
+		return State;
+	}
+	State.LastDay = Data.CoveredThrough > Data.LastSolvedDate && IsValidDate(Data.CoveredThrough) ? Data.CoveredThrough : Data.LastSolvedDate;
+
+	// The days between the streak's last day and Date; Date itself can still be played
+	const int32 Missed = DaysBetween(State.LastDay, Date) - 1;
+	if (Missed <= 0)
+	{
+		return State;
+	}
+	if (Missed <= State.SaverDays)
+	{
+		State.LastDay = ToDate(FromDate(Date) - FTimespan::FromDays(1));
+		State.SaverDays -= Missed;
+	}
+	else
+	{
+		State.MissedDays = Missed;
+	}
+	return State;
+}
+
+void UDailySubsystem::ApplySavers(int32 Date)
+{
+	const FStreakState State = GetStreakState(Date);
+	if (State.MissedDays == 0 && State.LastDay > Data.LastSolvedDate && State.LastDay > Data.CoveredThrough)
+	{
+		Data.CoveredThrough = State.LastDay;
+		Data.SaverDays = State.SaverDays;
+	}
+}
+
 int32 UDailySubsystem::GetStreak() const
 {
-	// Still going if the latest solve was today or yesterday
-	if (Data.LastSolvedDate <= 0 || !IsValidDate(Data.LastSolvedDate))
+	// Still going if its last day (solved, or covered by streak savers) was today or yesterday
+	const FStreakState State = GetStreakState(GetToday());
+	return State.LastDay > 0 && State.MissedDays == 0 ? Data.Streak : 0;
+}
+
+int32 UDailySubsystem::GetSaverDays() const
+{
+	return GetStreakState(GetToday()).SaverDays;
+}
+
+bool UDailySubsystem::GetBrokenStreak(int32& OutStreak, int32& OutMissedDays, int32& OutSaverDaysNeeded) const
+{
+	const FStreakState State = GetStreakState(GetToday());
+	OutStreak = State.MissedDays > 0 ? Data.Streak : 0;
+	OutMissedDays = State.MissedDays;
+	OutSaverDaysNeeded = FMath::Max(State.MissedDays - State.SaverDays, 0);
+	return State.MissedDays > 0;
+}
+
+void UDailySubsystem::AddSaverDays(int32 Days, const FString& TransactionId)
+{
+	if (Days <= 0 || (!TransactionId.IsEmpty() && HasSaverTransaction(TransactionId)))
 	{
-		return 0;
+		return;
 	}
-	return DaysBetween(Data.LastSolvedDate, GetToday()) <= 1 ? Data.Streak : 0;
+	if (!TransactionId.IsEmpty())
+	{
+		Data.SaverTransactions.Add(TransactionId);
+	}
+	Data.SaverDays += Days;
+	ApplySavers(GetToday());
+	Save();
+	OnChanged.Broadcast();
+}
+
+void UDailySubsystem::DebugSetSaverDays(int32 Days)
+{
+	Data.SaverDays = FMath::Max(Days, 0);
+	Save();
+	OnChanged.Broadcast();
 }
 
 bool UDailySubsystem::StartDaily(const UObject* WorldContextObject, int32& Number, int32& Size, int32& Difficulty)
@@ -212,14 +284,18 @@ bool UDailySubsystem::RecordSolve(UPuzzle* Puzzle)
 	const bool bFirstSolve = Spec.Date > Data.LastSolvedDate;
 	if (bFirstSolve)
 	{
-		// The day after the last solve carries the streak on; a gap starts it again
-		const bool bConsecutive = Data.LastSolvedDate > 0 && IsValidDate(Data.LastSolvedDate)
-			&& DaysBetween(Data.LastSolvedDate, Spec.Date) == 1;
+		// The day after the streak's last day (solved, or covered by streak savers) carries it on; a gap starts it
+		// again, and the savers left wait to protect the new one
+		ApplySavers(Spec.Date);
+		const FStreakState State = GetStreakState(Spec.Date);
+		const bool bConsecutive = State.LastDay > 0 && DaysBetween(State.LastDay, Spec.Date) == 1;
 		Data.Streak = bConsecutive ? Data.Streak + 1 : 1;
 		Data.BestStreak = FMath::Max(Data.BestStreak, Data.Streak);
 		Data.LastSolvedDate = Spec.Date;
+		Data.CoveredThrough = 0;
 	}
 	Save();
+	OnChanged.Broadcast();
 	return bFirstSolve;
 }
 
@@ -231,6 +307,9 @@ void UDailySubsystem::DebugReset(bool bAll)
 		Data.LastSolvedDate = 0;
 		Data.Streak = 0;
 		Data.BestStreak = 0;
+		Data.SaverDays = 0;
+		Data.CoveredThrough = 0;
+		Data.SaverTransactions.Reset();
 	}
 	else if (Data.LastSolvedDate >= GetToday())
 	{
@@ -239,6 +318,7 @@ void UDailySubsystem::DebugReset(bool bAll)
 		Data.LastSolvedDate = Data.Streak > 0 ? ToDate(FromDate(GetToday()) - FTimespan::FromDays(1)) : 0;
 	}
 	Save();
+	OnChanged.Broadcast();
 }
 
 UDailySubsystem* UDailySubsystem::Get(const UObject* WorldContextObject)
@@ -254,6 +334,20 @@ void UDailySubsystem::Save()
 }
 
 #if !UE_BUILD_SHIPPING
+// Testing: "Happiness.StreakSaver.Set <days>" sets the unused streak saver days (no purchase). With Happiness.DailyDate
+// set to a later date (days missed) it shows recovery and protection. Reopen the mode screen to see the change.
+static FAutoConsoleCommandWithWorldAndArgs GSetSaverDaysCommand(
+	TEXT("Happiness.StreakSaver.Set"),
+	TEXT("Happiness.StreakSaver.Set <days>: the unused streak saver days, without a purchase"),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+	{
+		UDailySubsystem* Daily = UDailySubsystem::Get(World);
+		if (Daily && Args.Num() > 0 && Args[0].IsNumeric())
+		{
+			Daily->DebugSetSaverDays(FCString::Atoi(*Args[0]));
+		}
+	}));
+
 // Testing: "Happiness.ResetDaily" makes today's daily puzzle playable again; "Happiness.ResetDaily all" also
 // forgets every earlier solve and the streaks. Reopen the mode screen to see the change.
 static FAutoConsoleCommandWithWorldAndArgs GResetDailyCommand(

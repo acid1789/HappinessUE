@@ -30,7 +30,21 @@ struct FDailySaveData
 
 	UPROPERTY(SaveGame)
 	int32 ActiveDate = 0;
+
+	/** Streak saver days bought and not used yet: each one covers a day the streak missed */
+	UPROPERTY(SaveGame)
+	int32 SaverDays = 0;
+
+	/** The latest date (YYYYMMDD) streak savers covered: the streak carries on from it as if solved; 0 = none */
+	UPROPERTY(SaveGame)
+	int32 CoveredThrough = 0;
+
+	/** Store purchases already turned into saver days, so one the store reports again isn't counted twice */
+	UPROPERTY(SaveGame)
+	TArray<FString> SaverTransactions;
 };
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnDailyChanged);
 
 /** One day's daily puzzle, worked out from the date alone: the same for everyone on that date */
 USTRUCT(BlueprintType)
@@ -68,6 +82,11 @@ struct FDailyPuzzleSpec
  * Game flow: the Daily button on the mode screen ends any lesson session and fires OnDailyChosen; WBP_GameSelect
  * then calls StartDaily and plays the puzzle it returns. UCampaignSubsystem::InitPuzzleForPlay builds the daily
  * while one is active, and UFreePlaySubsystem::FinishFreePlayPuzzle scores it and ends the session once solved.
+ *
+ * Streak savers (bought through UStreakSaverStoreSubsystem) are days that cover missed days. Days missed since the
+ * streak's last day use them up first: a broken streak comes back, without counting the missed days. What's left
+ * covers later misses. Days are only used when there are enough to cover every missed day; otherwise the streak
+ * stays broken and they wait (more saver days can still bring it back, until a new streak starts).
  */
 UCLASS()
 class HAPPINESS_API UDailySubsystem : public UGameInstanceSubsystem
@@ -92,7 +111,7 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Daily")
 	static FDailyPuzzleSpec GetTodaySpec() { return GetSpec(GetToday()); }
 
-	/** The current streak: 0 once a day has been missed */
+	/** The current streak: 0 once a day has been missed that streak savers can't cover */
 	UFUNCTION(BlueprintPure, Category = "Daily")
 	int32 GetStreak() const;
 
@@ -101,6 +120,25 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Daily")
 	bool IsTodaySolved() const { return Data.LastSolvedDate >= GetToday(); }
+
+	/** Streak saver days left, after covering any days the streak has missed */
+	UFUNCTION(BlueprintPure, Category = "Daily|Streak Saver")
+	int32 GetSaverDays() const;
+
+	/** A streak that ended and could come back with more saver days: its length, the days it missed and how many more
+	 *  saver days would cover them. False if the streak is going (or there is none to bring back). */
+	UFUNCTION(BlueprintPure, Category = "Daily|Streak Saver")
+	bool GetBrokenStreak(int32& OutStreak, int32& OutMissedDays, int32& OutSaverDaysNeeded) const;
+
+	/** Bought streak saver days (TransactionId: the store purchase, or empty): they cover missed days first. Saves. */
+	void AddSaverDays(int32 Days, const FString& TransactionId);
+
+	/** The store purchase has already been turned into saver days */
+	bool HasSaverTransaction(const FString& TransactionId) const { return Data.SaverTransactions.Contains(TransactionId); }
+
+	/** The streak or streak savers changed */
+	UPROPERTY(BlueprintAssignable, Category = "Daily")
+	FOnDailyChanged OnChanged;
 
 	/** Start today's daily puzzle: returns what to pass to the game's PlayHappiness (number = seed, size, difficulty).
 	 *  Returns false, starting nothing, once today's puzzle is solved: one a day. */
@@ -135,8 +173,12 @@ public:
 	 */
 	bool RecordSolve(UPuzzle* Puzzle);
 
+	/** Testing (console Happiness.StreakSaver.Set <days>): the unused saver days, without a purchase */
+	void DebugSetSaverDays(int32 Days);
+
 	/** Testing (console Happiness.ResetDaily [all]): undo today's solve so today's puzzle can be played again, the
-	 *  streak back to before it; with bAll, forget every solve and the streaks. Ends any daily being played. */
+	 *  streak back to before it; with bAll, forget every solve, the streaks and the streak savers. Ends any daily
+	 *  being played. */
 	void DebugReset(bool bAll);
 
 	static UDailySubsystem* Get(const UObject* WorldContextObject);
@@ -148,6 +190,18 @@ public:
 
 private:
 	void Save();
+
+	/** The streak as of a date: its last day (solved, or covered by savers), the saver days left and the days missed
+	 *  since. Saver days only cover missed days when there are enough for all of them. */
+	struct FStreakState
+	{
+		int32 LastDay = 0;
+		int32 SaverDays = 0;
+		int32 MissedDays = 0;
+	};
+	FStreakState GetStreakState(int32 Date) const;
+	/** Keep what savers covered by a date (GetStreakState), before anything else changes the streak */
+	void ApplySavers(int32 Date);
 
 	FDailySaveData Data;
 	static TWeakObjectPtr<UDailySubsystem> Instance;
