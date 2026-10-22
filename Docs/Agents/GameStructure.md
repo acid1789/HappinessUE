@@ -64,6 +64,18 @@ level and EXP (`HappinessLevel`, `HappinessExp`).
   "reason, then result".
 - `CampaignTree.*`, `CampaignProgress.*`, `FreePlaySettings.*`, `HappinessSaveGame.*`: modes and progress.
 
+## Icon sets
+
+Each puzzle row uses one icon set (`DA_IconSet` data assets in `Content/Happiness/IconSets/`; set and icon IDs are
+what a saved puzzle stores). `PC_Happiness.SoftIconSetCollection` names the default collection (`KatrinaCollection`,
+8 sets). At BeginPlay `PC_Happiness` swaps in the player's own collection from `UIconSetSubsystem::GetPlayerCollection`
+(`HappinessClassic/IconSets.*`): the default sets, then each unlocked set from `DA_IconSetUnlocks` (`UIconSetUnlocks`:
+set + `EIconSetUnlock` condition). It updates in place when campaign progress changes; nothing extra is saved.
+`IS_GardenVisitors` unlocks once every lesson is completed. To add an unlockable set, add it to `DA_IconSetUnlocks`
+(new conditions go in `EIconSetUnlock` / `UIconSetSubsystem::IsUnlocked`). `DA_IconSetUnlocks` is always cooked
+(Asset Manager rule in `DefaultGame.ini`), so the sets it lists ship. `SelectRandomIconSets` takes the first
+PuzzleSize sets of the collection, shuffled first when Scramble Icons is on.
+
 ## Streak savers
 
 Bought days that cover missed daily puzzles (`UDailySubsystem`, `Ads/StreakSaverStore.*`, `UI/StreakSaverPanel.*`).

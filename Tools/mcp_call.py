@@ -18,7 +18,8 @@ import editor_gate as gate
 
 def changed_assets(payload):
     """The assets a tools/call may change: every /Game path in its arguments, unless the tool only reads.
-    An import names a folder and a new asset; the lock is on the new asset. A duplicate only reads its source."""
+    An import names a folder and a new asset; the lock is on the new asset. A duplicate only reads its source.
+    Setting properties changes only the instance, not assets its values refer to."""
     if payload.get("method") != "tools/call":
         return []
     call = payload.get("params", {}).get("arguments", {})
@@ -28,6 +29,9 @@ def changed_assets(payload):
     arguments = dict(arguments)
     if tool == "duplicate":
         arguments.pop("path", None)
+    if tool in ("set_properties", "reset_properties"):
+        # Only the instance changes; asset paths among the values are references to it
+        arguments = {"instance": arguments.get("instance")}
     paths = []
     if isinstance(arguments.get("folder_path"), str) and isinstance(arguments.get("asset_name"), str):
         paths.append(arguments.pop("folder_path").rstrip("/") + "/" + arguments.pop("asset_name"))

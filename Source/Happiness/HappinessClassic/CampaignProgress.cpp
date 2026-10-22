@@ -588,6 +588,31 @@ void UCampaignSubsystem::DebugSetLesson(ECampaignLesson Lesson, int32 Points, bo
 	OnProgressChanged.Broadcast();
 }
 
+void UCampaignSubsystem::DebugSetMaster(ECampaignLesson Lesson, int32 MasterPoints)
+{
+	if (GetNumMasterStages() == 0)
+	{
+		return;
+	}
+	if (Data.bInSession && Data.SessionLesson == Lesson)
+	{
+		Data.bInSession = false;
+		Data.bPuzzleOpen = false;
+	}
+
+	FLessonProgress& Progress = GetMutableProgress(Lesson);
+	Progress.Points = GetMaxPoints();
+	Progress.bFinalCompleted = true;
+	Progress.MasterPoints = FMath::Clamp(MasterPoints, 0, GetMasterMaxPoints());
+	Progress.bMasterRevealed = true;
+	if (UncelebratedLesson.IsSet() && UncelebratedLesson.GetValue() == Lesson)
+	{
+		UncelebratedLesson.Reset();
+	}
+	Save();
+	OnProgressChanged.Broadcast();
+}
+
 void UCampaignSubsystem::DebugResetMode()
 {
 	(Data.Mode == ECampaignMode::Campaign ? Data.CampaignLessons : Data.Lessons).Reset();
