@@ -18,8 +18,7 @@ Game Rules
 Campaign
 
 --- Dev tasks ---
-Back should background the app.
-
+Clue Selection is borked
 
 --- Art Tasks ---
 Puzzle Failed Art
