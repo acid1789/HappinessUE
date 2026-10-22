@@ -357,6 +357,12 @@ public:
 	 */
 	void DebugSetLesson(ECampaignLesson Lesson, int32 Points, bool bFinalCompleted, bool bCelebrate = false);
 
+	/**
+	 * Debug, Campaign mode: complete the lesson's final and set its Master Mode progress (MasterPoints clamped to
+	 * 0..GetMasterMaxPoints()), already shown to the player. A session on the lesson ends. Saves. Console: Happiness.Campaign.Master
+	 */
+	void DebugSetMaster(ECampaignLesson Lesson, int32 MasterPoints);
+
 	/** Debug: clear the current mode's progress, leaving the other mode's alone. Saves. */
 	void DebugResetMode();
 

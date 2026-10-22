@@ -241,11 +241,13 @@ unexplained hints. Difficulty: 0 easy, 1 normal, 2 hard. Sizes 3–8.
 
 - PIE console (`~`) command `Happiness.CompleteAllLessons` marks every lesson complete, which unlocks Campaign
   mode. Development builds only.
-- `Happiness.Lessons.*` set lesson progress in the current mode (the full list and arguments are at the top of
+- `Happiness.Lessons.*` and `Happiness.Campaign.*` set lesson progress in Lessons and Campaign mode, switching to that
+  mode first (`Campaign.*` completes every lesson first if Campaign is still locked; the full list and arguments are at the top of
   `Source/Happiness/HappinessClassic/CampaignDebugCommands.cpp`): `List`, `Reset`, `Clear <Lesson>`,
   `Points <Lesson> <N>`, `Stage <Lesson> <Stage>`, `ToFinal [Lesson]`, `Complete [Lesson]`, `ToColumn <Column>`.
   A lesson is its enum name (`NextTo`) or number; left out, the first unfinished one. `Complete` with the lessons
-  screen open plays the completion animation, as if back from its final. They save the progress: back up
+  screen open plays the completion animation, as if back from its final. `Happiness.Campaign.Master <Lesson> <N>` completes a
+  clue and sets its Master Mode puzzles solved. They save the progress: back up
   `Saved/SaveGames/HappinessSave.sav` first if it matters. Development builds only.
 - To see a fast UI animation, slow it on the live PIE widget (`ObjectTools.set_properties` on its transient path
   from `obj list class=<Class>`) and take screenshots with the PIE console command `shot showui`: full
@@ -271,7 +273,7 @@ python Tools/mcp_call.py $A StopPIE '{}'
 - **`ExecPIECommand`** runs a console command in the PIE world, as if typed in the game's console (`~`): the game's
   dev commands, engine commands (`slomo 0.5`, `stat fps`), console variables (`Happiness.PreviewAdLayout 1`) and
   log verbosity (`log LogTemp Verbose`). It returns false when PIE isn't running.
-- **The game's dev commands** (development builds only): `Happiness.SolvePuzzle`, `Happiness.CompleteAllLessons`, `Happiness.Lessons.*`,
+- **The game's dev commands** (development builds only): `Happiness.SolvePuzzle`, `Happiness.CompleteAllLessons`, `Happiness.Lessons.*`, `Happiness.Campaign.*`,
   `Happiness.DailyDate`, `Happiness.ResetDaily`, `Happiness.StreakSaver.Set`, `Happiness.Reminder.Test`, `Happiness.PreviewAdLayout`, `Happiness.Ads`,
   `Happiness.LargeBanner`, `Happiness.RemoveAdsToken`, `Happiness.TestAd`. Find them all with
   `grep -rhn 'TEXT("Happiness\.' Source/Happiness`.

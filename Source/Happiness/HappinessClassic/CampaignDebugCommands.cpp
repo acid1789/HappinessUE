@@ -1,5 +1,6 @@
-// Console commands (PIE console, ~) for testing the lessons. Development builds only. They change the current
-// mode's progress (Lessons, or Campaign once switched to it) and save it: back up the save first if it matters.
+// Console commands (PIE console, ~) for testing the lessons and the campaign. Development builds only. Each set
+// switches to its mode first (Happiness.Campaign.* completes every lesson first if Campaign mode is still locked),
+// then changes that mode's progress and saves it: back up the save first if it matters.
 //
 //   Happiness.Lessons.List                    every lesson's points, stage and state
 //   Happiness.Lessons.Reset                   clear every lesson
@@ -9,6 +10,9 @@
 //   Happiness.Lessons.ToFinal [Lesson]        every point, the final open but not played
 //   Happiness.Lessons.Complete [Lesson]       complete it; the lessons tree, if showing, plays its completion
 //   Happiness.Lessons.ToColumn <Column>       complete every lesson before that tree column, clear the rest
+//
+//   Happiness.Campaign.<the same>             the same for the campaign (points are solved puzzles there)
+//   Happiness.Campaign.Master <Lesson> <N>    complete it and set its Master Mode puzzles solved (shown already)
 //
 // <Lesson> is its name (NextTo; any case) or number (ECampaignLesson). Left out, it is the first lesson in the tree
 // that isn't completed.
@@ -23,6 +27,13 @@
 #if !UE_BUILD_SHIPPING
 namespace
 {
+	/** One set of commands: Happiness.Lessons.* or Happiness.Campaign.* */
+	struct FTrack
+	{
+		ECampaignMode Mode;
+		const TCHAR* Name;
+	};
+
 	FString LessonEnumName(ECampaignLesson Lesson)
 	{
 		return StaticEnum<ECampaignLesson>()->GetNameStringByValue(int64(Lesson));
@@ -30,7 +41,7 @@ namespace
 
 	/** The lesson named by Args[Index]; the first incomplete one when left out and bDefaultNext */
 	bool ParseLessonArg(const TArray<FString>& Args, int32 Index, bool bDefaultNext, const UCampaignSubsystem& Campaign,
-		ECampaignLesson& Lesson, FOutputDevice& Ar)
+		const FTrack& Track, ECampaignLesson& Lesson, FOutputDevice& Ar)
 	{
 		if (!Args.IsValidIndex(Index))
 		{
@@ -51,7 +62,7 @@ namespace
 			}
 			else
 			{
-				Ar.Log(TEXT("Name a lesson (e.g. NextTo); Happiness.Lessons.List lists them"));
+				Ar.Logf(TEXT("Name a lesson (e.g. NextTo); Happiness.%s.List lists them"), Track.Name);
 			}
 			return false;
 		}
@@ -60,7 +71,7 @@ namespace
 		const int64 Value = Arg.IsNumeric() ? FCString::Atoi(*Arg) : StaticEnum<ECampaignLesson>()->GetValueByNameString(Arg);
 		if (Value < 0 || Value > 255 || UCampaignTree::GetLessonColumn(ECampaignLesson(Value)) == INDEX_NONE)
 		{
-			Ar.Logf(TEXT("No lesson '%s' in the tree; Happiness.Lessons.List lists them"), *Arg);
+			Ar.Logf(TEXT("No lesson '%s' in the tree; Happiness.%s.List lists them"), *Arg, Track.Name);
 			return false;
 		}
 		Lesson = ECampaignLesson(Value);
@@ -86,144 +97,186 @@ namespace
 			: !Campaign.IsLessonUnlocked(Lesson) ? TEXT("locked")
 			: Stage == UCampaignSubsystem::GetFinalStage() ? TEXT("final open")
 			: TEXT("open");
-		Ar.Logf(TEXT("  %-16s column %d  %2d/%d points  stage %d  %s"), *LessonEnumName(Lesson),
-			UCampaignTree::GetLessonColumn(Lesson), Progress.Points, UCampaignSubsystem::GetMaxPoints(), Stage, State);
+		const FString Master = Campaign.IsMasterUnlocked(Lesson)
+			? FString::Printf(TEXT("  master %d/%d%s"), Progress.MasterPoints, UCampaignSubsystem::GetMasterMaxPoints(),
+				Progress.bMasterRevealed ? TEXT("") : TEXT(" (not shown yet)"))
+			: FString();
+		Ar.Logf(TEXT("  %-16s column %d  %2d/%d points  stage %d  %s%s"), *LessonEnumName(Lesson),
+			UCampaignTree::GetLessonColumn(Lesson), Progress.Points, UCampaignSubsystem::GetMaxPoints(), Stage, State, *Master);
 	}
 
-	using FLessonCommand = TFunction<void(UCampaignSubsystem&, const TArray<FString>&, UWorld*, FOutputDevice&)>;
-
-	/** Happiness.Lessons.<Name>; Run gets the world's campaign */
-	FAutoConsoleCommandWithWorldArgsAndOutputDevice MakeLessonCommand(const TCHAR* Name, const TCHAR* Help, FLessonCommand Run)
+	/** Switch to the track's mode; Campaign mode needs every lesson completed */
+	void EnterTrack(UCampaignSubsystem& Campaign, const FTrack& Track, FOutputDevice& Ar)
 	{
-		return FAutoConsoleCommandWithWorldArgsAndOutputDevice(*(FString(TEXT("Happiness.Lessons.")) + Name), Help,
+		if (Track.Mode == ECampaignMode::Campaign && !Campaign.IsCampaignModeUnlocked())
+		{
+			Campaign.CompleteAllLessons();
+			Ar.Log(TEXT("Campaign mode was locked: every lesson completed"));
+		}
+		if (UCampaignSubsystem::GetMode() != Track.Mode)
+		{
+			Campaign.SetMode(Track.Mode);
+			Ar.Logf(TEXT("Switched to %s mode"), Track.Name);
+		}
+	}
+
+	using FTrackCommand = TFunction<void(UCampaignSubsystem&, const FTrack&, const TArray<FString>&, UWorld*, FOutputDevice&)>;
+
+	TArray<TUniquePtr<FAutoConsoleCommandWithWorldArgsAndOutputDevice>> GCommands;
+
+	/** Happiness.<Track>.<Name>; Run gets the world's campaign, already in the track's mode */
+	void AddCommand(const FTrack& Track, const TCHAR* Name, const TCHAR* Help, FTrackCommand Run)
+	{
+		GCommands.Add(MakeUnique<FAutoConsoleCommandWithWorldArgsAndOutputDevice>(
+			*FString::Printf(TEXT("Happiness.%s.%s"), Track.Name, Name),
+			*FString::Printf(TEXT("Happiness.%s.%s%s"), Track.Name, Name, Help),
 			FConsoleCommandWithWorldArgsAndOutputDeviceDelegate::CreateLambda(
-				[Run](const TArray<FString>& Args, UWorld* World, FOutputDevice& Ar)
+				[Track, Run](const TArray<FString>& Args, UWorld* World, FOutputDevice& Ar)
 				{
 					if (UCampaignSubsystem* Campaign = UCampaignSubsystem::Get(World))
 					{
-						Run(*Campaign, Args, World, Ar);
+						EnterTrack(*Campaign, Track, Ar);
+						Run(*Campaign, Track, Args, World, Ar);
 					}
 					else
 					{
 						Ar.Log(TEXT("No game running (start PIE)"));
 					}
-				}));
+				})));
 	}
 
-	FAutoConsoleCommandWithWorldArgsAndOutputDevice GListCommand = MakeLessonCommand(TEXT("List"),
-		TEXT("Lists every lesson's progress in the current mode"),
-		[](UCampaignSubsystem& Campaign, const TArray<FString>&, UWorld*, FOutputDevice& Ar)
-		{
-			Ar.Logf(TEXT("%s mode:"), UCampaignSubsystem::GetMode() == ECampaignMode::Campaign ? TEXT("Campaign") : TEXT("Lessons"));
-			for (const TArray<ECampaignLesson>& Column : UCampaignTree::GetColumns())
+	void AddTrackCommands(const FTrack& InTrack)
+	{
+		AddCommand(InTrack, TEXT("List"), TEXT(": lists every lesson's progress"),
+			[](UCampaignSubsystem& Campaign, const FTrack& Track, const TArray<FString>&, UWorld*, FOutputDevice& Ar)
 			{
-				for (ECampaignLesson Lesson : Column)
+				Ar.Logf(TEXT("%s mode:"), Track.Name);
+				for (const TArray<ECampaignLesson>& Column : UCampaignTree::GetColumns())
 				{
+					for (ECampaignLesson Lesson : Column)
+					{
+						ReportLesson(Campaign, Lesson, Ar);
+					}
+				}
+			});
+
+		AddCommand(InTrack, TEXT("Reset"), TEXT(": clears every lesson"),
+			[](UCampaignSubsystem& Campaign, const FTrack&, const TArray<FString>&, UWorld*, FOutputDevice& Ar)
+			{
+				Campaign.DebugResetMode();
+				Ar.Log(TEXT("Every lesson cleared"));
+			});
+
+		AddCommand(InTrack, TEXT("Clear"), TEXT(" <Lesson>: clears one lesson's progress"),
+			[](UCampaignSubsystem& Campaign, const FTrack& Track, const TArray<FString>& Args, UWorld*, FOutputDevice& Ar)
+			{
+				ECampaignLesson Lesson;
+				if (ParseLessonArg(Args, 0, false, Campaign, Track, Lesson, Ar))
+				{
+					Campaign.DebugSetLesson(Lesson, 0, false);
 					ReportLesson(Campaign, Lesson, Ar);
 				}
-			}
-		});
+			});
 
-	FAutoConsoleCommandWithWorldArgsAndOutputDevice GResetCommand = MakeLessonCommand(TEXT("Reset"),
-		TEXT("Clears every lesson in the current mode"),
-		[](UCampaignSubsystem& Campaign, const TArray<FString>&, UWorld*, FOutputDevice& Ar)
-		{
-			Campaign.DebugResetMode();
-			Ar.Log(TEXT("Every lesson cleared"));
-		});
-
-	FAutoConsoleCommandWithWorldArgsAndOutputDevice GClearCommand = MakeLessonCommand(TEXT("Clear"),
-		TEXT("Happiness.Lessons.Clear <Lesson>: clears one lesson's progress"),
-		[](UCampaignSubsystem& Campaign, const TArray<FString>& Args, UWorld*, FOutputDevice& Ar)
-		{
-			ECampaignLesson Lesson;
-			if (ParseLessonArg(Args, 0, false, Campaign, Lesson, Ar))
+		AddCommand(InTrack, TEXT("Points"), TEXT(" <Lesson> <N>: sets a lesson's points, its final not completed"),
+			[](UCampaignSubsystem& Campaign, const FTrack& Track, const TArray<FString>& Args, UWorld*, FOutputDevice& Ar)
 			{
-				Campaign.DebugSetLesson(Lesson, 0, false);
-				ReportLesson(Campaign, Lesson, Ar);
-			}
-		});
-
-	FAutoConsoleCommandWithWorldArgsAndOutputDevice GPointsCommand = MakeLessonCommand(TEXT("Points"),
-		TEXT("Happiness.Lessons.Points <Lesson> <N>: sets a lesson's points, its final not completed"),
-		[](UCampaignSubsystem& Campaign, const TArray<FString>& Args, UWorld*, FOutputDevice& Ar)
-		{
-			ECampaignLesson Lesson;
-			int32 Points;
-			if (ParseLessonArg(Args, 0, false, Campaign, Lesson, Ar) && ParseIntArg(Args, 1, Points, Ar))
-			{
-				Campaign.DebugSetLesson(Lesson, Points, false);
-				ReportLesson(Campaign, Lesson, Ar);
-			}
-		});
-
-	FAutoConsoleCommandWithWorldArgsAndOutputDevice GStageCommand = MakeLessonCommand(TEXT("Stage"),
-		TEXT("Happiness.Lessons.Stage <Lesson> <Stage>: just enough points to unlock the stage (0 first, the final last)"),
-		[](UCampaignSubsystem& Campaign, const TArray<FString>& Args, UWorld*, FOutputDevice& Ar)
-		{
-			ECampaignLesson Lesson;
-			int32 Stage;
-			if (ParseLessonArg(Args, 0, false, Campaign, Lesson, Ar) && ParseIntArg(Args, 1, Stage, Ar))
-			{
-				Stage = FMath::Clamp(Stage, 0, UCampaignSubsystem::GetFinalStage());
-				Campaign.DebugSetLesson(Lesson, UCampaignSubsystem::GetStagePointsRequired(Stage), false);
-				ReportLesson(Campaign, Lesson, Ar);
-			}
-		});
-
-	FAutoConsoleCommandWithWorldArgsAndOutputDevice GToFinalCommand = MakeLessonCommand(TEXT("ToFinal"),
-		TEXT("Happiness.Lessons.ToFinal [Lesson]: every point, the final open but not played (default: the next lesson)"),
-		[](UCampaignSubsystem& Campaign, const TArray<FString>& Args, UWorld*, FOutputDevice& Ar)
-		{
-			ECampaignLesson Lesson;
-			if (ParseLessonArg(Args, 0, true, Campaign, Lesson, Ar))
-			{
-				Campaign.DebugSetLesson(Lesson, UCampaignSubsystem::GetMaxPoints(), false);
-				ReportLesson(Campaign, Lesson, Ar);
-			}
-		});
-
-	FAutoConsoleCommandWithWorldArgsAndOutputDevice GCompleteCommand = MakeLessonCommand(TEXT("Complete"),
-		TEXT("Happiness.Lessons.Complete [Lesson]: completes it; a showing lessons tree plays its completion (default: the next lesson)"),
-		[](UCampaignSubsystem& Campaign, const TArray<FString>& Args, UWorld* World, FOutputDevice& Ar)
-		{
-			ECampaignLesson Lesson;
-			if (!ParseLessonArg(Args, 0, true, Campaign, Lesson, Ar))
-			{
-				return;
-			}
-			Campaign.DebugSetLesson(Lesson, UCampaignSubsystem::GetMaxPoints(), true, true);
-			ReportLesson(Campaign, Lesson, Ar);
-
-			// As if back from its final. Not showing: it plays when the tree next comes back from a lesson puzzle.
-			for (TObjectIterator<UCampaignTreeWidget> Tree; Tree; ++Tree)
-			{
-				if (Tree->GetWorld() == World && Tree->IsVisible())
+				ECampaignLesson Lesson;
+				int32 Points;
+				if (ParseLessonArg(Args, 0, false, Campaign, Track, Lesson, Ar) && ParseIntArg(Args, 1, Points, Ar))
 				{
-					Tree->ShowForLessonSession();
+					Campaign.DebugSetLesson(Lesson, Points, false);
+					ReportLesson(Campaign, Lesson, Ar);
 				}
-			}
-		});
+			});
 
-	FAutoConsoleCommandWithWorldArgsAndOutputDevice GToColumnCommand = MakeLessonCommand(TEXT("ToColumn"),
-		TEXT("Happiness.Lessons.ToColumn <Column>: completes every lesson before the tree column (0 first) and clears the rest"),
-		[](UCampaignSubsystem& Campaign, const TArray<FString>& Args, UWorld*, FOutputDevice& Ar)
-		{
-			int32 Target;
-			if (!ParseIntArg(Args, 0, Target, Ar))
+		AddCommand(InTrack, TEXT("Stage"), TEXT(" <Lesson> <Stage>: just enough points to unlock the stage (0 first, the final last)"),
+			[](UCampaignSubsystem& Campaign, const FTrack& Track, const TArray<FString>& Args, UWorld*, FOutputDevice& Ar)
 			{
-				return;
-			}
-			const TArray<TArray<ECampaignLesson>>& Columns = UCampaignTree::GetColumns();
-			for (int32 Column = 0; Column < Columns.Num(); Column++)
-			{
-				for (ECampaignLesson Lesson : Columns[Column])
+				ECampaignLesson Lesson;
+				int32 Stage;
+				if (ParseLessonArg(Args, 0, false, Campaign, Track, Lesson, Ar) && ParseIntArg(Args, 1, Stage, Ar))
 				{
-					const bool bDone = Column < Target;
-					Campaign.DebugSetLesson(Lesson, bDone ? UCampaignSubsystem::GetMaxPoints() : 0, bDone);
+					Stage = FMath::Clamp(Stage, 0, UCampaignSubsystem::GetFinalStage());
+					Campaign.DebugSetLesson(Lesson, UCampaignSubsystem::GetStagePointsRequired(Stage), false);
+					ReportLesson(Campaign, Lesson, Ar);
 				}
-			}
-			Ar.Logf(TEXT("Columns before %d completed, the rest cleared"), Target);
-		});
+			});
+
+		AddCommand(InTrack, TEXT("ToFinal"), TEXT(" [Lesson]: every point, the final open but not played (default: the next lesson)"),
+			[](UCampaignSubsystem& Campaign, const FTrack& Track, const TArray<FString>& Args, UWorld*, FOutputDevice& Ar)
+			{
+				ECampaignLesson Lesson;
+				if (ParseLessonArg(Args, 0, true, Campaign, Track, Lesson, Ar))
+				{
+					Campaign.DebugSetLesson(Lesson, UCampaignSubsystem::GetMaxPoints(), false);
+					ReportLesson(Campaign, Lesson, Ar);
+				}
+			});
+
+		AddCommand(InTrack, TEXT("Complete"), TEXT(" [Lesson]: completes it; a showing lessons tree plays its completion (default: the next lesson)"),
+			[](UCampaignSubsystem& Campaign, const FTrack& Track, const TArray<FString>& Args, UWorld* World, FOutputDevice& Ar)
+			{
+				ECampaignLesson Lesson;
+				if (!ParseLessonArg(Args, 0, true, Campaign, Track, Lesson, Ar))
+				{
+					return;
+				}
+				Campaign.DebugSetLesson(Lesson, UCampaignSubsystem::GetMaxPoints(), true, true);
+				ReportLesson(Campaign, Lesson, Ar);
+
+				// As if back from its final. Not showing: it plays when the tree next comes back from a lesson puzzle.
+				for (TObjectIterator<UCampaignTreeWidget> Tree; Tree; ++Tree)
+				{
+					if (Tree->GetWorld() == World && Tree->IsVisible())
+					{
+						Tree->ShowForLessonSession();
+					}
+				}
+			});
+
+		AddCommand(InTrack, TEXT("ToColumn"), TEXT(" <Column>: completes every lesson before the tree column (0 first) and clears the rest"),
+			[](UCampaignSubsystem& Campaign, const FTrack&, const TArray<FString>& Args, UWorld*, FOutputDevice& Ar)
+			{
+				int32 Target;
+				if (!ParseIntArg(Args, 0, Target, Ar))
+				{
+					return;
+				}
+				const TArray<TArray<ECampaignLesson>>& Columns = UCampaignTree::GetColumns();
+				for (int32 Column = 0; Column < Columns.Num(); Column++)
+				{
+					for (ECampaignLesson Lesson : Columns[Column])
+					{
+						const bool bDone = Column < Target;
+						Campaign.DebugSetLesson(Lesson, bDone ? UCampaignSubsystem::GetMaxPoints() : 0, bDone);
+					}
+				}
+				Ar.Logf(TEXT("Columns before %d completed, the rest cleared"), Target);
+			});
+	}
+
+	struct FRegisterCommands
+	{
+		FRegisterCommands()
+		{
+			const FTrack LessonsTrack{ECampaignMode::Lessons, TEXT("Lessons")};
+			const FTrack CampaignTrack{ECampaignMode::Campaign, TEXT("Campaign")};
+			AddTrackCommands(LessonsTrack);
+			AddTrackCommands(CampaignTrack);
+
+			AddCommand(CampaignTrack, TEXT("Master"), TEXT(" <Lesson> <N>: completes it and sets its Master Mode puzzles solved, already shown"),
+				[](UCampaignSubsystem& Campaign, const FTrack& Track, const TArray<FString>& Args, UWorld*, FOutputDevice& Ar)
+				{
+					ECampaignLesson Lesson;
+					int32 Points;
+					if (ParseLessonArg(Args, 0, false, Campaign, Track, Lesson, Ar) && ParseIntArg(Args, 1, Points, Ar))
+					{
+						Campaign.DebugSetMaster(Lesson, Points);
+						ReportLesson(Campaign, Lesson, Ar);
+					}
+				});
+		}
+	} GRegisterCommands;
 }
 #endif
