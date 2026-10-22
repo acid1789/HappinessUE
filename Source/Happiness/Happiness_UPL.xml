@@ -26,6 +26,18 @@
 			});
 		}
 	}
+
+	/** UBackButtonSubsystem: the back button sends the app to the background, like Home */
+	public void AndroidThunkJava_Happiness_MoveToBack()
+	{
+		runOnUiThread(new Runnable()
+		{
+			public void run()
+			{
+				moveTaskToBack(true);
+			}
+		});
+	}
 		</insert>
 	</gameActivityClassAdditions>
 </root>

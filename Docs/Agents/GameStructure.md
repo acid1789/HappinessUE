@@ -95,6 +95,14 @@ itself (alerts and sound, no push); Android 13+ asks for `POST_NOTIFICATIONS` th
 `ic_notification` drawable if there is one, else the app icon. Test on a phone with `Happiness.Reminder.Test [seconds]`.
 Android and iOS only; it does nothing in the editor.
 
+## Android back button
+
+`UBackButtonSubsystem` (`Source/Happiness/BackButton.*`, Android only) catches the back button before the UI does (a
+Slate input preprocessor) and sends the app to the background with `moveTaskToBack` (Java side
+`AndroidThunkJava_Happiness_MoveToBack` in `Happiness_UPL.xml`), like Home: the game keeps its state. Mid-puzzle it
+first calls WBP_Happiness's `Pause` (saves the time, shows the pause menu), unless the pause menu or an end screen is
+already showing. No screen handles back itself.
+
 ## Save data
 
 Everything lives in one save slot, `HappinessSave`, written by `SG_Happiness` (parent class

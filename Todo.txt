@@ -18,7 +18,6 @@ Game Rules
 Campaign
 
 --- Dev tasks ---
-Lessons Glow not behind properly
 Back should background the app.
 
 
