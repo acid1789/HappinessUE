@@ -3,6 +3,7 @@
 #include "Blueprint/UserWidget.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
+#include "Components/Border.h"
 #include "Components/GridPanel.h"
 #include "Components/HorizontalBox.h"
 #include "Components/Image.h"
@@ -76,7 +77,7 @@ namespace
 	}
 }
 
-FString UHappinessUIToolset::RenderWidget(const FString& WidgetBlueprintPath, int32 Width, int32 Height, const FString& OutputFile, int32 PreviewPuzzleSize)
+FString UHappinessUIToolset::RenderWidget(const FString& WidgetBlueprintPath, int32 Width, int32 Height, const FString& OutputFile, int32 PreviewPuzzleSize, bool bPreviewHint)
 {
 	if (!GEditor)
 	{
@@ -124,8 +125,26 @@ FString UHappinessUIToolset::RenderWidget(const FString& WidgetBlueprintPath, in
 	// Draw a few frames: the first lays the widget out, later ones can use cached child geometry
 	// (the campaign tree places its connector lines from its nodes' cached geometry)
 	TSharedRef<SWidget> SlateWidget = Widget->TakeWidget();
-	FWidgetRenderer Renderer(true, false);
-	for (int32 Pass = 0; Pass < (PreviewPuzzleSize != 0 ? 5 : 3); Pass++)
+	if (bPreviewHint)
+	{
+		for (const FName Name : {FName(TEXT("PauseMenu")), FName(TEXT("EndScreen")), FName(TEXT("LessonEndScreen")), FName(TEXT("CampaignEndScreen")), FName(TEXT("ConfirmDialog")), FName(TEXT("CellDialog")), FName(TEXT("PuzzleFailed"))})
+		{
+			if (UWidget* Overlay = Widget->GetWidgetFromName(Name)) Overlay->SetVisibility(ESlateVisibility::Collapsed);
+		}
+		if (UUserWidget* Hint = Cast<UUserWidget>(Widget->GetWidgetFromName(TEXT("HintInfo"))))
+		{
+			if (UCanvasPanel* Root = Cast<UCanvasPanel>(Hint->GetRootWidget()))
+			{
+				for (UWidget* Child : Root->GetAllChildren())
+				{
+					if (UBorder* Frame = Cast<UBorder>(Child)) Frame->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+				}
+			}
+		}
+	}
+	// Layout can move or resize text between passes; clear the previous pass.
+	FWidgetRenderer Renderer(true, true);
+	for (int32 Pass = 0; Pass < 6; Pass++)
 	{
 		Renderer.DrawWidget(Target, SlateWidget, DrawSize, 0.016f);
 	}

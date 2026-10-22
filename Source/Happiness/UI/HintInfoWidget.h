@@ -5,6 +5,9 @@
 #include "HappinessClassic/ClueHelp.h"
 #include "HintInfoWidget.generated.h"
 
+class UVerticalBox;
+class UFont;
+class UTexture2D;
 class UHint;
 class UPanelWidget;
 class UTextBlock;
@@ -15,7 +18,7 @@ class UWidget;
  *   - the clue it comes from, as the help line shows it ("[icon] is directly left of [icon]")
  *   - why the hint follows and what to do (UHint::GetExplanation), e.g. "Since [Daisy] is in this column, [Top] can't be here"
  *
- * The widget covers the vertical clue strip and stays laid out (only Box is hidden), so it always knows where the
+	* The widget spans from the puzzle grid to the screen bottom and stays laid out (only Box is hidden), so it always knows where the
  * hinted clue is: Box goes on the side of the clue with more room and stops short of it.
  * Clue and action lines are built from the same WBP_HelpText / WBP_HelpIcon pieces as the help line.
  */
@@ -70,10 +73,20 @@ public:
 	void HideHint();
 
 protected:
+	virtual void NativePreConstruct() override;
 	virtual void NativeConstruct() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 private:
+	void BuildPresentation();
+	void FitTextToPanel();
+	void MatchClueStripBounds();
+	FVector2D LastReadingSize = FVector2D::ZeroVector;
+	UPROPERTY(Transient) TObjectPtr<UVerticalBox> HintContent;
+	UPROPERTY() TObjectPtr<UFont> HintFont;
+	UPROPERTY() TObjectPtr<UTexture2D> HintPanelTexture;
+	UPROPERTY() TObjectPtr<UTexture2D> HintBadgeTexture;
+
 	void BuildLine(UPanelWidget* Line, const FClueHelp& Help, const TArray<UObject*>& IconSets);
 	void PlaceBox(UWidget* HintClue);
 
