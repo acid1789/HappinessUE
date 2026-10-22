@@ -63,6 +63,46 @@ level and EXP (`HappinessLevel`, `HappinessExp`).
   "reason, then result".
 - `CampaignTree.*`, `CampaignProgress.*`, `FreePlaySettings.*`, `HappinessSaveGame.*`: modes and progress.
 
+## Streak savers
+
+Bought days that cover missed daily puzzles (`UDailySubsystem`, `Ads/StreakSaverStore.*`, `UI/StreakSaverPanel.*`).
+Days missed since the streak's last day use saver days up first: a broken streak comes back (the missed days don't
+count toward it) and what's left protects later misses. Saver days are only used when there are enough for every
+missed day; otherwise the streak stays broken, the mode screen says it can be saved, and more days still bring it
+back until the next daily solve starts a new streak (the saver days left then protect that one). Saved in
+`FDailySaveData`: `SaverDays`, `CoveredThrough` (the last day savers covered), `SaverTransactions` (purchases already
+granted, so a purchase the store reports again isn't counted twice).
+
+Products are consumables `streak_saver_1`, `streak_saver_7`, `streak_saver_30` (1, 7, 30 days; ids are config on
+`UStreakSaverStoreSubsystem`, prices come from the stores). A purchase is granted, then consumed (Google Play) or
+finished (StoreKit); unfinished ones are picked up on the next store check. Editor and PC development builds have no
+store: buying grants the days at once. The mode screen makes the Streak Saver button (just above the Daily tile, never over a tile) and the
+panel itself (`UHappinessModeWidget::MakeStreakSaverButton`); a `StreakSaverButton` in the layout replaces the made one.
+Test with `Happiness.DailyDate` (a later date = missed days) and `Happiness.StreakSaver.Set <days>`.
+
+## Daily reminder
+
+`UDailyReminderSubsystem` (`HappinessClassic/DailyReminder`) schedules a phone notification for each of the next
+`DaysAhead` (7) days at `ReminderHour:ReminderMinute` local time (1:00; config `[/Script/Happiness.DailyReminderSubsystem]`
+in `DefaultGame.ini`), using the engine's local notifications (`UBlueprintPlatformLibrary`). It reschedules on startup,
+on coming back to the foreground and on `UDailySubsystem::OnChanged`, so a solved day gets no reminder and reminders
+stop a week after the app was last opened. The first one says "Keep your N-day streak going!" while the streak is
+still going. With a streak of 8+ days (`EveningMinStreak`) it also schedules an evening reminder at
+20:00 (`EveningHour`) on the next day not yet solved; solving that day reschedules and drops it. Permission is asked once, after the first daily solve (`bAskedPermission` in GameUserSettings): iOS asks
+itself (alerts and sound, no push); Android 13+ asks for `POST_NOTIFICATIONS` through
+`AndroidThunkJava_Happiness_RequestNotifications` in `Happiness_UPL.xml`, which also declares the permission.
+`bRestoreNotificationsOnReboot` brings Android's back after a restart. On Android the small icon is the
+`ic_notification` drawable if there is one, else the app icon. Test on a phone with `Happiness.Reminder.Test [seconds]`.
+Android and iOS only; it does nothing in the editor.
+
+## Android back button
+
+`UBackButtonSubsystem` (`Source/Happiness/BackButton.*`, Android only) catches the back button before the UI does (a
+Slate input preprocessor) and sends the app to the background with `moveTaskToBack` (Java side
+`AndroidThunkJava_Happiness_MoveToBack` in `Happiness_UPL.xml`), like Home: the game keeps its state. Mid-puzzle it
+first calls WBP_Happiness's `Pause` (saves the time, shows the pause menu), unless the pause menu or an end screen is
+already showing. No screen handles back itself.
+
 ## Save data
 
 Everything lives in one save slot, `HappinessSave`, written by `SG_Happiness` (parent class

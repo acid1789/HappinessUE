@@ -272,7 +272,7 @@ python Tools/mcp_call.py $A StopPIE '{}'
   dev commands, engine commands (`slomo 0.5`, `stat fps`), console variables (`Happiness.PreviewAdLayout 1`) and
   log verbosity (`log LogTemp Verbose`). It returns false when PIE isn't running.
 - **The game's dev commands** (development builds only): `Happiness.SolvePuzzle`, `Happiness.CompleteAllLessons`, `Happiness.Lessons.*`,
-  `Happiness.DailyDate`, `Happiness.ResetDaily`, `Happiness.PreviewAdLayout`, `Happiness.Ads`,
+  `Happiness.DailyDate`, `Happiness.ResetDaily`, `Happiness.StreakSaver.Set`, `Happiness.Reminder.Test`, `Happiness.PreviewAdLayout`, `Happiness.Ads`,
   `Happiness.LargeBanner`, `Happiness.RemoveAdsToken`, `Happiness.TestAd`. Find them all with
   `grep -rhn 'TEXT("Happiness\.' Source/Happiness`.
 - **`CaptureEditorImage` is for screens, not motion.** Each capture takes long enough that an animation or effect

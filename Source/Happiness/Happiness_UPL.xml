@@ -5,5 +5,39 @@
 		<!-- A game: Android 16+ (API 36) keeps its landscape-only orientation on tablets and foldables instead of
 		     letting the system rotate or resize it -->
 		<addAttribute tag="application" name="android:appCategory" value="game"/>
+		<!-- The daily puzzle reminder (UDailyReminderSubsystem): Android 13+ only notifies with this permission -->
+		<addPermission android:name="android.permission.POST_NOTIFICATIONS"/>
 	</androidManifestUpdates>
+
+	<gameActivityClassAdditions>
+		<insert>
+	/** UDailyReminderSubsystem: ask for permission to notify (Android 13+; earlier versions need none) */
+	public void AndroidThunkJava_Happiness_RequestNotifications()
+	{
+		if (android.os.Build.VERSION.SDK_INT &gt;= 33 &amp;&amp;
+			checkSelfPermission("android.permission.POST_NOTIFICATIONS") != android.content.pm.PackageManager.PERMISSION_GRANTED)
+		{
+			runOnUiThread(new Runnable()
+			{
+				public void run()
+				{
+					requestPermissions(new String[] { "android.permission.POST_NOTIFICATIONS" }, 7301);
+				}
+			});
+		}
+	}
+
+	/** UBackButtonSubsystem: the back button sends the app to the background, like Home */
+	public void AndroidThunkJava_Happiness_MoveToBack()
+	{
+		runOnUiThread(new Runnable()
+		{
+			public void run()
+			{
+				moveTaskToBack(true);
+			}
+		});
+	}
+		</insert>
+	</gameActivityClassAdditions>
 </root>

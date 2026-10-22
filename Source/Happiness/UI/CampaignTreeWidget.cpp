@@ -771,6 +771,10 @@ void UCampaignTreeWidget::RebuildTree()
 	FillCanvas(LinesSlot);
 	LinesSlot->SetZOrder(0);
 	const FLinearColor Ink(.105f, .047f, .018f), Ivory(1.f, .94f, .77f);
+	// Every node child gets its own ZOrder: with explicit canvas ZOrder (bExplicitCanvasChildZOrder), a canvas only moves
+	// to a new layer at the first child of each ZOrder, and skips that when the child is culled. Shared ZOrders put every
+	// badge and node on the lines' layer (under the halo and connectors) once column 1 scrolls out of view.
+	int32 BadgeZOrder = 1000, NodeZOrder = 2000;
 	for (int32 Column = 0; Column < Columns.Num(); ++Column)
 	{
 		const float X = (Column + .5f) * LessonColumnSpacing;
@@ -787,7 +791,7 @@ void UCampaignTreeWidget::RebuildTree()
 		UCanvasPanelSlot* BadgeSlot = NodeCanvas->AddChildToCanvas(Badge);
 		BadgeSlot->SetPosition(FVector2D(X - 87, TopY - 66));
 		BadgeSlot->SetSize(FVector2D(174, 68));
-		BadgeSlot->SetZOrder(1);
+		BadgeSlot->SetZOrder(++BadgeZOrder);
 		UTextBlock* Number = WidgetTree->ConstructWidget<UTextBlock>();
 		Number->SetText(FText::AsNumber(Column + 1));
 		Number->SetFont(FSlateFontInfo(LessonSerifFont, 36));
@@ -807,7 +811,7 @@ void UCampaignTreeWidget::RebuildTree()
 		UCanvasPanelSlot* CountSlot = NodeCanvas->AddChildToCanvas(CountPanel);
 		CountSlot->SetPosition(FVector2D(X - 175, TopY + (Lessons.Num() - 1) * 254.f + 260.f));
 		CountSlot->SetSize(FVector2D(350, 54));
-		CountSlot->SetZOrder(1);
+		CountSlot->SetZOrder(++BadgeZOrder);
 		UTextBlock* CountText = WidgetTree->ConstructWidget<UTextBlock>();
 		CountText->SetFont(FSlateFontInfo(LessonSerifFont, 26));
 		CountText->SetColorAndOpacity(FSlateColor(Ink));
@@ -857,7 +861,7 @@ void UCampaignTreeWidget::RebuildTree()
 			UCanvasPanelSlot* NodeSlot = NodeCanvas->AddChildToCanvas(Button);
 			NodeSlot->SetPosition(FVector2D(X - 146, Y));
 			NodeSlot->SetSize(FVector2D(292, 214));
-			NodeSlot->SetZOrder(2);
+			NodeSlot->SetZOrder(++NodeZOrder);
 			UCampaignTreeNodeClick* Click = NewObject<UCampaignTreeNodeClick>(this);
 			Click->Lesson = Lesson;
 			Click->Tree = this;

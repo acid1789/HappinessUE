@@ -13,6 +13,12 @@ Lock a widget before changing it (`python Tools/editor_gate.py lock /Game/... --
 change the current `set_target_umg_asset` target are refused without its lock; reading the tree and querying
 properties need none ([EditorTooling.md](EditorTooling.md#file-locks)).
 
+- **Canvas ZOrder and culling:** the project sets `bExplicitCanvasChildZOrder=True`, so a canvas only moves to a new
+  paint layer at the first child of each ZOrder value, and skips even that when the child is culled (off-screen).
+  Children sharing a ZOrder whose first member scrolls out of view then paint on the layer below, under things that
+  should be behind them. In scrolling canvases, give children that must stack their own ZOrder each
+  (`UCampaignTreeWidget::RebuildTree` numbers its badges and nodes).
+
 ## Basics
 
 ```bash
