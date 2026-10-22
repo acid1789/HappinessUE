@@ -19,7 +19,7 @@ static FAutoConsoleCommandWithWorld GCompleteAllLessonsCommand(
 	{
 		if (UCampaignSubsystem* Campaign = UCampaignSubsystem::Get(World))
 		{
-			Campaign->DebugCompleteAllLessons();
+			Campaign->CompleteAllLessons();
 		}
 	}));
 #endif
@@ -548,7 +548,7 @@ void UCampaignSubsystem::EndLessonSession()
 	}
 }
 
-void UCampaignSubsystem::DebugCompleteAllLessons()
+void UCampaignSubsystem::CompleteAllLessons()
 {
 	for (const TArray<ECampaignLesson>& Column : UCampaignTree::GetColumns())
 	{

@@ -1,6 +1,7 @@
 #include "UI/CampaignTreeWidget.h"
 
 #include "HappinessClassic/CampaignProgress.h"
+#include "UI/CompleteLessonsPanel.h"
 #include "HappinessClassic/CampaignTree.h"
 #include "UI/GameRulesWidget.h"
 #include "UI/LessonPopupWidget.h"
@@ -659,6 +660,10 @@ void UCampaignTreeWidget::SetVisibility(ESlateVisibility InVisibility)
 		bCenterCurrentColumn = true;
 	}
 	Super::SetVisibility(InVisibility);
+	if (CompleteLessons)
+	{
+		CompleteLessons->Refresh();
+	}
 	if (InVisibility == ESlateVisibility::Collapsed || InVisibility == ESlateVisibility::Hidden)
 	{
 		EndCelebration();

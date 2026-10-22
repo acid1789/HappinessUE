@@ -9,6 +9,21 @@ class UCanvasPanel;
 class UTexture2D;
 class UFont;
 
+/**
+ * What WBP_Happiness's confirm dialog is asking (its ShowConfirmDialog Type and ConfirmType; ConfirmConfirm switches
+ * on it). Was the Blueprint enum /Game/Happiness/Blueprints/EHappinessConfirmType: DefaultEngine.ini's
+ * [CoreRedirects] points that, and its NewEnumerator0..4 values, here. Add new values at the end.
+ */
+UENUM(BlueprintType)
+enum class EHappinessConfirmType : uint8
+{
+	Hint,
+	ResetPuzzle,
+	FixPuzzle,
+	SaveAndQuit,
+	MainMenu,
+};
+
 /** Smooth confirmation/cancel silhouettes and the plaque's small leaf ornament. */
 UCLASS()
 class HAPPINESS_API UConfirmDialogGlyph : public UWidget
@@ -40,6 +55,12 @@ public:
 
 	virtual void SetVisibility(ESlateVisibility InVisibility) override;
 
+	/**
+	 * Ask from C++, where no Blueprint handles the dialog's Confirm and Cancel (e.g. the Lessons screen's
+	 * UCompleteLessonsPanel): shows Question and Description; either button closes it, and Confirm then calls OnConfirm.
+	 */
+	void Ask(const FText& Question, const FString& Description, TFunction<void()> OnConfirm);
+
 protected:
 	virtual void NativePreConstruct() override;
 	virtual void NativeConstruct() override;
@@ -49,6 +70,11 @@ protected:
 
 private:
 	void BuildPlaqueLayout();
+	UFUNCTION() void HandleConfirmPressed();
+	UFUNCTION() void HandleCancelPressed();
+	/** Set by Ask, until the dialog closes */
+	TFunction<void()> AskConfirmed;
+	bool bAsking = false;
 	UPROPERTY() TObjectPtr<UTexture2D> PlaqueTexture;
 	UPROPERTY() TObjectPtr<UTexture2D> ButtonTexture;
 	UPROPERTY() TObjectPtr<UTexture2D> ConfirmTexture;

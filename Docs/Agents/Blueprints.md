@@ -93,6 +93,13 @@ with `read_graph_dsl` to confirm the result.
 
 ## Gotchas
 
+- **Moving a Blueprint enum to C++** (there is no tool to add entries to a Blueprint enum): declare the UENUM, then
+  point the asset at it in `DefaultEngine.ini` `[CoreRedirects]` with `+EnumRedirects=(OldName="/Game/.../E.E",
+  NewName="/Script/Happiness.E",OverrideClassName="/Script/CoreUObject.Enum",ValueChanges=(("NewEnumerator0","A"),...))`.
+  Without `OverrideClassName` the import keeps class `UserDefinedEnum`, fails to resolve, and every switch on it
+  becomes "Switch on (bad enum)". Blueprints using it then load through the redirect with no edit; they store the
+  native enum the next time they are saved. Example: `EHappinessConfirmType` (`UI/ConfirmDialogWidget.h`).
+
 - **ForEachLoop re-reads a pure array input every iteration.** Removing items from that array inside the loop
   (e.g. `RemoveFromParent` over `GetAllChildren`) skips every other item. Iterate with `ReverseforEachLoop`.
 - **Local variables are per call,** so a function can call itself (used by `WBP_Happiness.DoHint`).

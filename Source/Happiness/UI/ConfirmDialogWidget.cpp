@@ -218,6 +218,43 @@ void UConfirmDialogWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 	SetDescription(GetGameInstance()?FString():TEXT("Your current choices will be cleared."));
+	// Pressed, like the Blueprint's Confirm and Cancel: the dialog hides then, so a click would never finish
+	if(UButton* Confirm=Cast<UButton>(GetWidgetFromName(TEXT("Button_Confirm"))))
+	{
+		Confirm->OnPressed.AddUniqueDynamic(this,&UConfirmDialogWidget::HandleConfirmPressed);
+	}
+	if(UButton* Cancel=Cast<UButton>(GetWidgetFromName(TEXT("Button_Cancel"))))
+	{
+		Cancel->OnPressed.AddUniqueDynamic(this,&UConfirmDialogWidget::HandleCancelPressed);
+	}
+}
+
+void UConfirmDialogWidget::Ask(const FText& Question, const FString& Description, TFunction<void()> OnConfirm)
+{
+	// The Blueprint's SetMessage sets its Message variable, which may be bound to the question's text
+	if(const FTextProperty* Message=FindFProperty<FTextProperty>(GetClass(),TEXT("Message")))
+		Message->SetPropertyValue_InContainer(this,Question);
+	else if(const FStrProperty* MessageString=FindFProperty<FStrProperty>(GetClass(),TEXT("Message")))
+		MessageString->SetPropertyValue_InContainer(this,Question.ToString());
+	if(UTextBlock* QuestionText=Cast<UTextBlock>(GetWidgetFromName(TEXT("TextBlock_142"))))
+		QuestionText->SetText(Question);
+	SetVisibility(ESlateVisibility::Visible);
+	SetDescription(Description);
+	AskConfirmed=MoveTemp(OnConfirm);
+	bAsking=true;
+}
+
+void UConfirmDialogWidget::HandleConfirmPressed()
+{
+	if(!bAsking) return;
+	TFunction<void()> Confirmed=MoveTemp(AskConfirmed);
+	SetVisibility(ESlateVisibility::Collapsed);
+	if(Confirmed) Confirmed();
+}
+
+void UConfirmDialogWidget::HandleCancelPressed()
+{
+	if(bAsking) SetVisibility(ESlateVisibility::Collapsed);
 }
 
 void UConfirmDialogWidget::SetDescription(FString Description)
@@ -236,6 +273,8 @@ void UConfirmDialogWidget::SetVisibility(ESlateVisibility InVisibility)
 	if (InVisibility == ESlateVisibility::Hidden || InVisibility == ESlateVisibility::Collapsed)
 	{
 		SetDescription(FString());
+		AskConfirmed.Reset();
+		bAsking=false;
 	}
 }
 

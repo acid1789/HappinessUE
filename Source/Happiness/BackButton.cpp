@@ -6,7 +6,6 @@
 #include "Framework/Application/IInputProcessor.h"
 #include "Framework/Application/SlateApplication.h"
 #include "InputCoreTypes.h"
-#include "UI/GamePanelWidget.h"
 
 #if PLATFORM_ANDROID
 #include "Android/AndroidApplication.h"
@@ -30,29 +29,56 @@ namespace
 #endif
 	}
 
+	/** It and every widget it is inside show, up to one in the viewport */
+	bool IsShowing(const UWidget* Widget)
+	{
+		while (Widget)
+		{
+			if (!Widget->IsVisible())
+			{
+				return false;
+			}
+			if (const UWidget* Parent = Widget->GetParent())
+			{
+				Widget = Parent;
+				continue;
+			}
+			const UUserWidget* Top = Cast<UUserWidget>(Widget);
+			if (Top && Top->IsInViewport())
+			{
+				return true;
+			}
+			// The root of a widget's tree: on to the widget whose tree it is
+			Widget = Widget->GetTypedOuter<UUserWidget>();
+		}
+		return false;
+	}
+
 	/**
 	 * Mid-puzzle, pause it first (WBP_Happiness's Pause: saves the time, shows the pause menu), so the clock stops and
 	 * the player comes back to the pause menu. Not when it's already paused or the puzzle is over (an end screen).
+	 * WBP_Happiness has no C++ parent: it is the screen with a Pause function and a PauseMenu.
 	 */
 	void PausePuzzle(UWorld* World)
 	{
 		static const FName Showing[] = { TEXT("PauseMenu"), TEXT("EndScreen"), TEXT("LessonEndScreen"), TEXT("CampaignEndScreen") };
 
 		TArray<UUserWidget*> Screens;
-		UWidgetBlueprintLibrary::GetAllWidgetsOfClass(World, Screens, UGamePanelWidget::StaticClass(), true);
+		UWidgetBlueprintLibrary::GetAllWidgetsOfClass(World, Screens, UUserWidget::StaticClass(), false);
 		for (UUserWidget* Screen : Screens)
 		{
-			if (!Screen->IsInViewport() || !Screen->IsVisible())
+			UFunction* Pause = Screen->FindFunction(TEXT("Pause"));
+			if (!Pause || !Screen->WidgetTree || !Screen->WidgetTree->FindWidget(Showing[0]) || !IsShowing(Screen))
 			{
 				continue;
 			}
 			bool bPaused = false;
 			for (const FName& Name : Showing)
 			{
-				const UWidget* Overlay = Screen->WidgetTree ? Screen->WidgetTree->FindWidget(Name) : nullptr;
+				const UWidget* Overlay = Screen->WidgetTree->FindWidget(Name);
 				bPaused |= Overlay && Overlay->IsVisible();
 			}
-			if (UFunction* Pause = !bPaused ? Screen->FindFunction(TEXT("Pause")) : nullptr)
+			if (!bPaused)
 			{
 				Screen->ProcessEvent(Pause, nullptr);
 			}

@@ -11,6 +11,7 @@ class UButton;
 class UBorder;
 class UCanvasPanel;
 class UCampaignTreeWidget;
+class UCompleteLessonsPanel;
 class ULessonPopupWidget;
 class UScrollBox;
 class USizeBox;
@@ -136,6 +137,10 @@ public:
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> OverallStatus;
+
+	/** Optional. WBP_CompleteLessons, shown in Lessons mode until every lesson is completed; it asks with ConfirmDialog */
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UCompleteLessonsPanel> CompleteLessons;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UProgressBar> OverallProgress;

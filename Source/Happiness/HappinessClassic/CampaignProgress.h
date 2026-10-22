@@ -344,8 +344,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Campaign", meta = (WorldContext = "WorldContextObject"))
 	static void PrepareNextLessonPuzzle(const UObject* WorldContextObject, int32& Size, int32& Difficulty);
 
-	/** Debug: complete every lesson (unlocks Campaign mode). Console: Happiness.CompleteAllLessons */
-	void DebugCompleteAllLessons();
+	/**
+	 * Complete every lesson (unlocks Campaign mode). Saves. The Lessons screen's button (UCompleteLessonsPanel);
+	 * console: Happiness.CompleteAllLessons
+	 */
+	void CompleteAllLessons();
 
 	/**
 	 * Debug: set a lesson's progress in the current mode (Points clamped to 0..GetMaxPoints()), its Master Mode

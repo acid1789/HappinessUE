@@ -21,6 +21,7 @@ Campaign
 Clue Selection is borked
 
 --- Art Tasks ---
+Campaign Mode End Screen
 Puzzle Failed Art
 Streak Saver Art
 Finish Lessons
