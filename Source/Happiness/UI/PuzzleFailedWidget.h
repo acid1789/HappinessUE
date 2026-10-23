@@ -7,14 +7,15 @@
 
 class UButton;
 class USoundBase;
-class UTextBlock;
+class UTexture2D;
+class UFont;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPuzzleFailedAction);
 
 /**
- * Shown instead of an end screen when the board is completed with mistakes (PuzzleFailed in WBP_Happiness). Minimal
- * and see-through so the icons marked wrong stay visible: a small translucent panel over the bottom clue strip with
- * a line of text and Undo / Restart. The rest is clear but takes the clicks, so the board can't be played meanwhile.
+ * Shown instead of an end screen when the board is completed with mistakes (PuzzleFailed in WBP_Happiness).
+ * A slim banner sits over the top edge of the grid so the marked icons stay visible. The clear root blocks board
+ * input while the player chooses Undo or Restart.
  * Builds its own widgets (no Blueprint layout); either button hides it and fires its event.
  */
 UCLASS()
@@ -39,25 +40,6 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Puzzle Failed")
 	FOnPuzzleFailedAction OnRestart;
 
-	/** Where the panel sits: the bottom clue strip (WBP_Happiness's VerticalCluePanel area) */
-	UPROPERTY(EditAnywhere, Category = "Puzzle Failed")
-	FMargin PanelMargin = FMargin(10.f, 0.f, 205.f, 30.f);
-
-	UPROPERTY(EditAnywhere, Category = "Puzzle Failed")
-	FLinearColor PanelColor = FLinearColor(0.f, 0.f, 0.f, 0.55f);
-
-	UPROPERTY(EditAnywhere, Category = "Puzzle Failed")
-	FSlateFontInfo MessageFont;
-
-	UPROPERTY(EditAnywhere, Category = "Puzzle Failed")
-	FSlateFontInfo ButtonFont;
-
-	UPROPERTY(EditAnywhere, Category = "Puzzle Failed")
-	FButtonStyle ButtonStyle;
-
-	UPROPERTY(EditAnywhere, Category = "Puzzle Failed")
-	FVector2D ButtonSize = FVector2D(200.f, 64.f);
-
 	UPROPERTY(EditAnywhere, Category = "Puzzle Failed")
 	TObjectPtr<USoundBase> ClickSound;
 
@@ -66,7 +48,7 @@ protected:
 
 private:
 	void BuildLayout();
-	UButton* MakeButton(const FText& Label);
+	UButton* MakeButton(const FText& Label, bool bRestart);
 
 	UFUNCTION()
 	void HandleUndo();
@@ -79,4 +61,13 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UButton> RestartButton;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UTexture2D> FrameTexture;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UTexture2D> ButtonTexture;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UFont> GardenFont;
 };

@@ -77,7 +77,7 @@ namespace
 	}
 }
 
-FString UHappinessUIToolset::RenderWidget(const FString& WidgetBlueprintPath, int32 Width, int32 Height, const FString& OutputFile, int32 PreviewPuzzleSize, bool bPreviewHint)
+FString UHappinessUIToolset::RenderWidget(const FString& WidgetBlueprintPath, int32 Width, int32 Height, const FString& OutputFile, int32 PreviewPuzzleSize, bool bPreviewHint, bool bPreviewPuzzleFailed)
 {
 	if (!GEditor)
 	{
@@ -141,6 +141,14 @@ FString UHappinessUIToolset::RenderWidget(const FString& WidgetBlueprintPath, in
 				}
 			}
 		}
+	}
+	if (bPreviewPuzzleFailed)
+	{
+		for (const FName Name : {FName(TEXT("PauseMenu")), FName(TEXT("EndScreen")), FName(TEXT("LessonEndScreen")), FName(TEXT("CampaignEndScreen")), FName(TEXT("ConfirmDialog")), FName(TEXT("CellDialog")), FName(TEXT("HintInfo"))})
+		{
+			if (UWidget* Overlay = Widget->GetWidgetFromName(Name)) Overlay->SetVisibility(ESlateVisibility::Collapsed);
+		}
+		if (UWidget* Failed = Widget->GetWidgetFromName(TEXT("PuzzleFailed"))) Failed->SetVisibility(ESlateVisibility::Visible);
 	}
 	// Layout can move or resize text between passes; clear the previous pass.
 	FWidgetRenderer Renderer(true, true);
