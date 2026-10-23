@@ -350,6 +350,9 @@ The **not** overlay must keep its circular ring and upper-left-to-lower-right di
 open transparent interior so the excluded icon remains identifiable. `T_NotBackedPainted` includes the
 diagonal in its artwork; `Overlay_Not` in both clue widgets therefore uses a zero-degree render
 rotation. The legacy texture needed 45 degrees. Check existing widget transforms when replacing art.
+Both `Overlay_Not`s also use a render scale of 1.2 around their center: the ring reaches over the icon's
+frame and leaves more of the icon visible. Their slots stay one icon in size, because `Populate` moves the
+horizontal one for the span-not clues.
 For **directly left of**, the user selected option C: a short terracotta connector at the seam between
 the two icons, with a vertical terminal on the left and one right-pointing arrowhead. It conveys
 adjacency in a fixed left-to-right order. The production texture is `T_DirectlyLeftOfBackedPainted`, used by
@@ -360,7 +363,7 @@ on a compact dark umber capsule with a sandstone rim. `T_BetweenDotsPainted` is 
 Its portrait source includes transparent padding to preserve the existing 30-by-60 slots; these slots
 also serve the all-apart divider, whose runtime texture override must remain intact.
 The **chain** overlay retains its two staggered right-pointing arrows and existing slot positions.
-`T_ChainArrowBackedPainted` matches the terracotta, sandstone highlights and umber edges of the span arrow.
+`T_ChainArrowBackedPainted` matches the terracotta, sandstone highlights and umber edges of the span/gap arrow.
 Its transparent lower padding keeps the arrow in the upper part of each existing slot.
 Sources and generation prompts are `output/imagegen/between-painted-v1.*` and `chain-backed-v1.*`.
 The **either/or** overlay retains two opposing curved arrows with an open transparent center.
@@ -390,11 +393,14 @@ Sources and built-in generation prompts: `output/imagegen/edge-boxes-painted-v1.
 The **gap** overlay is bidirectional: two clear outward arrowheads in front of one exaggerated hollow,
 dashed tile centered vertically in the clue. Its top edge sits behind the arrow. The empty tile means
 exactly one intervening column (`abs(C0-C1) == 2`), and distinguishes gap from span.
-`T_GapPaintedCentered` uses the same terracotta, umber backing and sandstone
-rim as the other overlays. The Gap branch in `WBP_HorizontalClue.Populate` assigns it to `Overlay_Span`;
-the widget's default brush remains `T_SpanArrowBackedPainted` for span clues. Preserve its 180-by-60
-slot and the transparent areas over the endpoint icons. Source and built-in generation prompt:
-`output/imagegen/gap-painted-v2.*`.
+It is two textures in the same terracotta, umber backing and sandstone rim as the other overlays:
+`T_GapArrowPainted` on `Overlay_GapArrow` (ZOrder 13, above `Overlay_Not` at 12; along the top of the clue) and
+`T_GapDottedSquarePainted` on `Overlay_GapSquare` (ZOrder 11, centered on the middle icon, its top edge
+behind the arrow). Both are sized at the scale of the earlier combined art (180 units per 2172 px).
+The square texture has a transparent strip on its right, so its brush crops it with a UV region
+(max x 512/659). The Gap branch in `WBP_HorizontalClue.Populate` shows both. Span clues (and the span-not ones)
+show `Overlay_GapArrow` alone: the old span arrow (`Overlay_Span`, `T_SpanArrowBackedPainted`) is gone. Sources: `output/imagegen/gap-arrow-only.png` and
+`gap-square-only.png`, split from `gap-painted-v2.*`; `T_GapPaintedCentered` is no longer used.
 
 All Apart uses `T_AllApartDividerPainted`: two straight terracotta vertical
 separators on narrow dark umber badges with sandstone rims. They keep the existing
