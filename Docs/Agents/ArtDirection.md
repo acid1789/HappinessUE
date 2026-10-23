@@ -304,6 +304,12 @@ The transparent production version is `output/imagegen/happiness-logo-F-final.pn
 `HappinessClassic_Btn`, replacing the legacy smiley logo while retaining its click behavior. Keep the
 lettering separate from background artwork. The local source PNGs and generation prompts are ignored by Git.
 
+On the Happiness mode screen, the user selected the airy cloud treatment with forest-sage lettering
+(option A in `output/imagegen/happiness-mode-cloud-logo-color-study.png`). Its transparent title art is
+`output/imagegen/happiness-logo-cloud-sage-production.png`, imported as
+`/Game/General/Textures/T_HappinessLogo_CloudSage` for `WBP_HappinessMode.HappinessLogo`.
+The mode screen keeps the shared villa background and its existing mode-card layout.
+
 The reference background supplied by the user is
 `output/imagegen/Mediterranean Terrace Coastal Vista.png`. It is imported as
 `/Game/General/Textures/T_VillaBackground` and assigned to the full-screen `Background` image in
