@@ -96,7 +96,10 @@ UTexture2D* UHintSparkleIconWidget::MakeSparkleTexture(const FLinearColor& Color
 	UTexture2D* Texture = UTexture2D::CreateTransient(Size, Size, PF_B8G8R8A8);
 	if (!Texture) return nullptr;
 	Texture->SRGB = true;
+#if WITH_EDITORONLY_DATA
+	// Editor-only property (a transient texture has a single mip anyway); game builds don't have it
 	Texture->MipGenSettings = TMGS_NoMipmaps;
+#endif
 	Texture->Filter = TF_Bilinear;
 	FColor* Pixels = static_cast<FColor*>(Texture->GetPlatformData()->Mips[0].BulkData.Lock(LOCK_READ_WRITE));
 	for (int32 Y = 0; Y < Size; ++Y)

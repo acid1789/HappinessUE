@@ -414,7 +414,9 @@ color family. `T_ClueSelectionSage` replaces the red selection markers in both
 `WBP_HorizontalClue` and `WBP_VerticalClue`. A transparent nine-slice Box brush
 keeps the thicker sage corners intact in either orientation; the icons stay
 uncovered. Selection remains hidden until the existing Blueprint selection logic
-shows it. Source and prompt: `output/imagegen/clue-selection-sage-v1.*`.
+shows it. Its slot is `ClueFrame` grown by 3 on every side (0,0, 186x66 or 66x186 vertical), so the sage
+stroke, inset in its texture, lies over the frame: resize both together.
+Source and prompt: `output/imagegen/clue-selection-sage-v1.*`.
 
 Grid cells now use `T_VillaCellFrameThin`, a sandstone nine-slice frame with
 straight outer edges flush to the texture bounds. Its 1254px source has an

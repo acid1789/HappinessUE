@@ -266,6 +266,8 @@ python Tools/mcp_call.py $A StartPIE '{"options": {"bSimulate": false, "playMode
 python Tools/mcp_call.py $A IsPIERunning '{}'          # poll until true, then give the game a few seconds to load
 python Tools/mcp_call.py $I ExecPIECommand '{"command": "Happiness.SolvePuzzle"}'
 python Tools/mcp_call.py $I ClickViewport '{"x": 0.18, "y": 0.08, "button": "Left"}'   # normalized viewport coords
+python Tools/mcp_call.py $I TapViewport '{"x": 0.18, "y": 0.08}'   # a finger: touch events, like a phone
+python Tools/mcp_call.py $I SetPIEProperty '{"className": "PC_Happiness_C", "propertyName": "InputMode", "value": "NewEnumerator0"}'
 python Tools/mcp_call.py $A CaptureEditorImage '{}'    # the whole editor window as a base64 PNG ("data")
 python Tools/mcp_call.py $A StopPIE '{}'
 ```
@@ -282,9 +284,40 @@ python Tools/mcp_call.py $A StopPIE '{}'
   short effects in the logs, or ask the user to look.
 - **`ClickViewport`** uses coordinates normalized to the PIE viewport (0 to 1). To aim from a capture, subtract the
   viewport's top-left corner in the capture and divide by the viewport's size there.
+- **`ClickViewport` can miss buttons.** Its mouse up lands a frame after the down, by when the real cursor's position
+  has taken the button's hover away, and a mouse click only counts while hovered: a button gets both events (the
+  Slate debugger shows them) and does nothing. `TapViewport` sends touch events, which don't need hover, so its taps
+  land every time. Prefer it for pressing buttons.
+- **Testing the phone's touch input.** PIE runs in mouse mode (`PC_Happiness.InputMode`, set to touch at BeginPlay
+  only on Android and iOS; the grid, icons and clues pick their behaviour from it, and the game panel wires each
+  cell for it when the grid is built). Set it with `SetPIEProperty` (above; the console's `set` is refused in the
+  editor) **before** the grid is built: start a new puzzle from the main menu, since Reset Puzzle keeps the cells.
+  Then `TapViewport`. `SetPIEProperty` changes the objects in the PIE world only, never class defaults or assets.
+- **Which widget took an input:** `SlateDebugger.Event.EnableAllInputFilters`, `SlateDebugger.Event.LogInputEvent 1`,
+  `SlateDebugger.Event.InputRoutingModeEnabled 1` (the whole widget path) and `SlateDebugger.Event.Start` through
+  `ExecPIECommand`, then read `LogSlateDebugger` in `Saved/Logs/Happiness.log`.
 - Moves made this way change the player's save. Undo them before stopping PIE.
 - Stop PIE before saving assets. Dev test code must not keep PIE objects alive past PIE (a global
   `TStrongObjectPtr` to a widget in the play world): ending PIE then fails with a fatal "world leaked" error.
+
+### Testing on the Android emulator
+
+Bugs that only happen on a phone can usually be reproduced on the emulator, driven entirely from the shell.
+
+- **Device:** AVD `HappinessPhone` (Android 14 Google Play image, x86_64, 1080x2412 like the user's phone); start it with
+  `"$ANDROID_HOME/emulator/emulator.exe" -avd HappinessPhone -no-snapshot -gpu host` and wait for
+  `adb -e shell getprop sys.boot_completed` to be 1. `HappinessPhone17` (Android 17) also exists.
+- **Build:** the normal APK is arm64 only, and the emulator's ARM translation crashes in UE's startup (SIGILL on an
+  `FRSQRTE` it doesn't implement). `bash Saved/package_emu.sh` builds the dev package for x86_64 and installs it on
+  `emulator-5554` (`Config/DefaultEngine.ini` is changed for the build only). Always pass `-s emulator-5554` to adb:
+  the user's phone may be connected too.
+- **Drive it:** `adb shell input tap X Y` (screen pixels), `adb exec-out screencap -p > shot.png`, the game's log with
+  `adb logcat -d` (UE lines are tagged `UE`; each carries the frame number, so a frame number that stops advancing
+  means a stuck game thread).
+- **Console commands:** this build has no console broadcast receiver. Put a command line in
+  `/sdcard/Android/data/com.ronsgames.happiness.dev/files/UnrealGame/Happiness/UECommandLine.txt`
+  (`../../../Happiness/Happiness.uproject -ExecCmds="cmd1,cmd2"`) and restart the app; delete it afterwards. The Slate
+  debugger commands (above) then log which widget each touch reaches.
 
 ### Niagara effects in UMG
 

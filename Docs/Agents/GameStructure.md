@@ -53,7 +53,10 @@ translucent panel over the bottom clue strip; the rest of it is clear but blocks
 The widget builds its own layout in C++ (`RebuildWidget`); its look is the Puzzle Failed properties.
 
 The player controller `General/Blueprints/PC_Happiness` starts, loads and saves puzzles and holds the player's
-level and EXP (`HappinessLevel`, `HappinessExp`).
+level and EXP (`HappinessLevel`, `HappinessExp`). Its `InputMode` (mouse, or touch on Android and iOS) must be set
+before any puzzle screen exists, so BeginPlay sets it first: `WBP_GamePanel` wires each cell for the mode when it
+builds the grid (touch: `Button_Cell` opens the cell dialog; mouse: the icons take clicks), and the game resumes a
+saved puzzle as soon as `WBP_GameSelect` is added to the viewport. Set after that, a resumed grid takes no taps.
 
 ## Puzzle code (`Source/Happiness/HappinessClassic/`)
 
