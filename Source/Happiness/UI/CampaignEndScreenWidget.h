@@ -13,6 +13,11 @@ class UTextBlock;
 class UPuzzle;
 class UWidget;
 class ULessonProgressTicks;
+class UCanvasPanel;
+class UImage;
+class UFont;
+class UTexture2D;
+class ULessonResultGlyph;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCampaignEndScreenEvent);
 
@@ -162,10 +167,19 @@ public:
 	void Hide();
 
 protected:
+	virtual void NativePreConstruct() override;
 	virtual void NativeConstruct() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 private:
+	void BuildNotebookLayout();
+	void UpdateNotebookActions();
+	UPROPERTY() TObjectPtr<UTexture2D> NotebookTexture;
+	UPROPERTY() TObjectPtr<UTexture2D> ButtonTexture;
+	UPROPERTY() TObjectPtr<UFont> NotebookFont;
+	UPROPERTY(Transient) TObjectPtr<UCanvasPanel> NotebookCanvas;
+	UPROPERTY(Transient) TObjectPtr<UImage> UnlockFrame;
+	UPROPERTY(Transient) TObjectPtr<ULessonResultGlyph> ResultSeal;
 	enum class EAnimState : uint8
 	{
 		Idle,
