@@ -163,8 +163,9 @@ LessonLockArt image in WBP_CampaignTree preserves the texture reference for cook
 `WBP_LessonPopup` now uses the option-B notebook presentation, built by
 `ULessonPopupWidget::BuildNotebookLayout` around its existing bound widgets. T_LessonNotebook and
 T_LessonNotebookButtons supply the blank surfaces; all labels, progress, stage states and actions stay live.
-The right page scrolls long descriptions. The design canvas grows when the Campaign Master row appears,
-preserving the existing reveal animation and stage/replay routing. The shared ULessonClueDiagram captures
+The right page scrolls long descriptions. Once a clue's Master Mode is shown (after its reveal animation), the
+Master stage row replaces the Campaign stage row, like the bar and text above it; the popup keeps its size.
+Campaign's seven stage buttons are narrower than Lessons' five: their labels go on two lines and shrink to fit. The shared ULessonClueDiagram captures
 its lesson when its Slate widget is constructed: recreate it when changing the notebook to another clue.
 Learn More broadcasts `OnLearnMoreRequested(ECampaignLesson)`. `UCampaignTreeWidget::HandleLearnMore` opens
 WBP_GameRules (`RulesClass`) over the tree and popup (Z 300 in its root canvas), selected at that clue's subject

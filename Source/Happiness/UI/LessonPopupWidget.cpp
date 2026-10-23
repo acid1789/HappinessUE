@@ -284,7 +284,7 @@ void ULessonPopupWidget::BuildNotebookLayout()
 		ProgressText->SetJustification(ETextJustify::Center);
 	}
 	Place(StageBox, FVector2D(85,710), FVector2D(1330,104));
-	if (MasterBox) Place(MasterBox, FVector2D(450,805), FVector2D(600,100));
+	if (MasterBox) Place(MasterBox, FVector2D(450,712), FVector2D(600,100));
 	if (PlayButton)
 	{
 		if (!PlayLabel) PlayLabel = WidgetTree->ConstructWidget<UTextBlock>();
@@ -303,26 +303,26 @@ void ULessonPopupWidget::BuildNotebookLayout()
 void ULessonPopupWidget::UpdateNotebookLayout()
 {
 	if (!NotebookCanvas || !NotebookSize) return;
-	const float Extra = MasterBox && MasterBox->GetVisibility() != ESlateVisibility::Collapsed ? 150.f : 0.f;
-	NotebookSize->SetHeightOverride(950.f + Extra);
+	// The Master row replaces the stage row (Refresh), so the layout is the same either way
+	NotebookSize->SetHeightOverride(950.f);
 	auto Move = [](UWidget* Widget, float Y)
 	{
 		if (Widget)
 			if (UCanvasPanelSlot* LayoutSlot = Cast<UCanvasPanelSlot>(Widget->Slot))
 				LayoutSlot->SetPosition(FVector2D(LayoutSlot->GetPosition().X,Y));
 	};
-	Move(LessonProgress ? LessonProgress->GetParent() : nullptr, 620.f + Extra * .62f);
-	Move(ProgressText ? ProgressText->GetParent() : nullptr, 660.f + Extra * .62f);
-	Move(StageBox, 710.f + Extra * .62f);
-	Move(MasterBox, 805.f + Extra * .62f);
-	Move(PlayButton, 830.f + Extra);
-	Move(CloseButton, 830.f + Extra);
+	Move(LessonProgress ? LessonProgress->GetParent() : nullptr, 620.f);
+	Move(ProgressText ? ProgressText->GetParent() : nullptr, 660.f);
+	Move(StageBox, 710.f);
+	Move(MasterBox, 712.f);
+	Move(PlayButton, 830.f);
+	Move(CloseButton, 830.f);
 	if (CloseButton)
 	{
 		const bool bOnlyBack = !PlayButton || PlayButton->GetVisibility() == ESlateVisibility::Collapsed;
 		if (UCanvasPanelSlot* LayoutSlot = Cast<UCanvasPanelSlot>(CloseButton->Slot))
 		{
-			LayoutSlot->SetPosition(FVector2D(bOnlyBack ? 500.f : 375.f, 830.f + Extra));
+			LayoutSlot->SetPosition(FVector2D(bOnlyBack ? 500.f : 375.f, 830.f));
 			LayoutSlot->SetSize(FVector2D(bOnlyBack ? 500.f : 350.f,88.f));
 		}
 	}
@@ -333,7 +333,6 @@ void ULessonPopupWidget::NativePreConstruct()
 	Super::NativePreConstruct();
 	BuildNotebookLayout();
 	StageButtonSize = FVector2D(250.f, 74.f);
-	StageFont = FSlateFontInfo(NotebookFont, UCampaignSubsystem::GetNumStages() > 5 ? 22 : 26);
 	StageButtonStyle = NotebookButtonStyle(false);
 	StageTextColor = NotebookInk;
 
@@ -397,6 +396,11 @@ void ULessonPopupWidget::BuildStageButtons()
 	constexpr int32 FittedStages = 5;
 	constexpr float Spacing = 12.f;
 	const bool bNarrow = NumStages > FittedStages;
+	// Here rather than only at construction: the popup is rebuilt when the mode changes
+	if (NotebookFont)
+	{
+		StageFont = FSlateFontInfo(NotebookFont, bNarrow ? 22 : 26);
+	}
 	const float ButtonWidth = bNarrow ? FittedStages * (StageButtonSize.X + Spacing) / NumStages - Spacing : StageButtonSize.X;
 
 	for (int32 Stage = 0; Stage < NumStages; Stage++)
@@ -448,10 +452,15 @@ UButton* ULessonPopupWidget::AddStageButton(UPanelWidget* Box, int32 Stage, cons
 	{
 		Label->SetFont(StageFont);
 	}
-	if (UButtonSlot* LabelSlot = Cast<UButtonSlot>(Button->AddChild(Label)))
+	// Shrink a name that doesn't fit inside the button's padding (Campaign's narrower two-line buttons)
+	UScaleBox* Fit = WidgetTree->ConstructWidget<UScaleBox>();
+	Fit->SetStretch(EStretch::ScaleToFit);
+	Fit->SetStretchDirection(EStretchDirection::DownOnly);
+	Fit->AddChild(Label);
+	if (UButtonSlot* LabelSlot = Cast<UButtonSlot>(Button->AddChild(Fit)))
 	{
-		LabelSlot->SetHorizontalAlignment(HAlign_Center);
-		LabelSlot->SetVerticalAlignment(VAlign_Center);
+		LabelSlot->SetHorizontalAlignment(HAlign_Fill);
+		LabelSlot->SetVerticalAlignment(VAlign_Fill);
 	}
 	StageLabels.Add(Label);
 	ULessonCompletionBadge* Check = WidgetTree->ConstructWidget<ULessonCompletionBadge>();
@@ -745,9 +754,14 @@ void ULessonPopupWidget::Refresh()
 		CloseLabel->SetText(!bAllDone ? LOCTEXT("Close", "Back")
 			: (bCampaignMode ? LOCTEXT("ReturnToCampaign", "Return to Campaign") : LOCTEXT("ReturnToLessons", "Return to Lessons")));
 	}
+	// Master Mode's stages take the Campaign stages' row, like the bar and text above them
 	if (MasterBox)
 	{
 		MasterBox->SetVisibility(bMaster ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+	}
+	if (StageBox)
+	{
+		StageBox->SetVisibility(bMaster && MasterBox ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
 	}
 	const int32 FirstMaster = UCampaignSubsystem::GetFirstMasterStage();
 	for (int32 i = 0; i < MasterButtons.Num(); i++)

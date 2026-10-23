@@ -23,6 +23,7 @@ Player Level Display
 Campaign Button Text
 Icon Set Selections
 Finish Lessons
+Master Rewards
 
 --- Art Tasks ---
 Campaign Mode End Screen
