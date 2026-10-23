@@ -25,7 +25,6 @@ Icon Set Selections
 Finish Lessons
 
 --- Art Tasks ---
-Span Arrow a bit to big
 Campaign Mode End Screen
 Puzzle Failed Art
 Streak Saver Art
