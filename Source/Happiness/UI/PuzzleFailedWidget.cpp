@@ -121,16 +121,16 @@ UButton* UPuzzleFailedWidget::MakeButton(const FText& Label, bool bRestart)
 	Button->SetCursor(EMouseCursor::Hand);
 
 	UHorizontalBox* Content = WidgetTree->ConstructWidget<UHorizontalBox>();
-	USizeBox* IconSize = WidgetTree->ConstructWidget<USizeBox>();
-	IconSize->SetWidthOverride(21.f);
-	IconSize->SetHeightOverride(21.f);
+	USizeBox* GlyphSizeBox = WidgetTree->ConstructWidget<USizeBox>();
+	GlyphSizeBox->SetWidthOverride(21.f);
+	GlyphSizeBox->SetHeightOverride(21.f);
 	if (bRestart)
 	{
 		ULessonResultGlyph* Icon = WidgetTree->ConstructWidget<ULessonResultGlyph>();
 		Icon->Symbol = 0;
 		Icon->Color = PuzzleFailedInk;
 		Icon->SetVisibility(ESlateVisibility::HitTestInvisible);
-		IconSize->SetContent(Icon);
+		GlyphSizeBox->SetContent(Icon);
 	}
 	else
 	{
@@ -138,9 +138,9 @@ UButton* UPuzzleFailedWidget::MakeButton(const FText& Label, bool bRestart)
 		Icon->Symbol = 0;
 		Icon->Color = PuzzleFailedInk;
 		Icon->SetVisibility(ESlateVisibility::HitTestInvisible);
-		IconSize->SetContent(Icon);
+		GlyphSizeBox->SetContent(Icon);
 	}
-	Content->AddChildToHorizontalBox(IconSize)->SetVerticalAlignment(VAlign_Center);
+	Content->AddChildToHorizontalBox(GlyphSizeBox)->SetVerticalAlignment(VAlign_Center);
 	UTextBlock* Caption = WidgetTree->ConstructWidget<UTextBlock>();
 	Caption->SetText(Label);
 	Caption->SetFont(FSlateFontInfo(GardenFont, 20));

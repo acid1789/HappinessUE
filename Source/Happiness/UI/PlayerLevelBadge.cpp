@@ -10,14 +10,16 @@
 #include "GameFramework/PlayerController.h"
 #include "HappinessClassic/CampaignProgress.h"
 #include "HappinessClassic/CampaignTree.h"
+#include "UObject/ConstructorHelpers.h"
 
 namespace
 {
 	const FLinearColor SunGold(1.f, 0.78f, 0.3f, 1.f);
 	const FLinearColor SunRim(0.85f, 0.55f, 0.15f, 1.f);
-	const FLinearColor LevelInk(0.32f, 0.22f, 0.13f, 1.f);
-	constexpr float SunSize = 132.f;
-	constexpr float IconSize = 36.f;
+	const FLinearColor PlayerLevelInk(0.10f, 0.25f, 0.10f, 1.f);
+	constexpr float SunSize = 144.f;
+	constexpr float IconSize = 60.f;
+	constexpr float RewardRadius = 114.f;
 
 	/** A circle: a rounded box with corners of half its size */
 	FSlateBrush MakeDisc(const FLinearColor& Fill, const FLinearColor& Rim, float Size)
@@ -29,6 +31,15 @@ namespace
 		Brush.OutlineSettings = FSlateBrushOutlineSettings(FVector4(Size * 0.5f, Size * 0.5f, Size * 0.5f, Size * 0.5f), FSlateColor(Rim), 3.f);
 		return Brush;
 	}
+}
+
+UPlayerLevelBadge::UPlayerLevelBadge(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{
+	static ConstructorHelpers::FObjectFinder<UTexture2D> SunArt(TEXT("/Game/General/Textures/T_PlayerLevelSun.T_PlayerLevelSun"));
+	static ConstructorHelpers::FObjectFinder<UTexture2D> RewardArt(TEXT("/Game/General/Textures/T_MasterRewardGems.T_MasterRewardGems"));
+	SunTexture = SunArt.Object;
+	RewardAtlasTexture = RewardArt.Object;
 }
 
 TSharedRef<SWidget> UPlayerLevelBadge::RebuildWidget()
@@ -67,7 +78,7 @@ void UPlayerLevelBadge::BuildLayout()
 	{
 		LevelText->SetFont(FSlateFontInfo(Font, 50));
 	}
-	LevelText->SetColorAndOpacity(FSlateColor(LevelInk));
+	LevelText->SetColorAndOpacity(FSlateColor(PlayerLevelInk));
 	LevelText->SetJustification(ETextJustify::Center);
 	if (UCanvasPanelSlot* TextSlot = Root->AddChildToCanvas(LevelText))
 	{
@@ -78,7 +89,6 @@ void UPlayerLevelBadge::BuildLayout()
 
 	// Clockwise from the top, between the sun's rim and the badge's edge
 	const int32 NumIcons = UCampaignTree::GetNumColumns();
-	const float Radius = (BadgeSize - IconSize) * 0.5f;
 	Icons.Reset();
 	for (int32 Index = 0; Index < NumIcons; Index++)
 	{
@@ -86,6 +96,20 @@ void UPlayerLevelBadge::BuildLayout()
 		if (IconTextures.IsValidIndex(Index) && IconTextures[Index])
 		{
 			Icon->SetBrushFromTexture(IconTextures[Index]);
+		}
+		else if (RewardAtlasTexture && Index < 12)
+		{
+			const int32 Column = Index % 4;
+			const int32 Row = Index / 4;
+			constexpr float Inset = 0.02f;
+			FSlateBrush Brush;
+			Brush.SetResourceObject(RewardAtlasTexture);
+			Brush.DrawAs = ESlateBrushDrawType::Image;
+			Brush.ImageSize = FVector2D(IconSize);
+			Brush.SetUVRegion(FBox2f(
+				FVector2f((Column + Inset) / 4.f, (Row + Inset) / 3.f),
+				FVector2f((Column + 1.f - Inset) / 4.f, (Row + 1.f - Inset) / 3.f)));
+			Icon->SetBrush(Brush);
 		}
 		else
 		{
@@ -95,7 +119,7 @@ void UPlayerLevelBadge::BuildLayout()
 		if (UCanvasPanelSlot* IconSlot = Root->AddChildToCanvas(Icon))
 		{
 			IconSlot->SetAlignment(FVector2D(0.5f));
-			IconSlot->SetPosition(Center + Radius * FVector2D(FMath::Sin(Angle), -FMath::Cos(Angle)));
+			IconSlot->SetPosition(Center + RewardRadius * FVector2D(FMath::Sin(Angle), -FMath::Cos(Angle)));
 			IconSlot->SetSize(FVector2D(IconSize));
 		}
 		Icons.Add(Icon);

@@ -151,7 +151,7 @@ void UHappinessModeWidget::MakePlayerLevelBadge()
 		// Top right, right of the logo and above the tiles; under the Remove Ads dialog (Z 30)
 		BadgeSlot->SetAnchors(FAnchors(1.f, 0.f));
 		BadgeSlot->SetAlignment(FVector2D(1.f, 0.f));
-		BadgeSlot->SetPosition(FVector2D(-48.f, 12.f));
+		BadgeSlot->SetPosition(FVector2D(-16.f, 0.f));
 		BadgeSlot->SetSize(FVector2D(UPlayerLevelBadge::BadgeSize));
 		BadgeSlot->SetZOrder(2);
 	}

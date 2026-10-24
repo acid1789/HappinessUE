@@ -77,7 +77,7 @@ namespace
 	}
 }
 
-FString UHappinessUIToolset::RenderWidget(const FString& WidgetBlueprintPath, int32 Width, int32 Height, const FString& OutputFile, int32 PreviewPuzzleSize, bool bPreviewHint, bool bPreviewPuzzleFailed)
+FString UHappinessUIToolset::RenderWidget(const FString& WidgetBlueprintPath, int32 Width, int32 Height, const FString& OutputFile, int32 PreviewPuzzleSize, bool bPreviewHint, bool bPreviewPuzzleFailed, bool bPreviewMasterRewards)
 {
 	if (!GEditor)
 	{
@@ -125,6 +125,22 @@ FString UHappinessUIToolset::RenderWidget(const FString& WidgetBlueprintPath, in
 	// Draw a few frames: the first lays the widget out, later ones can use cached child geometry
 	// (the campaign tree places its connector lines from its nodes' cached geometry)
 	TSharedRef<SWidget> SlateWidget = Widget->TakeWidget();
+	if (bPreviewMasterRewards)
+	{
+		if (const FObjectProperty* BadgeProperty = FindFProperty<FObjectProperty>(Widget->GetClass(), TEXT("PlayerLevelBadge")))
+		{
+			if (UUserWidget* Badge = Cast<UUserWidget>(BadgeProperty->GetObjectPropertyValue_InContainer(Widget)))
+			{
+				for (int32 Index = 0; Index < 12; ++Index)
+				{
+					if (UWidget* Reward = Badge->GetWidgetFromName(*FString::Printf(TEXT("Icon%d"), Index)))
+					{
+						Reward->SetVisibility(ESlateVisibility::HitTestInvisible);
+					}
+				}
+			}
+		}
+	}
 	if (bPreviewHint)
 	{
 		for (const FName Name : {FName(TEXT("PauseMenu")), FName(TEXT("EndScreen")), FName(TEXT("LessonEndScreen")), FName(TEXT("CampaignEndScreen")), FName(TEXT("ConfirmDialog")), FName(TEXT("CellDialog")), FName(TEXT("PuzzleFailed"))})

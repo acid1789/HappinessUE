@@ -21,8 +21,10 @@ class HAPPINESS_API UPlayerLevelBadge : public UUserWidget
 	GENERATED_BODY()
 
 public:
+	UPlayerLevelBadge(const FObjectInitializer& ObjectInitializer);
+
 	/** Width and height of the whole badge, icons included */
-	static constexpr float BadgeSize = 228.f;
+	static constexpr float BadgeSize = 300.f;
 
 	/** Reads the level and the unlocked icons again */
 	UFUNCTION(BlueprintCallable, Category = "Player Level")
@@ -35,6 +37,10 @@ public:
 	/** One icon per tree column, clockwise from the top; a placeholder dot for any unset */
 	UPROPERTY(EditAnywhere, Category = "Player Level")
 	TArray<TObjectPtr<UTexture2D>> IconTextures;
+
+	/** Four columns by three rows, clockwise from the top; used when IconTextures has no override. */
+	UPROPERTY(EditAnywhere, Category = "Player Level")
+	TObjectPtr<UTexture2D> RewardAtlasTexture;
 
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
