@@ -21,7 +21,7 @@
 
 namespace
 {
-	const FLinearColor FailedInk(.10f, .05f, .02f);
+	const FLinearColor PuzzleFailedInk(.10f, .05f, .02f);
 }
 
 UPuzzleFailedWidget::UPuzzleFailedWidget(const FObjectInitializer& ObjectInitializer)
@@ -87,7 +87,7 @@ void UPuzzleFailedWidget::BuildLayout()
 	UTextBlock* Message = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Message"));
 	Message->SetText(LOCTEXT("Message", "Some Icons Are Wrong"));
 	Message->SetFont(FSlateFontInfo(GardenFont, 25));
-	Message->SetColorAndOpacity(FailedInk);
+	Message->SetColorAndOpacity(PuzzleFailedInk);
 	Message->SetJustification(ETextJustify::Center);
 	Message->SetShadowOffset(FVector2D::ZeroVector);
 	USizeBox* MessageSize = WidgetTree->ConstructWidget<USizeBox>();
@@ -128,7 +128,7 @@ UButton* UPuzzleFailedWidget::MakeButton(const FText& Label, bool bRestart)
 	{
 		ULessonResultGlyph* Icon = WidgetTree->ConstructWidget<ULessonResultGlyph>();
 		Icon->Symbol = 0;
-		Icon->Color = FailedInk;
+		Icon->Color = PuzzleFailedInk;
 		Icon->SetVisibility(ESlateVisibility::HitTestInvisible);
 		IconSize->SetContent(Icon);
 	}
@@ -136,7 +136,7 @@ UButton* UPuzzleFailedWidget::MakeButton(const FText& Label, bool bRestart)
 	{
 		UConfirmDialogGlyph* Icon = WidgetTree->ConstructWidget<UConfirmDialogGlyph>();
 		Icon->Symbol = 0;
-		Icon->Color = FailedInk;
+		Icon->Color = PuzzleFailedInk;
 		Icon->SetVisibility(ESlateVisibility::HitTestInvisible);
 		IconSize->SetContent(Icon);
 	}
@@ -144,7 +144,7 @@ UButton* UPuzzleFailedWidget::MakeButton(const FText& Label, bool bRestart)
 	UTextBlock* Caption = WidgetTree->ConstructWidget<UTextBlock>();
 	Caption->SetText(Label);
 	Caption->SetFont(FSlateFontInfo(GardenFont, 20));
-	Caption->SetColorAndOpacity(FailedInk);
+	Caption->SetColorAndOpacity(PuzzleFailedInk);
 	Caption->SetShadowOffset(FVector2D::ZeroVector);
 	UHorizontalBoxSlot* CaptionSlot = Content->AddChildToHorizontalBox(Caption);
 	CaptionSlot->SetPadding(FMargin(5.f, 0.f, 0.f, 0.f));
