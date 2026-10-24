@@ -356,6 +356,9 @@ private:
 	bool bCenterCurrentColumn = true;
 	bool bPanCandidate = false;
 	bool bDraggingTree = false;
+	/** The pointer that pressed (a finger, or the mouse cursor): touches don't move the cursor */
+	int32 PanUserIndex = 0;
+	uint32 PanPointerIndex = 0;
 	FVector2D PanStart;
 	float PanStartOffset = 0.f;
 

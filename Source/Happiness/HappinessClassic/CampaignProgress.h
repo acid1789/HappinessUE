@@ -244,6 +244,11 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Campaign")
 	int32 GetCurrentMasterStage(ECampaignLesson Lesson) const;
 
+	/** Every clue in the tree column has completed Campaign Master Mode, whatever the current mode. Each column
+	 *  unlocks one of the icons around the player's level on the mode screen (UPlayerLevelBadge). */
+	UFUNCTION(BlueprintPure, Category = "Campaign")
+	bool IsMasterColumnCompleted(int32 Column) const;
+
 	/** Stage size, difficulty and the progress needed to unlock it, for a given mode */
 	static int32 GetStageSizeFor(ECampaignMode Mode, int32 Stage);
 	static int32 GetStageDifficultyFor(ECampaignMode Mode, int32 Stage);

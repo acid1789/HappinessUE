@@ -9,6 +9,7 @@
 #include "Blueprint/WidgetTree.h"
 #include "Engine/Font.h"
 #include "HappinessClassic/DailyPuzzle.h"
+#include "UI/PlayerLevelBadge.h"
 #include "UI/StreakSaverPanel.h"
 
 #define LOCTEXT_NAMESPACE "HappinessMode"
@@ -45,6 +46,7 @@ void UHappinessModeWidget::NativeConstruct()
 	{
 		AdRemoval->OnChanged.AddUniqueDynamic(this, &UHappinessModeWidget::RefreshAdRemoval);
 	}
+	MakePlayerLevelBadge();
 	MakeStreakSaverButton();
 	if (StreakSaverButton)
 	{
@@ -114,6 +116,11 @@ void UHappinessModeWidget::Show()
 	RefreshAdRemoval();
 	RefreshCampaignLock();
 	RefreshDaily();
+	if (PlayerLevelBadge)
+	{
+		// The level changes in games
+		PlayerLevelBadge->Refresh();
+	}
 	SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 }
 
@@ -128,6 +135,25 @@ void UHappinessModeWidget::RefreshCampaignLock()
 		{
 			Note->SetVisibility(bUnlocked ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible);
 		}
+	}
+}
+
+void UHappinessModeWidget::MakePlayerLevelBadge()
+{
+	UCanvasPanel* Root = Cast<UCanvasPanel>(GetRootWidget());
+	if (PlayerLevelBadge || !Root)
+	{
+		return;
+	}
+	PlayerLevelBadge = CreateWidget<UPlayerLevelBadge>(this, UPlayerLevelBadge::StaticClass());
+	if (UCanvasPanelSlot* BadgeSlot = PlayerLevelBadge ? Root->AddChildToCanvas(PlayerLevelBadge) : nullptr)
+	{
+		// Top right, right of the logo and above the tiles; under the Remove Ads dialog (Z 30)
+		BadgeSlot->SetAnchors(FAnchors(1.f, 0.f));
+		BadgeSlot->SetAlignment(FVector2D(1.f, 0.f));
+		BadgeSlot->SetPosition(FVector2D(-48.f, 12.f));
+		BadgeSlot->SetSize(FVector2D(UPlayerLevelBadge::BadgeSize));
+		BadgeSlot->SetZOrder(2);
 	}
 }
 

@@ -20,7 +20,7 @@ functions (`GetNumStages`, `GetStageSize`, `GetMaxPoints`, ...) follow it.
 | Widget (`Content/...`) | C++ parent (`Source/Happiness/...`) | Role |
 |---|---|---|
 | `General/UI/WBP_GameSelect` | — | Main menu; hosts the mode screen, campaign tree and Free Play config |
-| `Happiness/UI/WBP_HappinessMode` | `UI/HappinessModeWidget` | Free Play / Lessons / Campaign / Back |
+| `Happiness/UI/WBP_HappinessMode` | `UI/HappinessModeWidget` | Free Play / Lessons / Campaign / Back ; top right, the player level badge (`UI/PlayerLevelBadge`, made in code): the level on a sun, ringed by one icon per tree column, shown once every clue in that column has completed Campaign Master Mode (`UCampaignSubsystem::IsMasterColumnCompleted`). Placeholder discs until `SunTexture` / `IconTextures` are set |
 | `Happiness/UI/WBP_HappinessConfig` | — | Free Play setup: size, difficulty, clue selection (`WBP_ClueSelect`, `UI/ClueSelectWidget`) |
 | `Happiness/UI/WBP_CampaignTree` | `UI/CampaignTreeWidget` | The lesson tree (Lessons and Campaign). Bottom left in Lessons mode until every lesson is completed: `WBP_CompleteLessons` (`UI/CompleteLessonsPanel`), which asks with the screen's own `ConfirmDialog` (`UConfirmDialogWidget::Ask`), then completes every lesson, unlocking Campaign |
 | `Happiness/UI/WBP_LessonPopup` | `UI/LessonPopupWidget` | A lesson's description, progress bar with stage ticks, stage buttons |

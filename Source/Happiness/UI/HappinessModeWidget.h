@@ -6,6 +6,7 @@
 #include "HappinessModeWidget.generated.h"
 
 class UButton;
+class UPlayerLevelBadge;
 class UStreakSaverPanel;
 class UTextBlock;
 class USizeBox;
@@ -89,6 +90,10 @@ protected:
 	UPROPERTY(Transient)
 	TObjectPtr<UTextBlock> StreakSaverLabel;
 
+	/** The player's level and Master Mode icons, top right. Made in the screen's root canvas unless the layout has one. */
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UPlayerLevelBadge> PlayerLevelBadge;
+
 	/** The streak saver shop, over the whole screen (made the first time it's needed) */
 	UPROPERTY(Transient)
 	TObjectPtr<UStreakSaverPanel> StreakSaverPanel;
@@ -117,6 +122,9 @@ private:
 
 	UFUNCTION()
 	void RefreshStreak();
+
+	/** Make the level badge if the layout has none */
+	void MakePlayerLevelBadge();
 
 	/** Make the Streak Saver button if the layout has none */
 	void MakeStreakSaverButton();

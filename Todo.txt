@@ -18,7 +18,6 @@ Game Rules
 Campaign
 
 --- Dev tasks ---
-Clue Selection is borked
 Player Level Display
 Icon Set Selections
 Finish Lessons
@@ -26,8 +25,8 @@ Master Rewards
 
 --- Art Tasks ---
 Streak Saver Art
-Distinguish Title from Background
 Options Menu Visuals
+Selection isnt noticable
 
 
 

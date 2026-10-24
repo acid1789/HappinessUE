@@ -26,6 +26,7 @@
 #include "Fonts/FontMeasure.h"
 #include "Engine/Font.h"
 #include "Framework/Application/SlateApplication.h"
+#include "Framework/Application/SlateUser.h"
 #include "InputCoreTypes.h"
 #include "Kismet/GameplayStatics.h"
 #include "Rendering/DrawElements.h"
@@ -660,6 +661,9 @@ void UCampaignTreeWidget::SetVisibility(ESlateVisibility InVisibility)
 		bCenterCurrentColumn = true;
 	}
 	Super::SetVisibility(InVisibility);
+	// A press from before it was shown or hidden isn't a pan of the tree
+	bPanCandidate = false;
+	bDraggingTree = false;
 	if (CompleteLessons)
 	{
 		CompleteLessons->Refresh();
@@ -961,6 +965,8 @@ FReply UCampaignTreeWidget::NativeOnPreviewMouseButtonDown(const FGeometry& G, c
 					(!LessonPopup || !LessonPopup->IsVisible()) && !IsCelebrating();
 	if (bPanCandidate)
 	{
+		PanUserIndex = Event.GetUserIndex();
+		PanPointerIndex = Event.GetPointerIndex();
 		PanStart = Event.GetScreenSpacePosition();
 		PanStartOffset = TreeScroll->GetScrollOffset();
 	}
@@ -1022,9 +1028,11 @@ void UCampaignTreeWidget::NativeTick(const FGeometry& G, float Delta)
 	if (bPanCandidate && FSlateApplication::IsInitialized())
 	{
 		auto& Slate = FSlateApplication::Get();
-		if (Slate.GetPressedMouseButtons().Contains(EKeys::LeftMouseButton))
+		const TSharedPtr<FSlateUser> PanUser = Slate.GetUser(PanUserIndex);
+		if (PanUser && Slate.GetPressedMouseButtons().Contains(EKeys::LeftMouseButton))
 		{
-			const FVector2D DragCursor = Slate.GetCursorPos();
+			// Where the pointer that pressed is now: on a phone the cursor stays put while a finger moves
+			const FVector2D DragCursor = PanUser->GetPointerPosition(PanPointerIndex);
 			if (bDraggingTree || FVector2D::Distance(DragCursor, PanStart) > 10.f)
 			{
 				bDraggingTree = true;

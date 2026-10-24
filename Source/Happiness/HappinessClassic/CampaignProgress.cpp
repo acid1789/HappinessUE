@@ -161,6 +161,27 @@ int32 UCampaignSubsystem::GetCurrentMasterStage(ECampaignLesson Lesson) const
 	return Stage;
 }
 
+bool UCampaignSubsystem::IsMasterColumnCompleted(int32 Column) const
+{
+	// Campaign progress whatever the current mode; 4 puzzles at each Master Mode stage, as in GetMasterMaxPoints
+	const TArray<ECampaignLesson> Lessons = UCampaignTree::GetColumnLessons(Column);
+	const TArray<FStage>& Master = GetMasterStages(ECampaignMode::Campaign);
+	if (Lessons.IsEmpty() || Master.IsEmpty())
+	{
+		return false;
+	}
+	const int32 MasterMax = Master.Last().Required + 4;
+	for (ECampaignLesson Lesson : Lessons)
+	{
+		const FLessonProgress* Progress = Data.CampaignLessons.Find(Lesson);
+		if (!Progress || !Progress->bFinalCompleted || Progress->MasterPoints < MasterMax)
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
 ECampaignMode UCampaignSubsystem::GetMode()
 {
 	const UCampaignSubsystem* Campaign = Instance.Get();
