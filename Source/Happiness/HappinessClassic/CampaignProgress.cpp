@@ -511,6 +511,8 @@ FLessonPuzzleResult UCampaignSubsystem::FinishLessonPuzzle(UPuzzle* Puzzle)
 			if (Result.bLessonCompleted)
 			{
 				UncelebratedLesson = Result.Lesson;
+				// The last lesson: Campaign mode and the Garden Visitors open
+				bLessonsCompletionPending |= Data.Mode == ECampaignMode::Lessons && IsCampaignModeUnlocked();
 			}
 		}
 		else if (Result.Stage == GetCurrentStage(Result.Lesson) && Progress.Points < MaxPoints)
@@ -560,6 +562,13 @@ void UCampaignSubsystem::PrepareNextLessonPuzzle(const UObject* WorldContextObje
 	Difficulty = GetStageDifficulty(SaveData.SessionStage);
 }
 
+bool UCampaignSubsystem::ConsumeLessonsCompletion()
+{
+	const bool bPending = bLessonsCompletionPending;
+	bLessonsCompletionPending = false;
+	return bPending;
+}
+
 bool UCampaignSubsystem::ConsumeLessonCompletion(ECampaignLesson& Lesson)
 {
 	if (!UncelebratedLesson.IsSet())
@@ -583,6 +592,7 @@ void UCampaignSubsystem::EndLessonSession()
 
 void UCampaignSubsystem::CompleteAllLessons()
 {
+	bLessonsCompletionPending |= !IsCampaignModeUnlocked();
 	for (const TArray<ECampaignLesson>& Column : UCampaignTree::GetColumns())
 	{
 		for (ECampaignLesson Lesson : Column)
@@ -598,6 +608,7 @@ void UCampaignSubsystem::CompleteAllLessons()
 
 void UCampaignSubsystem::DebugSetLesson(ECampaignLesson Lesson, int32 Points, bool bFinalCompleted, bool bCelebrate)
 {
+	const bool bWasUnlocked = IsCampaignModeUnlocked();
 	if (Data.bInSession && Data.SessionLesson == Lesson)
 	{
 		Data.bInSession = false;
@@ -612,6 +623,7 @@ void UCampaignSubsystem::DebugSetLesson(ECampaignLesson Lesson, int32 Points, bo
 	if (bCelebrate && bFinalCompleted)
 	{
 		UncelebratedLesson = Lesson;
+		bLessonsCompletionPending |= !bWasUnlocked && IsCampaignModeUnlocked();
 	}
 	else if (UncelebratedLesson.IsSet() && UncelebratedLesson.GetValue() == Lesson)
 	{

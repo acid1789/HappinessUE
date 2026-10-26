@@ -9,10 +9,23 @@
 #include "Blueprint/WidgetTree.h"
 #include "Engine/Font.h"
 #include "HappinessClassic/DailyPuzzle.h"
+#include "Components/Image.h"
+#include "Kismet/GameplayStatics.h"
+#include "Sound/SoundBase.h"
+#include "UI/FireworksWidget.h"
+#include "UI/LessonsCompletePopup.h"
 #include "UI/PlayerLevelBadge.h"
 #include "UI/StreakSaverPanel.h"
+#include "UObject/ConstructorHelpers.h"
 
 #define LOCTEXT_NAMESPACE "HappinessMode"
+
+UHappinessModeWidget::UHappinessModeWidget(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{
+	static ConstructorHelpers::FObjectFinder<USoundBase> Unlock(TEXT("/Game/General/Audio/Cues/PuzzleComplete.PuzzleComplete"));
+	UnlockSound = Unlock.Object;
+}
 
 void UHappinessModeWidget::NativeConstruct()
 {
@@ -114,6 +127,11 @@ void UHappinessModeWidget::Show()
 {
 	HandleClosePurchaseClicked();
 	RefreshAdRemoval();
+	UCampaignSubsystem* Campaign = UCampaignSubsystem::Get(this);
+	if (Campaign && Campaign->ConsumeLessonsCompletion())
+	{
+		StartUnlockCelebration();
+	}
 	RefreshCampaignLock();
 	RefreshDaily();
 	if (PlayerLevelBadge)
@@ -228,12 +246,154 @@ void UHappinessModeWidget::HandleStreakSaverClicked()
 
 void UHappinessModeWidget::Hide()
 {
+	EndUnlockCelebration();
+	if (LessonsCompletePopup)
+	{
+		LessonsCompletePopup->Hide();
+	}
 	HandleClosePurchaseClicked();
 	if (StreakSaverPanel)
 	{
 		StreakSaverPanel->Hide();
 	}
 	SetVisibility(ESlateVisibility::Collapsed);
+}
+
+void UHappinessModeWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+{
+	Super::NativeTick(MyGeometry, InDeltaTime);
+	UpdateUnlockCelebration(InDeltaTime);
+}
+
+void UHappinessModeWidget::StartUnlockCelebration()
+{
+	UCanvasPanel* Root = Cast<UCanvasPanel>(GetRootWidget());
+	if (!Root)
+	{
+		return;
+	}
+	if (!Fireworks)
+	{
+		Fireworks = WidgetTree->ConstructWidget<UFireworksWidget>(UFireworksWidget::StaticClass(), TEXT("UnlockFireworks"));
+		if (UCanvasPanelSlot* FireworksSlot = Root->AddChildToCanvas(Fireworks))
+		{
+			// Over the whole screen, above the congratulations (Z 40); the congratulations take the taps
+			FireworksSlot->SetAnchors(FAnchors(0.f, 0.f, 1.f, 1.f));
+			FireworksSlot->SetOffsets(FMargin(0.f));
+			FireworksSlot->SetZOrder(45);
+		}
+	}
+	Fireworks->Stop();
+	Fireworks->SetVisibility(ESlateVisibility::HitTestInvisible);
+	UnlockTime = 0.f;
+	bUnlockFireworksStarted = false;
+	FirstBurstAt = -1.f;
+	ShowLessonsCompletePopup();
+}
+
+bool UHappinessModeWidget::PlayUnlockFireworks()
+{
+	const UWidget* Window = LessonsCompletePopup ? LessonsCompletePopup->GetWindow() : nullptr;
+	if (!Window)
+	{
+		return false;
+	}
+	const FGeometry& Area = Fireworks->GetCachedGeometry();
+	const FGeometry& Target = Window->GetCachedGeometry();
+	if (Area.GetLocalSize().X <= 0.f || Target.GetLocalSize().X <= 0.f || Area.Scale <= 0.f)
+	{
+		return false;
+	}
+	// Over the congratulations' window, in the fireworks' space; sizes go with the window's (1400 wide in its layout)
+	const FVector2D Center = Area.AbsoluteToLocal(Target.GetAbsolutePositionAtCoordinates(FVector2D(.5f)));
+	const FVector2D Size = Target.GetAbsoluteSize() / Area.Scale;
+	const float Unit = 1.6f * Size.X / 1400.f;
+	// Offsets in window sizes, from its center
+	const struct { float X, Y, Delay; } Plan[] =
+	{
+		{ 0.f, -.3f, .45f }, { -.36f, -.14f, .8f }, { .36f, -.2f, 1.1f }, { -.2f, .16f, 1.45f },
+		{ .25f, .1f, 1.75f }, { 0.f, -.04f, 2.05f }, { -.42f, .3f, 2.35f }, { .42f, .28f, 2.6f },
+	};
+	TArray<UFireworksWidget::FBurst> Bursts;
+	for (const auto& Step : Plan)
+	{
+		UFireworksWidget::FBurst& Burst = Bursts.AddDefaulted_GetRef();
+		Burst.Position = Center + FVector2D(Step.X * Size.X, Step.Y * Size.Y);
+		Burst.Delay = Step.Delay;
+		// Each rocket climbs from just below the window
+		Burst.RocketRise = Center.Y + Size.Y * .5f + 40.f * Unit - Burst.Position.Y;
+	}
+	Fireworks->Play(Bursts, Unit);
+	return true;
+}
+
+void UHappinessModeWidget::UpdateUnlockCelebration(float DeltaTime)
+{
+	if (!IsCelebratingUnlock())
+	{
+		return;
+	}
+	UnlockTime += DeltaTime;
+	// Once the congratulations have opened (and been laid out)
+	if (!bUnlockFireworksStarted && UnlockTime >= UnlockFireworksDelay && PlayUnlockFireworks())
+	{
+		bUnlockFireworksStarted = true;
+		FirstBurstAt = UnlockTime + Fireworks->GetFirstBurstTime();
+	}
+	Fireworks->Advance(DeltaTime);
+	if (FirstBurstAt >= 0.f && UnlockTime >= FirstBurstAt)
+	{
+		FirstBurstAt = -1.f;
+		if (UnlockSound)
+		{
+			UGameplayStatics::PlaySound2D(this, UnlockSound, 1.f, 1.f, 0.f, nullptr, nullptr, true);
+		}
+	}
+	if (bUnlockFireworksStarted ? !Fireworks->IsPlaying() : UnlockTime >= UnlockFireworksDelay + 2.f)
+	{
+		EndUnlockCelebration();
+	}
+}
+
+void UHappinessModeWidget::EndUnlockCelebration()
+{
+	if (!IsCelebratingUnlock())
+	{
+		return;
+	}
+	UnlockTime = -1.f;
+	FirstBurstAt = -1.f;
+	if (Fireworks)
+	{
+		Fireworks->Stop();
+		Fireworks->SetVisibility(ESlateVisibility::Collapsed);
+	}
+}
+
+void UHappinessModeWidget::ShowLessonsCompletePopup()
+{
+	if (!LessonsCompletePopup)
+	{
+		LessonsCompletePopup = CreateWidget<ULessonsCompletePopup>(this, ULessonsCompletePopup::StaticClass());
+		UCanvasPanel* Root = Cast<UCanvasPanel>(GetRootWidget());
+		if (UCanvasPanelSlot* PopupSlot = Root && LessonsCompletePopup ? Root->AddChildToCanvas(LessonsCompletePopup) : nullptr)
+		{
+			// Over the whole screen, under the fireworks
+			PopupSlot->SetAnchors(FAnchors(0.f, 0.f, 1.f, 1.f));
+			PopupSlot->SetOffsets(FMargin(0.f));
+			PopupSlot->SetZOrder(40);
+		}
+		else if (LessonsCompletePopup)
+		{
+			LessonsCompletePopup->AddToViewport(40);
+		}
+	}
+	if (LessonsCompletePopup)
+	{
+		// The Campaign tile's picture, on the popup's Campaign card
+		const UImage* Art = Cast<UImage>(GetWidgetFromName(TEXT("CampaignButtonArt")));
+		LessonsCompletePopup->Show(Art ? &Art->GetBrush() : nullptr);
+	}
 }
 
 void UHappinessModeWidget::RefreshStreak()

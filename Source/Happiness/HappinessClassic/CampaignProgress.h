@@ -352,6 +352,13 @@ public:
 	 */
 	bool ConsumeLessonCompletion(ECampaignLesson& Lesson);
 
+	/** Every lesson has just been completed (Campaign mode and the Garden Visitors unlocked), and the mode screen
+	 *  hasn't celebrated it yet (UHappinessModeWidget). Not saved, like the lesson completion above. */
+	bool IsLessonsCompletionPending() const { return bLessonsCompletionPending; }
+
+	/** IsLessonsCompletionPending, once */
+	bool ConsumeLessonsCompletion();
+
 	/**
 	 * Before playing the session's next puzzle: the session moves on to the stage that currently earns points (the
 	 * final once all points are earned). Returns the size and difficulty of the stage to play.
@@ -436,5 +443,6 @@ private:
 
 	FLessonPuzzleResult LastResult;
 	TOptional<ECampaignLesson> UncelebratedLesson;
+	bool bLessonsCompletionPending = false;
 	static TWeakObjectPtr<UCampaignSubsystem> Instance;
 };

@@ -212,6 +212,11 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lesson Completion")
 	float GlowMoveDuration = 1.f;
 
+	/** After the last lesson's completion: seconds the tree stays before it closes, back to the mode screen, which
+	 *  celebrates every lesson being completed (UHappinessModeWidget) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lesson Completion")
+	float CloseAfterLastLessonDelay = 0.6f;
+
 	/** Played as the check starts to pop in */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lesson Completion")
 	TObjectPtr<USoundBase> CheckSound;
@@ -350,6 +355,9 @@ private:
 	float CelebrationScrollTo = 0.f;
 	/** How far the glow has moved from CelebrationFromColumn to CelebrationToColumn (0 to 1, eased) */
 	float GlowMove = 0.f;
+	/** Every lesson is completed: once the celebration ends, seconds until the tree closes (below 0: it stays) */
+	float CloseCountdown = -1.f;
+	bool bCloseAfterCelebration = false;
 
 	float LastViewportWidth = 0.f;
 	int32 LastCompletedColumns = INDEX_NONE;

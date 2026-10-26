@@ -616,6 +616,12 @@ void UCampaignTreeWidget::ShowForLessonSession()
 			LessonPopup->SetVisibility(ESlateVisibility::Collapsed);
 		}
 		StartCelebration(Completed);
+		// The last lesson: once its check has settled, back to the mode screen, which celebrates every lesson
+		bCloseAfterCelebration = Campaign->IsLessonsCompletionPending();
+		if (bCloseAfterCelebration && !IsCelebrating())
+		{
+			Close();
+		}
 		return;
 	}
 	if (LessonPopup && Campaign && Campaign->IsInLessonSession())
@@ -670,6 +676,8 @@ void UCampaignTreeWidget::SetVisibility(ESlateVisibility InVisibility)
 	}
 	if (InVisibility == ESlateVisibility::Collapsed || InVisibility == ESlateVisibility::Hidden)
 	{
+		bCloseAfterCelebration = false;
+		CloseCountdown = -1.f;
 		EndCelebration();
 	}
 }
@@ -1025,6 +1033,16 @@ void UCampaignTreeWidget::NativeTick(const FGeometry& G, float Delta)
 		bCenterCurrentColumn = false;
 	}
 	UpdateCelebration(Delta, Width, FMath::Max(0.f, ContentWidth - Width));
+	if (bCloseAfterCelebration && !IsCelebrating())
+	{
+		bCloseAfterCelebration = false;
+		CloseCountdown = CloseAfterLastLessonDelay;
+	}
+	if (CloseCountdown >= 0.f && (CloseCountdown -= Delta) < 0.f)
+	{
+		Close();
+		return;
+	}
 	if (bPanCandidate && FSlateApplication::IsInitialized())
 	{
 		auto& Slate = FSlateApplication::Get();
@@ -1234,7 +1252,7 @@ void UCampaignTreeWidget::EndCelebration()
 
 void UCampaignTreeWidget::NotifyNodeClicked(ECampaignLesson Lesson)
 {
-	if (!bDraggingTree && !IsCelebrating() && IsLessonUnlocked(Lesson))
+	if (!bDraggingTree && !IsCelebrating() && !bCloseAfterCelebration && CloseCountdown < 0.f && IsLessonUnlocked(Lesson))
 	{
 		if (LessonPopup)
 		{
