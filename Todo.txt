@@ -23,9 +23,8 @@ Icon Set Selections
 Finish Lessons
 Master Rewards
 Total Play Time
-Player level resets every time the app is closed
 Rotate Not Overlay
-
+Final Unlock has empty box
 
 --- Art Tasks ---
 Streak Saver Art
