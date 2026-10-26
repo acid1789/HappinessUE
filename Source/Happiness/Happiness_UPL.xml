@@ -9,6 +9,36 @@
 		<addPermission android:name="android.permission.POST_NOTIFICATIONS"/>
 	</androidManifestUpdates>
 
+	<gameActivityOnCreateBeginningAdditions>
+		<insert>
+		// Tapping a local notification starts GameActivity directly, skipping SplashActivity, which is what passes
+		// the immersive and cutout settings on as extras. GameActivity reads them from any extras it gets, so the
+		// notification's own extras would turn immersive mode off (Back/Home/Recents stay on screen). Pass them on
+		// from the manifest here, as SplashActivity does.
+		if (!isStandalone &amp;&amp; _extrasBundle != null &amp;&amp; _extrasBundle.getString("UseSplashScreen") == null)
+		{
+			try
+			{
+				Bundle HappinessMeta = getPackageManager().getApplicationInfo(getPackageName(), PackageManager.GET_META_DATA).metaData;
+				if (HappinessMeta != null)
+				{
+					if (HappinessMeta.getBoolean("com.epicgames.unreal.GameActivity.bShouldHideUI", false))
+					{
+						_extrasBundle.putString("ShouldHideUI", "true");
+					}
+					if (HappinessMeta.getBoolean("com.epicgames.unreal.GameActivity.bUseDisplayCutout", false))
+					{
+						_extrasBundle.putString("UseDisplayCutout", "true");
+					}
+				}
+			}
+			catch (PackageManager.NameNotFoundException e)
+			{
+			}
+		}
+		</insert>
+	</gameActivityOnCreateBeginningAdditions>
+
 	<gameActivityClassAdditions>
 		<insert>
 	/** UDailyReminderSubsystem: ask for permission to notify (Android 13+; earlier versions need none) */
