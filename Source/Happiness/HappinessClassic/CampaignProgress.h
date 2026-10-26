@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Containers/Ticker.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "CampaignLesson.h"
 #include "CampaignProgress.generated.h"
@@ -43,6 +44,11 @@ struct FLessonProgress
 	 *  Until then nothing mentions it, not the end screen nor the popup that reopens after the puzzle. */
 	UPROPERTY(SaveGame, BlueprintReadOnly, Category = "Campaign")
 	bool bMasterRevealed = false;
+
+	/** Seconds spent on this lesson's puzzles, every stage together: counted while one is on the puzzle screen,
+	 *  unsolved and not paused (UCampaignSubsystem::TickPlayTime) */
+	UPROPERTY(SaveGame, BlueprintReadOnly, Category = "Campaign")
+	float PlaySeconds = 0.f;
 };
 
 /** What finishing a lesson puzzle did */
@@ -278,6 +284,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Campaign")
 	int32 GetLessonPoints(ECampaignLesson Lesson) const;
 
+	/** Time spent on the lesson's puzzles in the current mode, all stages (FLessonProgress::PlaySeconds) */
+	UFUNCTION(BlueprintPure, Category = "Campaign")
+	float GetLessonPlaySeconds(ECampaignLesson Lesson) const;
+
 	/** The stage that currently earns points, or the final once all points are earned */
 	UFUNCTION(BlueprintPure, Category = "Campaign")
 	int32 GetCurrentStage(ECampaignLesson Lesson) const;
@@ -417,6 +427,10 @@ private:
 	const TMap<ECampaignLesson, FLessonProgress>& GetProgressMap() const;
 	FLessonProgress& GetMutableProgress(ECampaignLesson Lesson);
 	void Save();
+
+	/** Adds the frame's time to the session lesson's PlaySeconds while its puzzle is being played */
+	bool TickPlayTime(float DeltaTime);
+	FTSTicker::FDelegateHandle PlayTimeTicker;
 
 	FCampaignSaveData Data;
 

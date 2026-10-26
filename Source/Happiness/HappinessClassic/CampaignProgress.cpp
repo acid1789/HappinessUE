@@ -5,6 +5,10 @@
 #include "FreePlaySettings.h"
 #include "DailyPuzzle.h"
 
+#include "Blueprint/UserWidget.h"
+#include "Engine/GameInstance.h"
+#include "Engine/World.h"
+#include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 
 #define LOCTEXT_NAMESPACE "CampaignProgress"
@@ -40,10 +44,13 @@ void UCampaignSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 	// Progress used to be saved in its own slot; that slot is no longer used
 	UGameplayStatics::DeleteGameInSlot(TEXT("Campaign"), UHappinessSaveGame::SaveUserIndex);
+
+	PlayTimeTicker = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateUObject(this, &UCampaignSubsystem::TickPlayTime));
 }
 
 void UCampaignSubsystem::Deinitialize()
 {
+	FTSTicker::GetCoreTicker().RemoveTicker(PlayTimeTicker);
 	if (Instance == this)
 	{
 		Instance = nullptr;
@@ -292,6 +299,11 @@ FLessonProgress UCampaignSubsystem::GetLessonProgress(ECampaignLesson Lesson) co
 int32 UCampaignSubsystem::GetLessonPoints(ECampaignLesson Lesson) const
 {
 	return GetLessonProgress(Lesson).Points;
+}
+
+float UCampaignSubsystem::GetLessonPlaySeconds(ECampaignLesson Lesson) const
+{
+	return GetLessonProgress(Lesson).PlaySeconds;
 }
 
 int32 UCampaignSubsystem::GetCurrentStage(ECampaignLesson Lesson) const
@@ -737,6 +749,34 @@ FLessonProgress& UCampaignSubsystem::GetMutableProgress(ECampaignLesson Lesson)
 		Progress.NextSeed.SetNumZeroed(GetNumStages() + GetNumMasterStages());
 	}
 	return Progress;
+}
+
+bool UCampaignSubsystem::TickPlayTime(float DeltaTime)
+{
+	// The session puzzle is being played while PC_Happiness holds it (HappinessPuzzle: set when it starts or resumes,
+	// cleared on leaving it) and the puzzle screen's pause menu is closed. Solving it closes it (bPuzzleOpen).
+	// The time goes to disk with the next save, which every move makes.
+	if (!Data.bInSession || !Data.bPuzzleOpen)
+	{
+		return true;
+	}
+	const UWorld* World = GetGameInstance() ? GetGameInstance()->GetWorld() : nullptr;
+	const APlayerController* PC = World ? World->GetFirstPlayerController() : nullptr;
+	const FObjectPropertyBase* PuzzleProperty = PC ? FindFProperty<FObjectPropertyBase>(PC->GetClass(), TEXT("HappinessPuzzle")) : nullptr;
+	const FObjectPropertyBase* ScreenProperty = PC ? FindFProperty<FObjectPropertyBase>(PC->GetClass(), TEXT("HappinessWidget")) : nullptr;
+	if (!PuzzleProperty || !ScreenProperty || !PuzzleProperty->GetObjectPropertyValue_InContainer(PC))
+	{
+		return true;
+	}
+	const UUserWidget* Screen = Cast<UUserWidget>(ScreenProperty->GetObjectPropertyValue_InContainer(PC));
+	const UWidget* PauseMenu = Screen ? Screen->GetWidgetFromName(TEXT("PauseMenu")) : nullptr;
+	if (!Screen || !Screen->IsVisible() || (PauseMenu && PauseMenu->IsVisible()))
+	{
+		return true;
+	}
+	// A long frame (back from the background, a hitch) counts as one normal frame at most
+	GetMutableProgress(Data.SessionLesson).PlaySeconds += FMath::Min(DeltaTime, 0.25f);
+	return true;
 }
 
 void UCampaignSubsystem::Save()

@@ -123,7 +123,9 @@ already showing. No screen handles back itself.
 
 Everything lives in one save slot, `HappinessSave`, written by `SG_Happiness` (parent class
 `UHappinessSaveGame`). It holds the puzzle in progress (resumed on relaunch), the lesson and campaign progress,
-the Free Play settings and pace, and the player's level.
+the Free Play settings and pace, and the player's level. Each lesson's progress includes the time spent on its
+puzzles (`FLessonProgress::PlaySeconds`, counted by `UCampaignSubsystem::TickPlayTime` while one is on screen,
+unpaused and unsolved), shown on the lesson popup left of its Back / Return to Lessons button.
 
 
 ### Lessons tree presentation

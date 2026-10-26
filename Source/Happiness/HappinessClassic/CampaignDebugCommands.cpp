@@ -2,7 +2,7 @@
 // switches to its mode first (Happiness.Campaign.* completes every lesson first if Campaign mode is still locked),
 // then changes that mode's progress and saves it: back up the save first if it matters.
 //
-//   Happiness.Lessons.List                    every lesson's points, stage and state
+//   Happiness.Lessons.List                    every lesson's points, stage, state and time played
 //   Happiness.Lessons.Reset                   clear every lesson
 //   Happiness.Lessons.Clear <Lesson>          clear one lesson
 //   Happiness.Lessons.Points <Lesson> <N>     set its points (the stages they unlock open)
@@ -101,8 +101,9 @@ namespace
 			? FString::Printf(TEXT("  master %d/%d%s"), Progress.MasterPoints, UCampaignSubsystem::GetMasterMaxPoints(),
 				Progress.bMasterRevealed ? TEXT("") : TEXT(" (not shown yet)"))
 			: FString();
-		Ar.Logf(TEXT("  %-16s column %d  %2d/%d points  stage %d  %s%s"), *LessonEnumName(Lesson),
-			UCampaignTree::GetLessonColumn(Lesson), Progress.Points, UCampaignSubsystem::GetMaxPoints(), Stage, State, *Master);
+		Ar.Logf(TEXT("  %-16s column %d  %2d/%d points  stage %d  %s%s  time %.0fs"), *LessonEnumName(Lesson),
+			UCampaignTree::GetLessonColumn(Lesson), Progress.Points, UCampaignSubsystem::GetMaxPoints(), Stage, State, *Master,
+			Progress.PlaySeconds);
 	}
 
 	/** Switch to the track's mode; Campaign mode needs every lesson completed */
