@@ -14,7 +14,6 @@ Usage Analytics
 
 --- Design Tasks ---
 Quit to lessons?
-Game Rules
 Campaign
 Deal with active puzzle/daily notification
 Streak Saver Backing
@@ -24,15 +23,15 @@ Icon Set Selections
 Finish Lessons
 Master Rewards
 Total Play Time
-Launching from Notification keeps Back/Hamburger/Home buttons pressable
 Player level resets every time the app is closed
-rotate not overlay
+Rotate Not Overlay
 
 
 --- Art Tasks ---
 Streak Saver Art
 Options Menu Visuals
 Selection isnt noticable
+Game Rules
 
 
 
