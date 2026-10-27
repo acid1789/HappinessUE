@@ -13,7 +13,6 @@ Usage Analytics
 
 
 --- Design Tasks ---
-Quit to lessons?
 Campaign
 Streak Saver Backing
 Game Rules
@@ -24,8 +23,6 @@ Master Reward Animation
 Final Unlock has empty box
 New Game
 Master Erase
-Master Difficulty
-Mastered Text doent fit in the box
 
 --- Art Tasks ---
 Streak Saver Art

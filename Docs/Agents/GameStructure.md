@@ -22,7 +22,7 @@ functions (`GetNumStages`, `GetStageSize`, `GetMaxPoints`, ...) follow it.
 
 | Widget (`Content/...`) | C++ parent (`Source/Happiness/...`) | Role |
 |---|---|---|
-| `General/UI/WBP_GameSelect` | — | Main menu; hosts the mode screen, campaign tree and Free Play config |
+| `General/UI/WBP_GameSelect` | — | Main menu; hosts the mode screen, campaign tree and Free Play config. A new player (no `HappinessSave` at startup, `UCampaignSubsystem::ConsumeNewPlayerStart`) starts on the Lessons tree with Game Basics' popup open (`UHappinessModeWidget::StartNewPlayer`, on the mode screen's first tick); everyone else starts on the mode screen |
 | `Happiness/UI/WBP_HappinessMode` | `UI/HappinessModeWidget` | Free Play / Lessons / Campaign / Back ; top right, the player level badge (`UI/PlayerLevelBadge`, made in code): the level on `T_PlayerLevelSun`, ringed by twelve shaped rewards from `T_MasterRewardGems` (4×3 atlas). Each reward appears once every clue in that tree column has completed Campaign Master Mode (`UCampaignSubsystem::IsMasterColumnCompleted`). `SunTexture` and `IconTextures` remain art override hooks. The mode screen moves the badge into WBP_GameSelect's MainCanvas at Z 0 (`MoveBadgeToMenu`, after construction), so it stays up behind every menu screen (mode Z 5, tree Z 10, Free Play settings added later); it goes transparent while the puzzle screen (`WBP_Happiness`, in the same canvas) is visible (`UPlayerLevelBadge::SetCoveredBy`) and refreshes when it comes back. |
 | `Happiness/UI/WBP_HappinessConfig` | — | Free Play setup: size, difficulty, clue selection (`WBP_ClueSelect`, `UI/ClueSelectWidget`) |
 | `Happiness/UI/WBP_CampaignTree` | `UI/CampaignTreeWidget` | The lesson tree (Lessons and Campaign). Bottom left in Lessons mode until every lesson is completed: `WBP_CompleteLessons` (`UI/CompleteLessonsPanel`), which asks with the screen's own `ConfirmDialog` (`UConfirmDialogWidget::Ask`), then completes every lesson, unlocking Campaign. When every lesson has just been completed (the last final, or that button), the tree closes to the mode screen, which opens the congratulations (`UI/LessonsCompletePopup`, made in code: the Garden Visitors and Campaign unlocks) with fireworks over them (`UI/FireworksWidget`, code-drawn). `UCampaignSubsystem::ConsumeLessonsCompletion` says when; like the lesson completion, it isn't saved |
@@ -127,6 +127,8 @@ already showing. No screen handles back itself.
 
 The game save is the slot `HappinessSave`, written by `SG_Happiness` (parent class `UHappinessSaveGame`). It holds
 the lesson and campaign progress, the Free Play settings and pace, and the player's level.
+
+The game on Play before lessons and the campaign (version code 8) saved only the classic puzzle and the level. Its save starts the game over, as for a new player (`UHappinessSaveGame::ResetOldSave`, before anything reads the save): it is replaced by a fresh one keeping `Level` and `Experience`, and the puzzle slots are deleted (`Settings` is kept). An old save is told apart by the file's property tags: it has no `DataVersion` (written into every save from now on, `CurrentDataVersion`) and no `Campaign` (a property at its default isn't written, so the bytes are checked).
 
 Puzzles in progress have a slot per mode, `HappinessPuzzle_Daily`, `_FreePlay`, `_Lessons` and `_Campaign`
 (`UPuzzleSlotSubsystem`, `HappinessClassic/PuzzleSlots.*`): each an `SG_Happiness` holding just that mode's puzzle

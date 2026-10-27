@@ -83,6 +83,14 @@ FString UPuzzleSlotSubsystem::GetSlotName(EPuzzleSlot Slot)
 	}
 }
 
+void UPuzzleSlotSubsystem::DeleteAllSlots()
+{
+	for (EPuzzleSlot Slot : {EPuzzleSlot::Daily, EPuzzleSlot::FreePlay, EPuzzleSlot::Lessons, EPuzzleSlot::Campaign})
+	{
+		UGameplayStatics::DeleteGameInSlot(GetSlotName(Slot), UHappinessSaveGame::SaveUserIndex);
+	}
+}
+
 UHappinessSaveGame* UPuzzleSlotSubsystem::LoadSlot(EPuzzleSlot Slot) const
 {
 	const FString Name = GetSlotName(Slot);

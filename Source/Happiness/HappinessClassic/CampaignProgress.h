@@ -375,6 +375,9 @@ public:
 	/** IsLessonsCompletionPending, once */
 	bool ConsumeLessonsCompletion();
 
+	/** The game started with no game save at all (a new player): true once, for the menu to open on Game Basics */
+	bool ConsumeNewPlayerStart();
+
 	/**
 	 * Before playing the session's next puzzle: the session moves on to the stage that currently earns points (the
 	 * final once all points are earned). Returns the size and difficulty of the stage to play.
@@ -464,5 +467,6 @@ private:
 	FLessonPuzzleResult LastResult;
 	TOptional<ECampaignLesson> UncelebratedLesson;
 	bool bLessonsCompletionPending = false;
+	bool bNewPlayerStart = false;
 	static TWeakObjectPtr<UCampaignSubsystem> Instance;
 };

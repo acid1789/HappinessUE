@@ -13,6 +13,7 @@
 #include "Components/Image.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
+#include "UI/CampaignTreeWidget.h"
 #include "UI/ConfirmDialogWidget.h"
 #include "UI/FireworksWidget.h"
 #include "UI/LessonsCompletePopup.h"
@@ -180,6 +181,26 @@ void UHappinessModeWidget::MakePlayerLevelBadge()
 	}
 }
 
+void UHappinessModeWidget::StartNewPlayer()
+{
+	// On the first tick, once the menu is built (the game always starts on this screen)
+	UCampaignSubsystem* Campaign = UCampaignSubsystem::Get(this);
+	UCanvasPanel* Menu = Cast<UCanvasPanel>(GetParent());
+	if (!Campaign || !Menu || !Campaign->ConsumeNewPlayerStart())
+	{
+		return;
+	}
+	ShowTree(ECampaignMode::Lessons);
+	for (UWidget* Child : Menu->GetAllChildren())
+	{
+		if (UCampaignTreeWidget* Tree = Cast<UCampaignTreeWidget>(Child))
+		{
+			// As if the player had picked it: its popup opens, and Back still leads here
+			Tree->NotifyNodeClicked(ECampaignLesson::VerticalTwo);	// Game Basics
+		}
+	}
+}
+
 void UHappinessModeWidget::MoveBadgeToMenu()
 {
 	// The menu (WBP_GameSelect's MainCanvas) holds this screen, the campaign tree, the Free Play settings and the
@@ -299,6 +320,7 @@ void UHappinessModeWidget::NativeTick(const FGeometry& MyGeometry, float InDelta
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
 	MoveBadgeToMenu();
+	StartNewPlayer();
 	UpdateUnlockCelebration(InDeltaTime);
 }
 

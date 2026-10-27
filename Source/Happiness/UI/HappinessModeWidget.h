@@ -165,6 +165,9 @@ private:
 	/** Moves the badge from this screen into the main menu around it, behind its screens (once it has been built) */
 	void MoveBadgeToMenu();
 
+	/** A new player's first start (no save at all): straight to the Lessons tree with Game Basics open */
+	void StartNewPlayer();
+
 	/** Make the Streak Saver button if the layout has none */
 	void MakeStreakSaverButton();
 

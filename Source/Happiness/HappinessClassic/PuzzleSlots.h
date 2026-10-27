@@ -87,6 +87,9 @@ public:
 	/** UHappinessSaveGame: a game save has been loaded; between BeginResume and EndResume, put the slot's puzzle in it */
 	void ApplyResume(UHappinessSaveGame& GameSave);
 
+	/** Delete every mode's puzzle slot (UHappinessSaveGame::ResetOldSave) */
+	static void DeleteAllSlots();
+
 	/** A slot is being read or written: its save game mustn't be handed back here */
 	static bool IsSlotIO() { return bSlotIO; }
 
