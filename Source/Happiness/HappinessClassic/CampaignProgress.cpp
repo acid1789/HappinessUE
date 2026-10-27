@@ -711,7 +711,7 @@ void UCampaignSubsystem::ResetAllProgress()
 	OnProgressChanged.Broadcast();
 }
 
-bool UCampaignSubsystem::AreHintsAllowed(const UObject* WorldContextObject)
+bool UCampaignSubsystem::AreAssistsAllowed(const UObject* WorldContextObject)
 {
 	const UCampaignSubsystem* Campaign = Get(WorldContextObject);
 	return !Campaign || !Campaign->IsInLessonSession() || !IsMasterStage(Campaign->GetSessionStage());

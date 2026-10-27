@@ -19,11 +19,14 @@ void UButtonPanelWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTi
 		return;
 	}
 
-	// No hints on Master Mode stages
-	const bool bHintsAllowed = UCampaignSubsystem::AreHintsAllowed(this);
-	if (Button_H->GetIsEnabled() != bHintsAllowed)
+	// No hints or fixing on Master Mode stages
+	const bool bHintsAllowed = UCampaignSubsystem::AreAssistsAllowed(this);
+	for (UWidget* Button : { Button_H.Get(), Button_Fix.Get() })
 	{
-		Button_H->SetIsEnabled(bHintsAllowed);
+		if (Button && Button->GetIsEnabled() != bHintsAllowed)
+		{
+			Button->SetIsEnabled(bHintsAllowed);
+		}
 	}
 	if (IdleSeconds <= 0.f || WiggleSeconds <= 0.f)
 	{

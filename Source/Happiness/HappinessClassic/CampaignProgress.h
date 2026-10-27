@@ -420,9 +420,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Campaign", meta = (WorldContext = "WorldContextObject"))
 	static bool IsPlayingLesson(const UObject* WorldContextObject);
 
-	/** Hints can be used on the puzzle being played: not on Master Mode stages */
+	/** Hints and Fix Puzzle can be used on the puzzle being played: not on Master Mode stages */
 	UFUNCTION(BlueprintPure, Category = "Campaign", meta = (WorldContext = "WorldContextObject"))
-	static bool AreHintsAllowed(const UObject* WorldContextObject);
+	static bool AreAssistsAllowed(const UObject* WorldContextObject);
 
 	/** Ends any lesson session; call when a classic game is started */
 	UFUNCTION(BlueprintCallable, Category = "Campaign", meta = (WorldContext = "WorldContextObject"))

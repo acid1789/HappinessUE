@@ -23,7 +23,8 @@ Master Rewards
 Final Unlock has empty box
 New Game
 Hint Clue Effect needs to be bound to clue
-No Hints on Master Stages
+Master Erase
+Master Difficulty
 
 --- Art Tasks ---
 Streak Saver Art
