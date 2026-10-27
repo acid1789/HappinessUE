@@ -13,6 +13,7 @@
 //
 //   Happiness.Campaign.<the same>             the same for the campaign (points are solved puzzles there)
 //   Happiness.Campaign.Master <Lesson> <N>    complete it and set its Master Mode puzzles solved (shown already)
+//   Happiness.Campaign.MasterAll              complete every lesson and all of its Master Mode puzzles
 //
 // <Lesson> is its name (NextTo; any case) or number (ECampaignLesson). Left out, it is the first lesson in the tree
 // that isn't completed.
@@ -276,6 +277,19 @@ namespace
 						Campaign.DebugSetMaster(Lesson, Points);
 						ReportLesson(Campaign, Lesson, Ar);
 					}
+				});
+
+			AddCommand(CampaignTrack, TEXT("MasterAll"), TEXT(": completes every lesson and all of its Master Mode puzzles"),
+				[](UCampaignSubsystem& Campaign, const FTrack&, const TArray<FString>&, UWorld*, FOutputDevice& Ar)
+				{
+					for (const TArray<ECampaignLesson>& Column : UCampaignTree::GetColumns())
+					{
+						for (ECampaignLesson Lesson : Column)
+						{
+							Campaign.DebugSetMaster(Lesson, UCampaignSubsystem::GetMasterMaxPoints());
+						}
+					}
+					Ar.Log(TEXT("Every lesson mastered"));
 				});
 		}
 	} GRegisterCommands;

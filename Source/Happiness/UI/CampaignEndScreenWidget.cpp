@@ -154,8 +154,14 @@ void UCampaignEndScreenWidget::BuildNotebookLayout()
 	if (ProgressTicks) { ProgressTicks->SetVisibility(ESlateVisibility::HitTestInvisible); Place(ProgressTicks,{910,575},{450,24},3); }
 	StyleText(ProgressText,28,CampaignInk,ETextJustify::Center); Place(ProgressText,{905,607},{460,42});
 	UnlockFrame=Image(Face(false),{875,650},{520,74});
-	StyleText(UnlockText,28,CampaignGreen,ETextJustify::Center); UnlockText->SetAutoWrapText(true);
-	Place(UnlockText,{925,663},{420,50},2);
+	// One line, shrunk to fit the frame if it's ever too long
+	if (UnlockText)
+	{
+		StyleText(UnlockText,28,CampaignGreen,ETextJustify::Center); UnlockText->SetAutoWrapText(false);
+		UScaleBox* UnlockFit=WidgetTree->ConstructWidget<UScaleBox>(); UnlockFit->SetStretch(EStretch::ScaleToFit);
+		UnlockFit->SetStretchDirection(EStretchDirection::DownOnly); UnlockFit->SetVisibility(ESlateVisibility::HitTestInvisible);
+		UnlockFit->AddChild(UnlockText); Place(UnlockFit,{955,663},{360,50},2);	// between the frame's leaf ends
+	}
 	auto Action = [&](UButton* Button,const FText& Text,int32 Symbol,bool Primary,FVector2D P)
 	{
 		Button->ClearChildren(); FButtonStyle Style;
@@ -557,7 +563,7 @@ FText UCampaignEndScreenWidget::GetUnlockText() const
 {
 	if (Result.bMasterCompleted)
 	{
-		return FText::Format(LOCTEXT("ClueMastered", "{0} mastered!"), UCampaignTree::GetLessonDisplayName(Result.Lesson));
+		return LOCTEXT("ClueMastered", "Mastered!");
 	}
 	// Clearing the final shows no unlock text: Master Mode is found by reopening the clue from the tree
 	if (Result.bStageUnlocked)

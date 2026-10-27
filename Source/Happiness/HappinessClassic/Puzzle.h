@@ -140,8 +140,10 @@ public:
 
 	// Campaign puzzle: only clue types from Lesson and earlier lessons, and it can't be solved without Lesson's clues.
 	// Difficulty sets the givens and extra clues as usual. Returns false if no such puzzle was found (e.g. Between on 3x3).
+	// Candidates > 1 (Master Mode stages): makes that many such puzzles from the seed and keeps the one whose solve
+	// takes the most deductions (ComputeRating's Steps); the same seed always gives the same puzzle.
 	UFUNCTION(BlueprintCallable)
-	bool InitCampaign(int Seed, int Size, int Difficulty, ECampaignLesson Lesson, bool bAllClueTypes = false);
+	bool InitCampaign(int Seed, int Size, int Difficulty, ECampaignLesson Lesson, bool bAllClueTypes = false, int Candidates = 1);
 
 	// False for lessons that can't be played at this size (Given is never playable)
 	UFUNCTION(BlueprintCallable, BlueprintPure)

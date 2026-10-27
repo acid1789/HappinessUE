@@ -162,6 +162,9 @@ private:
 	/** Make the level badge if the layout has none */
 	void MakePlayerLevelBadge();
 
+	/** Moves the badge from this screen into the main menu around it, behind its screens (once it has been built) */
+	void MoveBadgeToMenu();
+
 	/** Make the Streak Saver button if the layout has none */
 	void MakeStreakSaverButton();
 
