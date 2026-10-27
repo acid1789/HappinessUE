@@ -1,10 +1,14 @@
 #include "UI/HintSparkleIconWidget.h"
 
+#include "UI/ButtonPanelWidget.h"
+
 #include "Blueprint/SlateBlueprintLibrary.h"
+#include "Blueprint/WidgetTree.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/Image.h"
 #include "Components/NativeWidgetHost.h"
+#include "Components/ScrollBox.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/Texture2D.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -16,6 +20,8 @@
 #include "UObject/UnrealType.h"
 #include "Widgets/SCanvas.h"
 
+TWeakObjectPtr<UHintSparkleIconWidget> UHintSparkleIconWidget::ShownClue;
+
 UHintSparkleIconWidget::UHintSparkleIconWidget(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
@@ -25,49 +31,193 @@ UHintSparkleIconWidget::UHintSparkleIconWidget(const FObjectInitializer& ObjectI
 	SparkleMaterial = Material.Object;
 }
 
-void UHintSparkleIconWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+bool UHintSparkleIconWidget::IsShowingHint() const
 {
-	Super::NativeTick(MyGeometry, InDeltaTime);
-	if (IsDesignTime()) return;
-
 	const FBoolProperty* HintProperty = FindFProperty<FBoolProperty>(GetClass(), TEXT("ShowingHint"));
-	const bool bShowingHint = HintProperty && HintProperty->GetPropertyValue_InContainer(this);
-	if (!bShowingHint || !IsVisible() || MyGeometry.GetLocalSize().IsNearlyZero())
-	{
-		StopSparkles();
-		return;
-	}
+	return HintProperty && HintProperty->GetPropertyValue_InContainer(this);
+}
 
+void UHintSparkleIconWidget::HideOldOutline()
+{
 	// The Blueprint still owns the original outline for hint cleanup, but it must not paint.
 	if (const FObjectProperty* DisplayProperty = FindFProperty<FObjectProperty>(GetClass(), TEXT("HintDisplay")))
 	{
 		if (UImage* OldOutline = Cast<UImage>(DisplayProperty->GetObjectPropertyValue_InContainer(this)))
 			OldOutline->SetVisibility(ESlateVisibility::Collapsed);
 	}
-	UUserWidget* Clue = nullptr;
-	for (UObject* Outer = GetOuter(); Outer && !Clue; Outer = Outer->GetOuter())
+}
+
+UUserWidget* UHintSparkleIconWidget::FindClue() const
+{
+	for (UObject* Outer = GetOuter(); Outer; Outer = Outer->GetOuter())
 	{
 		if (UUserWidget* ParentWidget = Cast<UUserWidget>(Outer))
 		{
 			const FString ClassName = ParentWidget->GetClass()->GetName();
 			if (ClassName.StartsWith(TEXT("WBP_HorizontalClue_C")) || ClassName.StartsWith(TEXT("WBP_VerticalClue_C")))
-				Clue = ParentWidget;
+				return ParentWidget;
 		}
 	}
-	if (Clue && !GetName().EndsWith(TEXT("_0")))
+	return nullptr;
+}
+
+void UHintSparkleIconWidget::NativeConstruct()
+{
+	Super::NativeConstruct();
+	if (IsDesignTime()) return;
+	UUserWidget* Clue = FindClue();
+	if (Clue && GetName().EndsWith(TEXT("_0")) && !ClueTicker.IsValid())
 	{
-		StopSparkles();
+		TickedClue = Clue;
+		ClueTicker = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateUObject(this, &UHintSparkleIconWidget::TickClue));
+	}
+}
+
+void UHintSparkleIconWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+{
+	Super::NativeTick(MyGeometry, InDeltaTime);
+	if (IsDesignTime()) return;
+
+	if (!IsShowingHint())
+		bStreamed = false;
+	if (!IsShowingHint() || !IsVisible() || MyGeometry.GetLocalSize().IsNearlyZero())
+	{
+		if (!ClueTicker.IsValid()) StopSparkles();
 		return;
 	}
+	HideOldOutline();
+	// A clue's first icon runs from TickClue; its other icons show nothing
+	if (ClueTicker.IsValid() || FindClue()) return;
+	UpdateSparkles(InDeltaTime, MyGeometry, false);
+	LastTickFrame = GFrameCounter;
+	if (!BoardWatch.IsValid())
+		BoardWatch = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateUObject(this, &UHintSparkleIconWidget::TickBoardWatch));
+}
 
+bool UHintSparkleIconWidget::TickBoardWatch(float DeltaTime)
+{
+	// The sparkles are drawn over the screen, not in the icon: when the icon is no longer painted (e.g. its cell
+	// resolved and collapsed its candidates), nothing else would end them
+	if (SparkleCanvas.IsValid() && GFrameCounter - LastTickFrame <= 2) return true;
+	StopSparkles();
+	BoardWatch.Reset();
+	return false;
+}
+
+namespace
+{
+	/** Descendant's geometry, arranged down from Ancestor (at AncestorGeometry) whether or not it was last painted */
+	bool FindDescendantGeometry(const TSharedRef<SWidget>& Ancestor, const FGeometry& AncestorGeometry,
+		const TSharedRef<SWidget>& Descendant, FGeometry& OutGeometry)
+	{
+		TArray<TSharedRef<SWidget>> Path;
+		for (TSharedPtr<SWidget> Widget = Descendant; Widget != Ancestor; Widget = Widget->GetParentWidget())
+		{
+			if (!Widget) return false;
+			Path.Add(Widget.ToSharedRef());
+		}
+		OutGeometry = AncestorGeometry;
+		TSharedRef<SWidget> Parent = Ancestor;
+		for (int32 Index = Path.Num() - 1; Index >= 0; --Index)
+		{
+			FArrangedChildren Arranged(EVisibility::All);
+			Parent->ArrangeChildren(OutGeometry, Arranged);
+			int32 Found = 0;
+			while (Found < Arranged.Num() && Arranged[Found].Widget != Path[Index]) ++Found;
+			if (Found == Arranged.Num()) return false;
+			OutGeometry = Arranged[Found].Geometry;
+			Parent = Path[Index];
+		}
+		return true;
+	}
+}
+
+bool UHintSparkleIconWidget::TickClue(float DeltaTime)
+{
+	UUserWidget* Clue = TickedClue.Get();
+	const TSharedPtr<SWidget> ClueSlate = Clue ? Clue->GetCachedWidget() : nullptr;
+	if (!ClueSlate || !IsShowingHint() || !IsVisible() || !Clue->IsVisible())
+	{
+		if (!IsShowingHint()) bStreamed = false;
+		bClueScrolled = false;
+		StopSparkles();
+		return true;
+	}
+
+	// The clue's place in its scroll box, from the scroll box's own geometry: it's up to date even while the clue is
+	// scrolled out of view (and not painted)
+	UScrollBox* Scroll = nullptr;
+	for (UWidget* Parent = Clue->GetParent(); Parent && !Scroll; Parent = Parent->GetParent())
+		Scroll = Cast<UScrollBox>(Parent);
+	const TSharedPtr<SWidget> ScrollSlate = Scroll ? Scroll->GetCachedWidget() : nullptr;
+	if (!ScrollSlate)
+	{
+		UpdateSparkles(DeltaTime, Clue->GetCachedGeometry(), true);
+		return true;
+	}
+	const FGeometry ScrollGeometry = Scroll->GetCachedGeometry();
+	if (ScrollGeometry.GetLocalSize().IsNearlyZero()) return true;
+	FGeometry ClueGeometry;
+	if (!FindDescendantGeometry(ScrollSlate.ToSharedRef(), ScrollGeometry, ClueSlate.ToSharedRef(), ClueGeometry)) return true;
+
+	if (!bClueScrolled)
+	{
+		// The hint is starting: bring its clue into view, with room for the sparkles around it
+		Scroll->ScrollWidgetIntoView(Clue, true, EDescendantScrollDestination::IntoView, 16.f);
+		bClueScrolled = true;
+	}
+	UpdateSparkles(DeltaTime, ClueGeometry, true, &ScrollGeometry);
+	return true;
+}
+
+void UHintSparkleIconWidget::StopTickers()
+{
+	if (BoardWatch.IsValid())
+	{
+		FTSTicker::RemoveTicker(BoardWatch);
+		BoardWatch.Reset();
+	}
+	if (ClueTicker.IsValid())
+	{
+		FTSTicker::RemoveTicker(ClueTicker);
+		ClueTicker.Reset();
+	}
+	TickedClue = nullptr;
+}
+
+void UHintSparkleIconWidget::UpdateSparkles(float InDeltaTime, const FGeometry& Geometry, bool bWholeClue, const FGeometry* Scroll)
+{
 	StartSparkles();
-	UpdateSparklePosition(Clue ? Clue->GetCachedGeometry() : MyGeometry, Clue != nullptr);
+	if (SparkleCanvas.IsValid() && !bStreamed)
+	{
+		// The hint has just started: the clue streams in from the hint button now, the board icon from the clue later
+		bStreamed = true;
+		StreamTime = bWholeClue ? 0.f : -CellStreamDelay;
+	}
+	if (bWholeClue && SparkleCanvas.IsValid())
+		ShownClue = this;
+	UpdateSparklePosition(Geometry, bWholeClue);
+	SparkleClip = FBox2D(ForceInit);
+	FVector2D ClipTopLeft, ClipBottomRight;
+	if (Scroll && ToSparkleSpace(*Scroll, ClipTopLeft, ClipBottomRight))
+	{
+		// The scroll box's area, widened by the orbit's overhang so that a clue in full view keeps its whole ring
+		FVector2D ClueTopLeft, ClueBottomRight;
+		const FVector2D Overhang = ToSparkleSpace(Geometry, ClueTopLeft, ClueBottomRight)
+			? (SparkleRect.GetSize() - (ClueBottomRight - ClueTopLeft)) * .5f + FVector2D(SpriteSize * .5f)
+			: FVector2D(SpriteSize);
+		SparkleClip = FBox2D(ClipTopLeft - Overhang, ClipBottomRight + Overhang);
+	}
 	OrbitTime += InDeltaTime;
+	StreamTime += InDeltaTime;
 	SpawnClock += InDeltaTime;
 	while (SpawnClock >= SpawnInterval)
 	{
 		SpawnClock -= SpawnInterval;
-		SpawnSparkle();
+		// None while waiting for the stream, then StreamSpawns at a time while streaming
+		const int32 Spawns = StreamTime < 0.f ? 0 : StreamTime < StreamSeconds ? StreamSpawns : 1;
+		for (int32 Spawn = 0; Spawn < Spawns; ++Spawn)
+			SpawnSparkle();
 	}
 	for (int32 Index = 0; Index < Sparkles.Num(); ++Index)
 	{
@@ -82,6 +232,12 @@ void UHintSparkleIconWidget::NativeTick(const FGeometry& MyGeometry, float InDel
 			continue;
 		}
 		UNiagaraUIWidget* Sparkle = Sparkles[Index];
+		// Sparkles still flying in from the hint button are never clipped to the clue's panel
+		const bool bInside = !SparkleClip.bIsValid || State.Age < State.Travel
+			|| SparkleClip.IsInsideOrOn(GetSparklePosition(Index) + FVector2D(GetSparkleSize(Index) * .5f));
+		const ESlateVisibility Shown = bInside ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Hidden;
+		Sparkle->SetVisibility(Shown);
+		SparkleImages[Index]->SetVisibility(Shown);
 		const float Fade = FMath::Min3(1.f, State.Age / .18f, (State.Lifetime - State.Age) / .3f);
 		const float Twinkle = .72f + .28f * FMath::Sin(OrbitTime * (4.3f + Index * .2f) + State.Phase);
 		Sparkle->SetRenderOpacity(Fade * Twinkle);
@@ -129,6 +285,38 @@ FVector2D UHintSparkleIconWidget::GetSparklePosition(int32 Index) const
 {
 	if (!SparkleStates.IsValidIndex(Index) || !SparkleStates[Index].bActive) return FVector2D::ZeroVector;
 	const FOrbitSparkle& State = SparkleStates[Index];
+	FVector2D Position = GetOrbitPosition(Index);
+	if (State.Age < State.Travel)
+	{
+		// Flying in: a curve from the hint button that ends where the sparkle is in the orbit by then, so it joins it
+		const float Along = FMath::InterpEaseInOut(0.f, 1.f, State.Age / State.Travel, 2.f);
+		const FVector2D Delta = Position - State.From;
+		const FVector2D Control = (State.From + Position) * .5f + FVector2D(-Delta.Y, Delta.X) * State.Bend;
+		Position = State.From * FMath::Square(1.f - Along) + Control * (2.f * (1.f - Along) * Along) + Position * FMath::Square(Along);
+	}
+	return Position - FVector2D(GetSparkleSize(Index) * .5f);
+}
+
+bool UHintSparkleIconWidget::GetStreamSource(FVector2D& OutFrom) const
+{
+	const UHintSparkleIconWidget* Clue = ShownClue.Get();
+	if (!TickedClue.IsValid() && Clue && Clue->SparkleCanvas.IsValid() && Clue->SparkleRect.bIsValid)
+	{
+		// Peel off a random point of the clue's ring (both canvases cover the same screen)
+		const float Angle = FMath::FRandRange(0.f, 2.f * PI);
+		OutFrom = Clue->SparkleRect.GetCenter() + Clue->SparkleRect.GetSize() * .5f * FVector2D(FMath::Cos(Angle), FMath::Sin(Angle));
+		return true;
+	}
+	const UWidget* Button = HintButton.Get();
+	FVector2D TopLeft, BottomRight;
+	if (!Button || !ToSparkleSpace(Button->GetCachedGeometry(), TopLeft, BottomRight)) return false;
+	OutFrom = (TopLeft + BottomRight) * .5f + FVector2D(FMath::FRandRange(-.2f, .2f), FMath::FRandRange(-.2f, .2f)) * (BottomRight - TopLeft);
+	return true;
+}
+
+FVector2D UHintSparkleIconWidget::GetOrbitPosition(int32 Index) const
+{
+	const FOrbitSparkle& State = SparkleStates[Index];
 	const float Angle = State.Phase + OrbitTime * State.Speed;
 	const FVector2D Center = SparkleRect.GetCenter();
 	const FVector2D Radius = SparkleRect.GetSize() * .5f;
@@ -138,8 +326,7 @@ FVector2D UHintSparkleIconWidget::GetSparklePosition(int32 Index) const
 	const FVector2D Normal = FVector2D(CosAngle / FMath::Max(Radius.X, 1.f),
 		SinAngle / FMath::Max(Radius.Y, 1.f)).GetSafeNormal();
 	return Center + FVector2D(CosAngle * Radius.X, SinAngle * Radius.Y)
-		+ Normal * (State.NormalOffset * SpriteSize)
-		- FVector2D(GetSparkleSize(Index) * .5f);
+		+ Normal * (State.NormalOffset * SpriteSize);
 }
 
 void UHintSparkleIconWidget::SpawnSparkle()
@@ -154,6 +341,14 @@ void UHintSparkleIconWidget::SpawnSparkle()
 		State.Speed = FMath::FRandRange(1.7f, 2.7f);
 		State.Scale = FMath::FRandRange(.1f, .5f);
 		State.NormalOffset = FMath::FRandRange(-.15f, .15f);
+		State.Travel = 0.f;
+		if (StreamTime < StreamSeconds && GetStreamSource(State.From))
+		{
+			State.Travel = TravelSeconds * FMath::FRandRange(.85f, 1.15f);
+			State.Lifetime += State.Travel;
+			State.Bend = FMath::FRandRange(.08f, .3f);
+			State.Scale = FMath::FRandRange(.25f, .6f);
+		}
 		State.bActive = true;
 		SparkleImages[Index]->SetVisibility(ESlateVisibility::HitTestInvisible);
 		Sparkles[Index]->SetVisibility(ESlateVisibility::HitTestInvisible);
@@ -210,7 +405,18 @@ void UHintSparkleIconWidget::StartSparkles()
 		if (UUserWidget* ParentWidget = Cast<UUserWidget>(Outer))
 		{
 			if (ParentWidget->GetClass()->GetName().StartsWith(TEXT("WBP_Happiness_C")))
+			{
 				ScreenCanvas = Cast<UCanvasPanel>(ParentWidget->GetRootWidget());
+				HintButton = nullptr;
+				if (ParentWidget->WidgetTree)
+				{
+					ParentWidget->WidgetTree->ForEachWidget([this](UWidget* Widget)
+					{
+						if (const UButtonPanelWidget* Panel = Cast<UButtonPanelWidget>(Widget); Panel && Panel->Button_H)
+							HintButton = Panel->Button_H;
+					});
+				}
+			}
 		}
 	}
 	if (ScreenCanvas)
@@ -237,22 +443,29 @@ void UHintSparkleIconWidget::StartSparkles()
 	}
 }
 
-void UHintSparkleIconWidget::UpdateSparklePosition(const FGeometry& Geometry, bool bWholeClue)
+bool UHintSparkleIconWidget::ToSparkleSpace(const FGeometry& Geometry, FVector2D& OutTopLeft, FVector2D& OutBottomRight) const
 {
-	FVector2D Pixel, TopLeft, BottomRight;
+	FVector2D Pixel;
 	const FGeometry HostGeometry = SparkleHost ? SparkleHost->GetCachedGeometry() : FGeometry();
 	if (SparkleHost && HostGeometry.GetLocalSize().X > 0.f)
 	{
-		TopLeft = HostGeometry.AbsoluteToLocal(Geometry.LocalToAbsolute(FVector2D::ZeroVector));
-		BottomRight = HostGeometry.AbsoluteToLocal(Geometry.LocalToAbsolute(Geometry.GetLocalSize()));
+		OutTopLeft = HostGeometry.AbsoluteToLocal(Geometry.LocalToAbsolute(FVector2D::ZeroVector));
+		OutBottomRight = HostGeometry.AbsoluteToLocal(Geometry.LocalToAbsolute(Geometry.GetLocalSize()));
 	}
 	else
 	{
-		USlateBlueprintLibrary::LocalToViewport(this, Geometry, FVector2D::ZeroVector, Pixel, TopLeft);
-		USlateBlueprintLibrary::LocalToViewport(this, Geometry, Geometry.GetLocalSize(), Pixel, BottomRight);
+		USlateBlueprintLibrary::LocalToViewport(this, Geometry, FVector2D::ZeroVector, Pixel, OutTopLeft);
+		USlateBlueprintLibrary::LocalToViewport(this, Geometry, Geometry.GetLocalSize(), Pixel, OutBottomRight);
 	}
+	const FVector2D Size = OutBottomRight - OutTopLeft;
+	return Size.X > 0.f && Size.Y > 0.f;
+}
+
+void UHintSparkleIconWidget::UpdateSparklePosition(const FGeometry& Geometry, bool bWholeClue)
+{
+	FVector2D TopLeft, BottomRight;
+	if (!ToSparkleSpace(Geometry, TopLeft, BottomRight)) return;
 	const FVector2D Size = BottomRight - TopLeft;
-	if (Size.X <= 0.f || Size.Y <= 0.f) return;
 	const FVector2D OrbitSize = bWholeClue
 		? FVector2D(Size.X * 1.08f, Size.Y * 1.16f)
 		: FVector2D(FMath::Max(Size.X, Size.Y) * 1.13f);
@@ -263,6 +476,8 @@ void UHintSparkleIconWidget::UpdateSparklePosition(const FGeometry& Geometry, bo
 
 void UHintSparkleIconWidget::StopSparkles()
 {
+	if (ShownClue.Get() == this)
+		ShownClue = nullptr;
 	if (SparkleCanvas.IsValid())
 	{
 		if (SparkleHost)
@@ -285,6 +500,13 @@ void UHintSparkleIconWidget::StopSparkles()
 
 void UHintSparkleIconWidget::NativeDestruct()
 {
+	StopTickers();
 	StopSparkles();
 	Super::NativeDestruct();
+}
+
+void UHintSparkleIconWidget::BeginDestroy()
+{
+	StopTickers();
+	Super::BeginDestroy();
 }
