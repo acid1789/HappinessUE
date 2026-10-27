@@ -298,6 +298,12 @@ void ULessonPopupWidget::BuildNotebookLayout()
 		AddActionContent(CloseButton, CloseLabel, 2, false);
 		Place(CloseButton, FVector2D(375,830), FVector2D(350,88));
 	}
+	PlayTimeText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("PlayTimeText"));
+	PlayTimeText->SetFont(FSlateFontInfo(NotebookFont, 26));
+	PlayTimeText->SetColorAndOpacity(NotebookInk);
+	PlayTimeText->SetJustification(ETextJustify::Right);
+	PlayTimeText->SetVisibility(ESlateVisibility::HitTestInvisible);
+	Place(PlayTimeText, FVector2D(105,856), FVector2D(250,36));
 }
 
 void ULessonPopupWidget::UpdateNotebookLayout()
@@ -324,6 +330,11 @@ void ULessonPopupWidget::UpdateNotebookLayout()
 		{
 			LayoutSlot->SetPosition(FVector2D(bOnlyBack ? 500.f : 375.f, 830.f));
 			LayoutSlot->SetSize(FVector2D(bOnlyBack ? 500.f : 350.f,88.f));
+		}
+		// The lesson's time sits just left of the button, centered on its height
+		if (UCanvasPanelSlot* TimeSlot = PlayTimeText ? Cast<UCanvasPanelSlot>(PlayTimeText->Slot) : nullptr)
+		{
+			TimeSlot->SetPosition(FVector2D((bOnlyBack ? 500.f : 375.f) - 20.f - 250.f, 856.f));
 		}
 	}
 }
@@ -748,6 +759,12 @@ void ULessonPopupWidget::Refresh()
 	if (PlayButton)
 	{
 		PlayButton->SetVisibility(bAllDone ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
+	}
+	if (PlayTimeText)
+	{
+		const int32 Seconds = Campaign ? FMath::FloorToInt(Campaign->GetLessonPlaySeconds(Lesson)) : 0;
+		PlayTimeText->SetText(FText::Format(LOCTEXT("PlayTime", "Time  {0}"),
+			FText::FromString(FString::Printf(TEXT("%02d:%02d:%02d"), Seconds / 3600, Seconds / 60 % 60, Seconds % 60))));
 	}
 	if (CloseLabel)
 	{

@@ -9,7 +9,8 @@ class UWidget;
 /**
  * The puzzle's side button panel. When the player hasn't touched anything for a while, the hint button gives a
  * small wiggle (a little left, a little right, back), again every IdleSeconds while they stay idle, unless the
- * player turned "Animate Hint Button" off in the options.
+ * player turned "Animate Hint Button" off in the options. On Master Mode stages hints and Fix Puzzle aren't allowed: the
+ * hint button is disabled and keeps still, and the Fix button is disabled (UCampaignSubsystem::AreAssistsAllowed).
  */
 UCLASS(Abstract)
 class HAPPINESS_API UButtonPanelWidget : public UUserWidget
@@ -19,6 +20,10 @@ class HAPPINESS_API UButtonPanelWidget : public UUserWidget
 public:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UWidget> Button_H;
+
+	/** Fix Puzzle: disabled on Master Mode stages, like the hint button */
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UWidget> Button_Fix;
 
 	/** Seconds without input before each wiggle */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hint Wiggle")

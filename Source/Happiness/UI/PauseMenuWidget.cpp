@@ -1,4 +1,5 @@
 #include "UI/PauseMenuWidget.h"
+#include "HappinessClassic/CampaignProgress.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "Brushes/SlateRoundedBoxBrush.h"
@@ -296,6 +297,13 @@ void UPauseMenuWidget::Show(APlayerController* PlayerController)
 {
 	PC = PlayerController;
 	UpdateTime();
+	// No fixing on Master Mode stages: Fix Puzzle shows faded and takes no taps
+	if (FixButton)
+	{
+		const bool bFixAllowed = UCampaignSubsystem::AreAssistsAllowed(this);
+		FixButton->SetIsEnabled(bFixAllowed);
+		FixButton->SetRenderOpacity(bFixAllowed ? 1.f : .45f);
+	}
 	SetVisibility(ESlateVisibility::Visible);
 }
 

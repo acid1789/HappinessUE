@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Containers/Ticker.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "CampaignLesson.h"
 #include "CampaignProgress.generated.h"
@@ -43,6 +44,11 @@ struct FLessonProgress
 	 *  Until then nothing mentions it, not the end screen nor the popup that reopens after the puzzle. */
 	UPROPERTY(SaveGame, BlueprintReadOnly, Category = "Campaign")
 	bool bMasterRevealed = false;
+
+	/** Seconds spent on this lesson's puzzles, every stage together: counted while one is on the puzzle screen,
+	 *  unsolved and not paused (UCampaignSubsystem::TickPlayTime) */
+	UPROPERTY(SaveGame, BlueprintReadOnly, Category = "Campaign")
+	float PlaySeconds = 0.f;
 };
 
 /** What finishing a lesson puzzle did */
@@ -278,6 +284,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Campaign")
 	int32 GetLessonPoints(ECampaignLesson Lesson) const;
 
+	/** Time spent on the lesson's puzzles in the current mode, all stages (FLessonProgress::PlaySeconds) */
+	UFUNCTION(BlueprintPure, Category = "Campaign")
+	float GetLessonPlaySeconds(ECampaignLesson Lesson) const;
+
 	/** The stage that currently earns points, or the final once all points are earned */
 	UFUNCTION(BlueprintPure, Category = "Campaign")
 	int32 GetCurrentStage(ECampaignLesson Lesson) const;
@@ -328,6 +338,18 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Campaign")
 	FLessonPuzzleResult FinishLessonPuzzle(UPuzzle* Puzzle);
 
+	/** Seed of the stage's open (or next) puzzle in the current mode, for its puzzle slot (UPuzzleSlotSubsystem) */
+	int32 GetStageSeed(ECampaignLesson Lesson, int32 Stage) const;
+
+	/** A lesson puzzle saved in its mode's puzzle slot can still be resumed: the stage's open puzzle is still Seed */
+	bool CanResumeLessonPuzzle(ECampaignMode Mode, ECampaignLesson Lesson, int32 Stage, int32 Seed) const;
+
+	/**
+	 * Back into the session of a lesson puzzle saved in its mode's puzzle slot, switching to Mode, so the next lesson
+	 * puzzle set up (InitPuzzleForPlay) is that one again. Saves. False if it can't be resumed.
+	 */
+	bool ResumeLessonPuzzle(ECampaignMode Mode, ECampaignLesson Lesson, int32 Stage, int32 Seed);
+
 	/** Leave the lesson session (e.g. a classic game is starting) */
 	UFUNCTION(BlueprintCallable, Category = "Campaign")
 	void EndLessonSession();
@@ -341,6 +363,13 @@ public:
 	 * Returns it once.
 	 */
 	bool ConsumeLessonCompletion(ECampaignLesson& Lesson);
+
+	/** Every lesson has just been completed (Campaign mode and the Garden Visitors unlocked), and the mode screen
+	 *  hasn't celebrated it yet (UHappinessModeWidget). Not saved, like the lesson completion above. */
+	bool IsLessonsCompletionPending() const { return bLessonsCompletionPending; }
+
+	/** IsLessonsCompletionPending, once */
+	bool ConsumeLessonsCompletion();
 
 	/**
 	 * Before playing the session's next puzzle: the session moves on to the stage that currently earns points (the
@@ -391,6 +420,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Campaign", meta = (WorldContext = "WorldContextObject"))
 	static bool IsPlayingLesson(const UObject* WorldContextObject);
 
+	/** Hints and Fix Puzzle can be used on the puzzle being played: not on Master Mode stages */
+	UFUNCTION(BlueprintPure, Category = "Campaign", meta = (WorldContext = "WorldContextObject"))
+	static bool AreAssistsAllowed(const UObject* WorldContextObject);
+
 	/** Ends any lesson session; call when a classic game is started */
 	UFUNCTION(BlueprintCallable, Category = "Campaign", meta = (WorldContext = "WorldContextObject"))
 	static void StopPlayingLesson(const UObject* WorldContextObject);
@@ -418,9 +451,14 @@ private:
 	FLessonProgress& GetMutableProgress(ECampaignLesson Lesson);
 	void Save();
 
+	/** Adds the frame's time to the session lesson's PlaySeconds while its puzzle is being played */
+	bool TickPlayTime(float DeltaTime);
+	FTSTicker::FDelegateHandle PlayTimeTicker;
+
 	FCampaignSaveData Data;
 
 	FLessonPuzzleResult LastResult;
 	TOptional<ECampaignLesson> UncelebratedLesson;
+	bool bLessonsCompletionPending = false;
 	static TWeakObjectPtr<UCampaignSubsystem> Instance;
 };

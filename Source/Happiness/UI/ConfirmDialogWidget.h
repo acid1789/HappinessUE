@@ -57,9 +57,12 @@ public:
 
 	/**
 	 * Ask from C++, where no Blueprint handles the dialog's Confirm and Cancel (e.g. the Lessons screen's
-	 * UCompleteLessonsPanel): shows Question and Description; either button closes it, and Confirm then calls OnConfirm.
+	 * UCompleteLessonsPanel): shows Question and Description; either button closes it, then Confirm calls OnConfirm
+	 * and Cancel OnCancel. ConfirmText and CancelText replace the buttons' "Confirm" and "Cancel" (empty: those) until
+	 * it closes.
 	 */
-	void Ask(const FText& Question, const FString& Description, TFunction<void()> OnConfirm);
+	void Ask(const FText& Question, const FString& Description, TFunction<void()> OnConfirm, TFunction<void()> OnCancel = nullptr,
+		const FText& ConfirmText = FText::GetEmpty(), const FText& CancelText = FText::GetEmpty());
 
 protected:
 	virtual void NativePreConstruct() override;
@@ -74,6 +77,10 @@ private:
 	UFUNCTION() void HandleCancelPressed();
 	/** Set by Ask, until the dialog closes */
 	TFunction<void()> AskConfirmed;
+	TFunction<void()> AskCancelled;
+	/** The buttons' captions */
+	UPROPERTY(Transient) TObjectPtr<UTextBlock> ConfirmLabel;
+	UPROPERTY(Transient) TObjectPtr<UTextBlock> CancelLabel;
 	bool bAsking = false;
 	UPROPERTY() TObjectPtr<UTexture2D> PlaqueTexture;
 	UPROPERTY() TObjectPtr<UTexture2D> ButtonTexture;

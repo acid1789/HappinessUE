@@ -2,15 +2,18 @@
 
 ## Modes
 
-From the game select screen, **Happiness** opens the mode screen (`WBP_HappinessMode`), unless a puzzle is in
-progress, in which case it goes straight back into that puzzle.
+The game always starts on the mode screen (`WBP_HappinessMode`). Each mode (Daily, Free Play, Lessons, Campaign)
+keeps its own puzzle in progress: choosing a mode with one asks whether to resume or abandon it (a `WBP_ConfirmDialog`
+the mode screen makes, `UHappinessModeWidget::AskResumeOrAbandon`), otherwise it goes into that mode's menus (see
+[Save data](#save-data)). Abandoning drops the puzzle from its slot (`UPuzzleSlotSubsystem::AbandonPuzzle`), then
+goes on as if there were none: Daily starts over, Free Play opens its settings, Lessons and Campaign open the tree.
 
 | Mode | What it is | Key code |
 |---|---|---|
 | **Free Play** | Any size 3–8 and difficulty, with a choice of clue types. Scored with EXP against a par time; EXP fills the player's level. | `UFreePlaySubsystem` (`HappinessClassic/FreePlaySettings.*`) |
 | **Lessons** | A tree of clue-type lessons (`WBP_CampaignTree`). Each lesson: 3x3 Easy, 3x3 Normal, 4x4 Easy, 4x4 Normal, then a 4x4 Hard final. Points per puzzle (3, minus hints) unlock stages. | `UCampaignSubsystem` (`HappinessClassic/CampaignProgress.*`), tree in `CampaignTree.cpp` |
 | **Campaign** | Unlocked by completing every lesson. The same tree on bigger boards: per clue 4×5x5 Normal, 5x5 Hard, 4×6x6 Normal, 6x6 Hard, 4×7x7 Normal, 7x7 Hard, then an 8x8 Easy final. One step per solved puzzle; scored with EXP like Free Play. | Same subsystem, `ECampaignMode::Campaign` |
-| **Master Mode** | Per clue, once its Campaign final is cleared: 4×8x8 Normal, then 4×8x8 Hard. Stages 7 and 8 of the clue's track (`GetFirstMasterStage()`), with their own count (`FLessonProgress::MasterPoints`) that doesn't affect Campaign progression. | Same subsystem (`IsMasterStage`, `GetCurrentMasterStage`, ...) |
+| **Master Mode** | Per clue, once its Campaign final is cleared: 4×8x8 Normal, then 4×8x8 Hard. Stages 7 and 8 of the clue's track (`GetFirstMasterStage()`), with their own count (`FLessonProgress::MasterPoints`) that doesn't affect Campaign progression. No hints or Fix Puzzle (`UCampaignSubsystem::AreAssistsAllowed`): the button panel (`UI/ButtonPanelWidget`) disables the hint and fix buttons and stops the hint button's wiggle, and the pause menu fades and disables Fix Puzzle. | Same subsystem (`IsMasterStage`, `GetCurrentMasterStage`, ...) |
 
 `UCampaignSubsystem::GetMode()` says which track the tree, popup and end screens are showing; the stage
 functions (`GetNumStages`, `GetStageSize`, `GetMaxPoints`, ...) follow it.
@@ -22,7 +25,7 @@ functions (`GetNumStages`, `GetStageSize`, `GetMaxPoints`, ...) follow it.
 | `General/UI/WBP_GameSelect` | — | Main menu; hosts the mode screen, campaign tree and Free Play config |
 | `Happiness/UI/WBP_HappinessMode` | `UI/HappinessModeWidget` | Free Play / Lessons / Campaign / Back ; top right, the player level badge (`UI/PlayerLevelBadge`, made in code): the level on `T_PlayerLevelSun`, ringed by twelve shaped rewards from `T_MasterRewardGems` (4×3 atlas). Each reward appears once every clue in that tree column has completed Campaign Master Mode (`UCampaignSubsystem::IsMasterColumnCompleted`). `SunTexture` and `IconTextures` remain art override hooks. |
 | `Happiness/UI/WBP_HappinessConfig` | — | Free Play setup: size, difficulty, clue selection (`WBP_ClueSelect`, `UI/ClueSelectWidget`) |
-| `Happiness/UI/WBP_CampaignTree` | `UI/CampaignTreeWidget` | The lesson tree (Lessons and Campaign). Bottom left in Lessons mode until every lesson is completed: `WBP_CompleteLessons` (`UI/CompleteLessonsPanel`), which asks with the screen's own `ConfirmDialog` (`UConfirmDialogWidget::Ask`), then completes every lesson, unlocking Campaign |
+| `Happiness/UI/WBP_CampaignTree` | `UI/CampaignTreeWidget` | The lesson tree (Lessons and Campaign). Bottom left in Lessons mode until every lesson is completed: `WBP_CompleteLessons` (`UI/CompleteLessonsPanel`), which asks with the screen's own `ConfirmDialog` (`UConfirmDialogWidget::Ask`), then completes every lesson, unlocking Campaign. When every lesson has just been completed (the last final, or that button), the tree closes to the mode screen, which opens the congratulations (`UI/LessonsCompletePopup`, made in code: the Garden Visitors and Campaign unlocks) with fireworks over them (`UI/FireworksWidget`, code-drawn). `UCampaignSubsystem::ConsumeLessonsCompletion` says when; like the lesson completion, it isn't saved |
 | `Happiness/UI/WBP_LessonPopup` | `UI/LessonPopupWidget` | A lesson's description, progress bar with stage ticks, stage buttons |
 | `Happiness/UI/WBP_Happiness` | — | The puzzle screen: board, clue panels, buttons, overlays |
 | `Happiness/UI/WBP_GamePanel` | `UI/GamePanelWidget` | Centers the board and sizes columns to the height of its two candidate-icon rows; the Blueprint still builds and updates the grid |
@@ -31,6 +34,7 @@ functions (`GetNumStages`, `GetStageSize`, `GetMaxPoints`, ...) follow it.
 | `Happiness/UI/WBP_HorizontalCluePanel` | — | The **right** clue column (horizontal clues) |
 | `Happiness/UI/WBP_ButtonPanel` | `UI/ButtonPanelWidget` | Side buttons; the hint button wiggles after 5 s idle |
 | `Happiness/UI/WBP_HintInfo` | `UI/HintInfoWidget` | Hint explanation panel over the bottom clue strip |
+| `Happiness/UI/WBP_Icon` | `UI/HintSparkleIconWidget` | One icon of a cell or clue. While its `ShowingHint` is set, sparkles orbit it (a clue's orbit its whole clue, run by its first icon `_0`). When a hint starts, its sparkles stream in to lead the player's eye: out of the hint button (`UButtonPanelWidget::Button_H`) to the clue, then, `CellStreamDelay` later, off the clue's ring to the board icon (`ShownClue`). Each sparkle flies into its place in the orbit (`StreamSeconds`, `StreamSpawns`, `TravelSeconds`). A clue's sparkles run from a core ticker, since the clue panels' scroll boxes stop ticking clues scrolled out of view: the hint scrolls its clue into view, the ring follows the clue as the panel scrolls (its place comes from arranging the scroll box), and sparkles outside the panel are hidden. A board icon's sparkles stop once the icon stops ticking (`TickBoardWatch`): placing a hinted icon ends the hint and collapses the cell's candidates in the same frame, before the icon could see it. |
 | `Happiness/UI/WBP_EndScreen` | — | Free Play end screen: times, EXP, level bar |
 | `Happiness/UI/WBP_LessonEndScreen` | `UI/LessonEndScreenWidget` | Lessons end screen: points breakdown, lesson progress |
 | `Happiness/UI/WBP_CampaignEndScreen` | `UI/CampaignEndScreenWidget` | Campaign end screen: Free Play scoring plus campaign progress |
@@ -55,8 +59,8 @@ The widget builds its own layout in C++ (`RebuildWidget`) with the existing hint
 The player controller `General/Blueprints/PC_Happiness` starts, loads and saves puzzles and holds the player's
 level and EXP (`HappinessLevel`, `HappinessExp`). Its `InputMode` (mouse, or touch on Android and iOS) must be set
 before any puzzle screen exists, so BeginPlay sets it first: `WBP_GamePanel` wires each cell for the mode when it
-builds the grid (touch: `Button_Cell` opens the cell dialog; mouse: the icons take clicks), and the game resumes a
-saved puzzle as soon as `WBP_GameSelect` is added to the viewport. Set after that, a resumed grid takes no taps.
+builds the grid (touch: `Button_Cell` opens the cell dialog; mouse: the icons take clicks). Set after that, a grid
+takes no taps.
 
 ## Puzzle code (`Source/Happiness/HappinessClassic/`)
 
@@ -121,9 +125,24 @@ already showing. No screen handles back itself.
 
 ## Save data
 
-Everything lives in one save slot, `HappinessSave`, written by `SG_Happiness` (parent class
-`UHappinessSaveGame`). It holds the puzzle in progress (resumed on relaunch), the lesson and campaign progress,
-the Free Play settings and pace, and the player's level.
+The game save is the slot `HappinessSave`, written by `SG_Happiness` (parent class `UHappinessSaveGame`). It holds
+the lesson and campaign progress, the Free Play settings and pace, and the player's level.
+
+Puzzles in progress have a slot per mode, `HappinessPuzzle_Daily`, `_FreePlay`, `_Lessons` and `_Campaign`
+(`UPuzzleSlotSubsystem`, `HappinessClassic/PuzzleSlots.*`): each an `SG_Happiness` holding just that mode's puzzle
+(every `SG_Happiness` variable but `Level` and `Experience`) and `FPuzzleSlotInfo` (the lesson, stage and seed of a
+lesson puzzle, the date of a daily one). `PC_Happiness`'s `SaveHappiness` still writes the whole game save, on every
+move; as it is written its puzzle is copied into the slot of the mode the puzzle was started in
+(`UPuzzleSlotSubsystem::NotePuzzleStarted`, called by `UCampaignSubsystem::InitPuzzleForPlay`). Resuming calls `UHappinessModeWidget::ResumePuzzle` (Free Play always goes through `WBP_GameSelect`'s `ShowHappinessConfig`,
+which resumes or opens the settings): between `BeginResume` and `EndResume`, loading the game save
+(`PC_Happiness`'s `LoadHappiness`) copies that slot's puzzle into it. A slot resumes while its puzzle can still be
+played: today's unsolved daily; a lesson puzzle whose stage is still on that seed
+(`UCampaignSubsystem::ResumeLessonPuzzle` restores its session). Finishing a puzzle (`HappinessFinished`) saves no
+puzzle into its slot. The pause menu's Main Menu saves the puzzle, like Save and Quit, rather than dropping it.
+`UHappinessSaveGame::HasActivePuzzle` is now always false, so `WBP_GameSelect` never resumes at startup. A save from
+before slots has its puzzle moved into the slot of the mode it was being played in (`MigrateOldSave`). Each lesson's progress includes the time spent on its
+puzzles (`FLessonProgress::PlaySeconds`, counted by `UCampaignSubsystem::TickPlayTime` while one is on screen,
+unpaused and unsolved), shown on the lesson popup left of its Back / Return to Lessons button.
 
 
 ### Lessons tree presentation

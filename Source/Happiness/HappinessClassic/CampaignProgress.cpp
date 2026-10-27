@@ -4,7 +4,12 @@
 #include "HappinessSaveGame.h"
 #include "FreePlaySettings.h"
 #include "DailyPuzzle.h"
+#include "PuzzleSlots.h"
 
+#include "Blueprint/UserWidget.h"
+#include "Engine/GameInstance.h"
+#include "Engine/World.h"
+#include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 
 #define LOCTEXT_NAMESPACE "CampaignProgress"
@@ -40,10 +45,13 @@ void UCampaignSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 	// Progress used to be saved in its own slot; that slot is no longer used
 	UGameplayStatics::DeleteGameInSlot(TEXT("Campaign"), UHappinessSaveGame::SaveUserIndex);
+
+	PlayTimeTicker = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateUObject(this, &UCampaignSubsystem::TickPlayTime));
 }
 
 void UCampaignSubsystem::Deinitialize()
 {
+	FTSTicker::GetCoreTicker().RemoveTicker(PlayTimeTicker);
 	if (Instance == this)
 	{
 		Instance = nullptr;
@@ -294,6 +302,11 @@ int32 UCampaignSubsystem::GetLessonPoints(ECampaignLesson Lesson) const
 	return GetLessonProgress(Lesson).Points;
 }
 
+float UCampaignSubsystem::GetLessonPlaySeconds(ECampaignLesson Lesson) const
+{
+	return GetLessonProgress(Lesson).PlaySeconds;
+}
+
 int32 UCampaignSubsystem::GetCurrentStage(ECampaignLesson Lesson) const
 {
 	// The last stage whose requirement is met
@@ -499,6 +512,8 @@ FLessonPuzzleResult UCampaignSubsystem::FinishLessonPuzzle(UPuzzle* Puzzle)
 			if (Result.bLessonCompleted)
 			{
 				UncelebratedLesson = Result.Lesson;
+				// The last lesson: Campaign mode and the Garden Visitors open
+				bLessonsCompletionPending |= Data.Mode == ECampaignMode::Lessons && IsCampaignModeUnlocked();
 			}
 		}
 		else if (Result.Stage == GetCurrentStage(Result.Lesson) && Progress.Points < MaxPoints)
@@ -548,6 +563,13 @@ void UCampaignSubsystem::PrepareNextLessonPuzzle(const UObject* WorldContextObje
 	Difficulty = GetStageDifficulty(SaveData.SessionStage);
 }
 
+bool UCampaignSubsystem::ConsumeLessonsCompletion()
+{
+	const bool bPending = bLessonsCompletionPending;
+	bLessonsCompletionPending = false;
+	return bPending;
+}
+
 bool UCampaignSubsystem::ConsumeLessonCompletion(ECampaignLesson& Lesson)
 {
 	if (!UncelebratedLesson.IsSet())
@@ -556,6 +578,40 @@ bool UCampaignSubsystem::ConsumeLessonCompletion(ECampaignLesson& Lesson)
 	}
 	Lesson = UncelebratedLesson.GetValue();
 	UncelebratedLesson.Reset();
+	return true;
+}
+
+int32 UCampaignSubsystem::GetStageSeed(ECampaignLesson Lesson, int32 Stage) const
+{
+	const FLessonProgress* Progress = GetProgressMap().Find(Lesson);
+	return Progress && Progress->NextSeed.IsValidIndex(Stage) ? Progress->NextSeed[Stage] : 0;
+}
+
+bool UCampaignSubsystem::CanResumeLessonPuzzle(ECampaignMode Mode, ECampaignLesson Lesson, int32 Stage, int32 Seed) const
+{
+	// Solving the puzzle moved the stage on to its next seed
+	const FLessonProgress* Progress = (Mode == ECampaignMode::Campaign ? Data.CampaignLessons : Data.Lessons).Find(Lesson);
+	return Progress && Progress->NextSeed.IsValidIndex(Stage) && Progress->NextSeed[Stage] == Seed &&
+		(Mode == ECampaignMode::Lessons || IsCampaignModeUnlocked());
+}
+
+bool UCampaignSubsystem::ResumeLessonPuzzle(ECampaignMode Mode, ECampaignLesson Lesson, int32 Stage, int32 Seed)
+{
+	if (!CanResumeLessonPuzzle(Mode, Lesson, Stage, Seed))
+	{
+		return false;
+	}
+	SetMode(Mode);
+	if (!IsStageUnlocked(Lesson, Stage))
+	{
+		return false;
+	}
+	Data.bInSession = true;
+	Data.SessionLesson = Lesson;
+	Data.SessionStage = Stage;
+	Data.bPuzzleOpen = true;
+	Data.OpenSeed = Seed;
+	Save();
 	return true;
 }
 
@@ -571,6 +627,7 @@ void UCampaignSubsystem::EndLessonSession()
 
 void UCampaignSubsystem::CompleteAllLessons()
 {
+	bLessonsCompletionPending |= !IsCampaignModeUnlocked();
 	for (const TArray<ECampaignLesson>& Column : UCampaignTree::GetColumns())
 	{
 		for (ECampaignLesson Lesson : Column)
@@ -586,6 +643,7 @@ void UCampaignSubsystem::CompleteAllLessons()
 
 void UCampaignSubsystem::DebugSetLesson(ECampaignLesson Lesson, int32 Points, bool bFinalCompleted, bool bCelebrate)
 {
+	const bool bWasUnlocked = IsCampaignModeUnlocked();
 	if (Data.bInSession && Data.SessionLesson == Lesson)
 	{
 		Data.bInSession = false;
@@ -600,6 +658,7 @@ void UCampaignSubsystem::DebugSetLesson(ECampaignLesson Lesson, int32 Points, bo
 	if (bCelebrate && bFinalCompleted)
 	{
 		UncelebratedLesson = Lesson;
+		bLessonsCompletionPending |= !bWasUnlocked && IsCampaignModeUnlocked();
 	}
 	else if (UncelebratedLesson.IsSet() && UncelebratedLesson.GetValue() == Lesson)
 	{
@@ -652,6 +711,12 @@ void UCampaignSubsystem::ResetAllProgress()
 	OnProgressChanged.Broadcast();
 }
 
+bool UCampaignSubsystem::AreAssistsAllowed(const UObject* WorldContextObject)
+{
+	const UCampaignSubsystem* Campaign = Get(WorldContextObject);
+	return !Campaign || !Campaign->IsInLessonSession() || !IsMasterStage(Campaign->GetSessionStage());
+}
+
 UCampaignSubsystem* UCampaignSubsystem::Get(const UObject* WorldContextObject)
 {
 	const UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull) : nullptr;
@@ -671,6 +736,7 @@ void UCampaignSubsystem::InitPuzzleForPlay(const UObject* WorldContextObject, UP
 	{
 		if (Campaign->StartLessonPuzzle(Campaign->GetSessionLesson(), Campaign->GetSessionStage(), Puzzle))
 		{
+			UPuzzleSlotSubsystem::NotePuzzleStarted(WorldContextObject);
 			return;
 		}
 		// The lesson can't be played any more (shouldn't happen); fall back to a classic puzzle
@@ -685,6 +751,7 @@ void UCampaignSubsystem::InitPuzzleForPlay(const UObject* WorldContextObject, UP
 		Puzzle->m_ExcludedClues = Daily.ExcludedClueMask;
 		Puzzle->Init(Daily.Seed, Daily.Size, Daily.Difficulty);
 		Puzzle->GetRating();
+		UPuzzleSlotSubsystem::NotePuzzleStarted(WorldContextObject);
 		return;
 	}
 
@@ -697,6 +764,7 @@ void UCampaignSubsystem::InitPuzzleForPlay(const UObject* WorldContextObject, UP
 
 	// Rate it now, while the player is starting, rather than on the end screen
 	Puzzle->GetRating();
+	UPuzzleSlotSubsystem::NotePuzzleStarted(WorldContextObject);
 }
 
 bool UCampaignSubsystem::HandlePuzzleFinished(const UObject* WorldContextObject, UPuzzle* Puzzle)
@@ -737,6 +805,34 @@ FLessonProgress& UCampaignSubsystem::GetMutableProgress(ECampaignLesson Lesson)
 		Progress.NextSeed.SetNumZeroed(GetNumStages() + GetNumMasterStages());
 	}
 	return Progress;
+}
+
+bool UCampaignSubsystem::TickPlayTime(float DeltaTime)
+{
+	// The session puzzle is being played while PC_Happiness holds it (HappinessPuzzle: set when it starts or resumes,
+	// cleared on leaving it) and the puzzle screen's pause menu is closed. Solving it closes it (bPuzzleOpen).
+	// The time goes to disk with the next save, which every move makes.
+	if (!Data.bInSession || !Data.bPuzzleOpen)
+	{
+		return true;
+	}
+	const UWorld* World = GetGameInstance() ? GetGameInstance()->GetWorld() : nullptr;
+	const APlayerController* PC = World ? World->GetFirstPlayerController() : nullptr;
+	const FObjectPropertyBase* PuzzleProperty = PC ? FindFProperty<FObjectPropertyBase>(PC->GetClass(), TEXT("HappinessPuzzle")) : nullptr;
+	const FObjectPropertyBase* ScreenProperty = PC ? FindFProperty<FObjectPropertyBase>(PC->GetClass(), TEXT("HappinessWidget")) : nullptr;
+	if (!PuzzleProperty || !ScreenProperty || !PuzzleProperty->GetObjectPropertyValue_InContainer(PC))
+	{
+		return true;
+	}
+	const UUserWidget* Screen = Cast<UUserWidget>(ScreenProperty->GetObjectPropertyValue_InContainer(PC));
+	const UWidget* PauseMenu = Screen ? Screen->GetWidgetFromName(TEXT("PauseMenu")) : nullptr;
+	if (!Screen || !Screen->IsVisible() || (PauseMenu && PauseMenu->IsVisible()))
+	{
+		return true;
+	}
+	// A long frame (back from the background, a hitch) counts as one normal frame at most
+	GetMutableProgress(Data.SessionLesson).PlaySeconds += FMath::Min(DeltaTime, 0.25f);
+	return true;
 }
 
 void UCampaignSubsystem::Save()

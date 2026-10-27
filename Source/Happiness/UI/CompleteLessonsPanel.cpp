@@ -4,6 +4,7 @@
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
 #include "HappinessClassic/CampaignProgress.h"
+#include "UI/CampaignTreeWidget.h"
 #include "UI/ConfirmDialogWidget.h"
 
 #define LOCTEXT_NAMESPACE "CompleteLessons"
@@ -48,6 +49,11 @@ void UCompleteLessonsPanel::HandleClicked()
 			if (UCampaignSubsystem* Campaign = WeakThis.IsValid() ? UCampaignSubsystem::Get(WeakThis.Get()) : nullptr)
 			{
 				Campaign->CompleteAllLessons();
+				// Back to the mode screen, which celebrates every lesson being completed
+				if (UCampaignTreeWidget* Tree = Campaign->IsLessonsCompletionPending() ? WeakThis->GetTypedOuter<UCampaignTreeWidget>() : nullptr)
+				{
+					Tree->Close();
+				}
 			}
 		});
 }

@@ -4,6 +4,7 @@
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Misc/App.h"
 #include "UI/GameCellWidget.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -17,6 +18,13 @@ UClueWidget::UClueWidget(const FObjectInitializer& ObjectInitializer)
 void UClueWidget::NativePreConstruct()
 {
 	Super::NativePreConstruct();
+	NotOverlay = GetWidgetFromName(TEXT("Overlay_Not"));
+	if (NotOverlay)
+	{
+		// Slate rounds each corner of a drawn image to a whole pixel after its render transform, so a turning mark's
+		// corners would snap independently and the mark would seem to pulse in size
+		NotOverlay->SetPixelSnapping(EWidgetPixelSnapping::Disabled);
+	}
 	if (IconRetainer || !IconMaskMaterial)
 	{
 		return;
@@ -59,6 +67,11 @@ void UClueWidget::NativePreConstruct()
 void UClueWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
+	if (NotOverlay && NotOverlay->IsVisible() && NotTurnSeconds > 0.f)
+	{
+		// From the app clock, so every clue's mark keeps the same angle
+		NotOverlay->SetRenderTransformAngle(float(FMath::Fmod(FApp::GetCurrentTime(), double(NotTurnSeconds)) / NotTurnSeconds * 360.0));
+	}
 	const FVector2D Size = IconRetainer ? IconRetainer->GetCachedGeometry().GetLocalSize() : FVector2D::ZeroVector;
 	if (Size.X > 0.f && Size.Y > 0.f && !Size.Equals(MaskSize, 0.1f))
 	{

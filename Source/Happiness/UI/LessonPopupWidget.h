@@ -263,6 +263,10 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<ULessonClueDiagram> NotebookDiagram;
 
+	/** Time spent on the lesson so far, all stages (UCampaignSubsystem::GetLessonPlaySeconds), left of CloseButton */
+	UPROPERTY(Transient)
+	TObjectPtr<UTextBlock> PlayTimeText;
+
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UTextBlock>> StageLabels;
 

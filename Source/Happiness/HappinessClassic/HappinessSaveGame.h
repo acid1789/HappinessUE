@@ -5,6 +5,7 @@
 #include "CampaignProgress.h"
 #include "FreePlaySettings.h"
 #include "DailyPuzzle.h"
+#include "PuzzleSlots.h"
 #include "HappinessSaveGame.generated.h"
 
 /**
@@ -12,6 +13,10 @@
  *
  * Whenever a save game is written to disk it takes the running game's current campaign progress and free play
  * settings, so saving the game from Blueprint (which creates a fresh SG_Happiness each time) never loses them.
+ *
+ * Each mode's puzzle in progress also has a save slot of its own, an SG_Happiness holding just that puzzle
+ * (UPuzzleSlotSubsystem): writing the game save copies its puzzle there, and loading it to resume a mode's puzzle
+ * copies that slot's puzzle in.
  */
 UCLASS(Blueprintable)
 class HAPPINESS_API UHappinessSaveGame : public USaveGame
@@ -34,7 +39,11 @@ public:
 	 */
 	static void SaveCurrentSettings();
 
-	/** True if the game save holds a puzzle in progress (SG_Happiness's ActivePuzzle): the player left it with Save and Quit */
+	/**
+	 * Always false. WBP_GameSelect asks this to resume a puzzle in progress when the game starts, but puzzles are now
+	 * resumed per mode, when the player chooses it on the mode screen (UPuzzleSlotSubsystem), so the game always
+	 * starts on the mode screen.
+	 */
 	UFUNCTION(BlueprintPure, Category = "Happiness")
 	static bool HasActivePuzzle();
 
@@ -50,4 +59,12 @@ public:
 	/** Ads turned off (UAdsSubsystem) */
 	UPROPERTY(SaveGame)
 	bool bAdsDisabled = false;
+
+	/** A mode's puzzle slot: which mode, and what tells whether its puzzle can still be resumed */
+	UPROPERTY(SaveGame)
+	FPuzzleSlotInfo PuzzleSlot;
+
+private:
+	/** Read from disk, so not a new save of the current game: writing it again doesn't touch the puzzle slots */
+	bool bLoadedFromDisk = false;
 };
