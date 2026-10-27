@@ -137,6 +137,7 @@ void UHappinessModeWidget::Show()
 	}
 	RefreshCampaignLock();
 	RefreshDaily();
+	MoveBadgeToMenu();
 	if (PlayerLevelBadge)
 	{
 		// The level changes in games
@@ -169,12 +170,44 @@ void UHappinessModeWidget::MakePlayerLevelBadge()
 	PlayerLevelBadge = CreateWidget<UPlayerLevelBadge>(this, UPlayerLevelBadge::StaticClass());
 	if (UCanvasPanelSlot* BadgeSlot = PlayerLevelBadge ? Root->AddChildToCanvas(PlayerLevelBadge) : nullptr)
 	{
-		// Top right, right of the logo and above the tiles; under the Remove Ads dialog (Z 30)
+		// Top right, right of the logo and above the tiles; under the Remove Ads dialog (Z 30). Raised by the empty
+		// space above the reward ring, so the top reward sits close to the screen's top edge.
 		BadgeSlot->SetAnchors(FAnchors(1.f, 0.f));
 		BadgeSlot->SetAlignment(FVector2D(1.f, 0.f));
-		BadgeSlot->SetPosition(FVector2D(-16.f, 0.f));
+		BadgeSlot->SetPosition(FVector2D(-16.f, -24.f));
 		BadgeSlot->SetSize(FVector2D(UPlayerLevelBadge::BadgeSize));
 		BadgeSlot->SetZOrder(2);
+	}
+}
+
+void UHappinessModeWidget::MoveBadgeToMenu()
+{
+	// The menu (WBP_GameSelect's MainCanvas) holds this screen, the campaign tree, the Free Play settings and the
+	// puzzle screen over its backdrop. At Z 0 the badge goes over the backdrop and under this screen (Z 5), the tree
+	// (Z 10) and the settings (added later, also at Z 0). Not done while constructing: the menu is still adding its
+	// children then.
+	UCanvasPanel* Menu = Cast<UCanvasPanel>(GetParent());
+	if (!PlayerLevelBadge || !Menu || PlayerLevelBadge->GetParent() == Menu)
+	{
+		return;
+	}
+	const FVector2D Position = Cast<UCanvasPanelSlot>(PlayerLevelBadge->Slot) ? Cast<UCanvasPanelSlot>(PlayerLevelBadge->Slot)->GetPosition() : FVector2D::ZeroVector;
+	PlayerLevelBadge->RemoveFromParent();
+	if (UCanvasPanelSlot* BadgeSlot = Menu->AddChildToCanvas(PlayerLevelBadge))
+	{
+		BadgeSlot->SetAnchors(FAnchors(1.f, 0.f));
+		BadgeSlot->SetAlignment(FVector2D(1.f, 0.f));
+		BadgeSlot->SetPosition(Position);
+		BadgeSlot->SetSize(FVector2D(UPlayerLevelBadge::BadgeSize));
+		BadgeSlot->SetZOrder(0);
+	}
+	// The puzzle screen is in the menu too: no badge over a puzzle
+	for (UWidget* Child : Menu->GetAllChildren())
+	{
+		if (Child && Child->GetClass()->GetName().StartsWith(TEXT("WBP_Happiness_C")))
+		{
+			PlayerLevelBadge->SetCoveredBy(Child);
+		}
 	}
 }
 
@@ -265,6 +298,7 @@ void UHappinessModeWidget::Hide()
 void UHappinessModeWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
+	MoveBadgeToMenu();
 	UpdateUnlockCelebration(InDeltaTime);
 }
 

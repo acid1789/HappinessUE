@@ -9,11 +9,14 @@ class UTextBlock;
 class UTexture2D;
 
 /**
- * The player's level on the mode screen (top right): a sun with the level (PC_Happiness.HappinessLevel) in its
+ * The player's level in the main menu (top right): a sun with the level (PC_Happiness.HappinessLevel) in its
  * center, ringed by one icon per lesson tree column. A column's icon shows once every clue in it has completed
  * Campaign Master Mode (UCampaignSubsystem::IsMasterColumnCompleted); until then its place is empty.
  * Builds its own widgets (no Blueprint layout). Without art (SunTexture, IconTextures) it draws placeholders.
  * Display only: it never takes a touch, so the menu under it keeps working.
+ *
+ * UHappinessModeWidget puts it in the main menu (WBP_GameSelect's MainCanvas), behind the menu's screens, so it stays
+ * up on all of them; it is hidden while CoveredBy (the puzzle screen) shows.
  */
 UCLASS()
 class HAPPINESS_API UPlayerLevelBadge : public UUserWidget
@@ -29,6 +32,9 @@ public:
 	/** Reads the level and the unlocked icons again */
 	UFUNCTION(BlueprintCallable, Category = "Player Level")
 	void Refresh();
+
+	/** Hidden while this widget is visible (and refreshed when it goes, as the level changes in games) */
+	void SetCoveredBy(UWidget* Widget) { CoveredBy = Widget; }
 
 	/** The sun behind the level; a gold disc while unset */
 	UPROPERTY(EditAnywhere, Category = "Player Level")
@@ -46,6 +52,7 @@ protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
+	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 private:
 	void BuildLayout();
@@ -58,4 +65,7 @@ private:
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UImage>> Icons;
+
+	TWeakObjectPtr<UWidget> CoveredBy;
+	bool bCovered = false;
 };

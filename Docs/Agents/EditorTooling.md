@@ -247,7 +247,7 @@ unexplained hints. Difficulty: 0 easy, 1 normal, 2 hard. Sizes 3–8.
   `Points <Lesson> <N>`, `Stage <Lesson> <Stage>`, `ToFinal [Lesson]`, `Complete [Lesson]`, `ToColumn <Column>`.
   A lesson is its enum name (`NextTo`) or number; left out, the first unfinished one. `Complete` with the lessons
   screen open plays the completion animation, as if back from its final. `Happiness.Campaign.Master <Lesson> <N>` completes a
-  clue and sets its Master Mode puzzles solved. They save the progress: back up
+  clue and sets its Master Mode puzzles solved; `Happiness.Campaign.MasterAll` does that for every clue with all of them solved. They save the progress: back up
   `Saved/SaveGames/HappinessSave.sav` first if it matters. Development builds only.
 - To see a fast UI animation, slow it on the live PIE widget (`ObjectTools.set_properties` on its transient path
   from `obj list class=<Class>`) and take screenshots with the PIE console command `shot showui`: full

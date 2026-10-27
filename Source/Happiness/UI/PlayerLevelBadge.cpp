@@ -18,8 +18,10 @@ namespace
 	const FLinearColor SunRim(0.85f, 0.55f, 0.15f, 1.f);
 	const FLinearColor PlayerLevelInk(0.10f, 0.25f, 0.10f, 1.f);
 	constexpr float SunSize = 144.f;
-	constexpr float IconSize = 60.f;
-	constexpr float RewardRadius = 114.f;
+	// The twelve rewards ring the sun just inside its ray tips (72 from its center), as close as they go without
+	// overlapping: neighbors are 2 * RewardRadius * sin(15 deg) apart, and the art fills about 96% of its icon
+	constexpr float IconSize = 50.f;
+	constexpr float RewardRadius = 92.f;
 
 	/** A circle: a rounded box with corners of half its size */
 	FSlateBrush MakeDisc(const FLinearColor& Fill, const FLinearColor& Rim, float Size)
@@ -145,6 +147,22 @@ void UPlayerLevelBadge::NativeDestruct()
 		Campaign->OnProgressChanged.RemoveDynamic(this, &UPlayerLevelBadge::HandleProgressChanged);
 	}
 	Super::NativeDestruct();
+}
+
+void UPlayerLevelBadge::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+{
+	Super::NativeTick(MyGeometry, InDeltaTime);
+	// Transparent rather than hidden, so it keeps ticking and comes back when the puzzle screen goes
+	const bool bNowCovered = CoveredBy.IsValid() && CoveredBy->IsVisible();
+	if (bNowCovered != bCovered)
+	{
+		bCovered = bNowCovered;
+		SetRenderOpacity(bCovered ? 0.f : 1.f);
+		if (!bCovered)
+		{
+			Refresh();
+		}
+	}
 }
 
 void UPlayerLevelBadge::HandleProgressChanged()
