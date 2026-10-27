@@ -16,6 +16,7 @@
 #include "Slate/WidgetRenderer.h"
 #include "TextureResource.h"
 
+
 namespace
 {
 	// Populate only the render instance, using the real cell and icon widgets without changing any assets.
@@ -77,7 +78,7 @@ namespace
 	}
 }
 
-FString UHappinessUIToolset::RenderWidget(const FString& WidgetBlueprintPath, int32 Width, int32 Height, const FString& OutputFile, int32 PreviewPuzzleSize, bool bPreviewHint, bool bPreviewPuzzleFailed, bool bPreviewMasterRewards)
+FString UHappinessUIToolset::RenderWidget(const FString& WidgetBlueprintPath, int32 Width, int32 Height, const FString& OutputFile, int32 PreviewPuzzleSize, bool bPreviewHint, bool bPreviewPuzzleFailed, bool bPreviewMasterRewards, int32 PreviewRulesSubject)
 {
 	if (!GEditor)
 	{
@@ -109,6 +110,13 @@ FString UHappinessUIToolset::RenderWidget(const FString& WidgetBlueprintPath, in
 	if (!Widget)
 	{
 		return TEXT("Error: could not create the widget.");
+	}
+	if (PreviewRulesSubject >= 0)
+	{
+		if (FIntProperty* SubjectProperty = FindFProperty<FIntProperty>(Widget->GetClass(), TEXT("PreviewSubject")))
+		{
+			SubjectProperty->SetPropertyValue_InContainer(Widget, PreviewRulesSubject);
+		}
 	}
 	if (PreviewPuzzleSize != 0 && !PopulateBoardPreview(Widget, FMath::Clamp(PreviewPuzzleSize, 3, 8)))
 	{

@@ -8,6 +8,8 @@
 #include "Components/HorizontalBox.h"
 #include "Components/HorizontalBoxSlot.h"
 #include "Components/Image.h"
+#include "Components/Overlay.h"
+#include "Components/OverlaySlot.h"
 #include "Components/PanelWidget.h"
 #include "Components/ScaleBox.h"
 #include "Components/ScrollBox.h"
@@ -33,6 +35,78 @@ namespace
 {
 	// How many seeds to try for a puzzle with the clue type in it
 	const int32 ExampleSeedTries = 40;
+	const FLinearColor RulesInk(0.025f, 0.012f, 0.005f, 1.f);
+	const FLinearColor RulesCream(0.97f, 0.94f, 0.84f, 1.f);
+	const FLinearColor RulesGold(0.83f, 0.63f, 0.28f, 1.f);
+	const FLinearColor RulesSage(0.025f, 0.10f, 0.025f, 1.f);
+	const FLinearColor RulesNavy(0.001f, 0.012f, 0.025f, 1.f);
+
+	FSlateBrush MakeRulesSurface(const FLinearColor& Fill, const FLinearColor& Outline, float Radius = 9.f, float Width = 2.f)
+	{
+		FSlateBrush Brush;
+		Brush.DrawAs = ESlateBrushDrawType::RoundedBox;
+		Brush.TintColor = FSlateColor(Fill);
+		Brush.OutlineSettings = FSlateBrushOutlineSettings(FVector4(Radius), FSlateColor(Outline), Width);
+		return Brush;
+	}
+
+	FButtonStyle MakeRulesEntryStyle(bool bSelected, UTexture2D* Texture)
+	{
+		FButtonStyle Style;
+		if (Texture)
+		{
+			auto Face = [Texture, bSelected](const FLinearColor& Tint)
+			{
+				FSlateBrush Brush;
+				Brush.SetResourceObject(Texture);
+				Brush.DrawAs = ESlateBrushDrawType::Image;
+				Brush.ImageSize = FVector2D(405.f, 42.f);
+				Brush.TintColor = FSlateColor(Tint);
+				Brush.SetUVRegion(FBox2f(
+					FVector2f(.001f, bSelected ? .502f : .002f),
+					FVector2f(.999f, bSelected ? .998f : .498f)));
+				return Brush;
+			};
+			Style.SetNormal(Face(FLinearColor::White));
+			Style.SetHovered(Face(FLinearColor(1.f, 1.f, .94f, 1.f)));
+			Style.SetPressed(Face(FLinearColor(.88f, .90f, .83f, 1.f)));
+		}
+		else
+		{
+			Style.SetNormal(MakeRulesSurface(bSelected ? RulesNavy : RulesCream, RulesGold, 24.f, 2.f));
+			Style.SetHovered(MakeRulesSurface(RulesCream, RulesGold, 24.f, 2.f));
+			Style.SetPressed(MakeRulesSurface(RulesSage, RulesGold, 24.f, 2.f));
+		}
+		Style.SetNormalPadding(FMargin(0.f)).SetPressedPadding(FMargin(0.f));
+		return Style;
+	}
+
+	FText GetRulesLessonDetails(ECampaignLesson Lesson)
+	{
+		switch (Lesson)
+		{
+		case ECampaignLesson::VerticalTwo: return LOCTEXT("DetailsSameColumn", "Both icons belong in one column, even though they are in different rows. Once you place either icon, you know the other icon's column too.");
+		case ECampaignLesson::VerticalThree: return LOCTEXT("DetailsThreeColumn", "All three icons line up in a single column. Placing any one of them identifies the column for the other two.");
+		case ECampaignLesson::TwoNot: return LOCTEXT("DetailsTwoNot", "The crossed-out icon cannot be in the other icon's column. If you place one of them, rule that column out for the other.");
+		case ECampaignLesson::ThreeNot: return LOCTEXT("DetailsThreeNot", "The two uncrossed icons share a column. The crossed-out icon cannot be in that column, even if its own row still has several possibilities.");
+		case ECampaignLesson::EitherOr: return LOCTEXT("DetailsEitherOr", "The top icon shares a column with exactly one of the two choices below. Whichever choice shares it, the other choice must be in a different column.");
+		case ECampaignLesson::NextTo: return LOCTEXT("DetailsNextTo", "There is no column between these icons. Either icon may be on the left; placing one narrows the other to its immediate neighboring columns.");
+		case ECampaignLesson::NotNextTo: return LOCTEXT("DetailsNotNextTo", "The crossed-out icon cannot occupy either column immediately beside the other icon. The clue does not by itself say where else it must be.");
+		case ECampaignLesson::DirectlyLeftOf: return LOCTEXT("DetailsDirectLeft", "The first icon is exactly one column to the left of the second. Their order is fixed, and there is no column between them.");
+		case ECampaignLesson::LeftOf: return LOCTEXT("DetailsLeftOf", "The first icon appears somewhere to the left of the second. They may be adjacent or have other columns between them, but their order cannot reverse.");
+		case ECampaignLesson::NotLeftOf: return LOCTEXT("DetailsNotLeft", "The first icon cannot be to the left of the second. Use this to remove placements that would put the icons in that forbidden order.");
+		case ECampaignLesson::Edge: return LOCTEXT("DetailsEdge", "An edge icon belongs in the first or last column. When crossed out, those two edge columns are ruled out instead.");
+		case ECampaignLesson::Span: return LOCTEXT("DetailsSpan", "The middle icon has one of the other icons somewhere to its left and the other somewhere to its right. The outer icons may appear in either order.");
+		case ECampaignLesson::SpanNotSide: return LOCTEXT("DetailsSpanNotSide", "One icon is beside the middle icon. The crossed-out icon cannot be on the middle icon's opposite side, which helps decide the arrangement.");
+		case ECampaignLesson::Gap: return LOCTEXT("DetailsGap", "The icons have exactly one column between them. The gap may face either way: one icon can be two columns left or two columns right of the other.");
+		case ECampaignLesson::SpanNotMid: return LOCTEXT("DetailsSpanNotMid", "The two outer icons have one column between them. The crossed-out icon cannot occupy that middle column.");
+		case ECampaignLesson::Between: return LOCTEXT("DetailsBetween", "The middle icon lies somewhere between the other two icons. The outer icons may appear in either order, and gaps are allowed.");
+		case ECampaignLesson::Chain: return LOCTEXT("DetailsChain", "Read this clue from left to right. The icons must appear in the shown order, although one or more columns may separate them.");
+		case ECampaignLesson::NextToEitherOr: return LOCTEXT("DetailsNextEither", "The middle icon is beside exactly one of the two other icons. The remaining icon is not beside it, so testing one neighbor can eliminate the other choice.");
+		case ECampaignLesson::AllApart: return LOCTEXT("DetailsAllApart", "Each of the three icons occupies a different column. If you place one icon, its column is ruled out for both of the others.");
+		default: return FText();
+		}
+	}
 
 	/** Icon Index of an icon set (DA_IconSet): its Icons array holds the textures, directly or in a struct. As UHintInfoWidget's. */
 	UTexture2D* GetRulesIconTexture(UObject* IconSet, int32 Index)
@@ -73,20 +147,13 @@ UGameRulesWidget::UGameRulesWidget(const FObjectInitializer& ObjectInitializer)
 	HorizontalClueClass = TSoftClassPtr<UUserWidget>(FSoftObjectPath(TEXT("/Game/Happiness/UI/WBP_HorizontalClue.WBP_HorizontalClue_C")));
 	ButtonPanelClass = TSoftClassPtr<UUserWidget>(FSoftObjectPath(TEXT("/Game/Happiness/UI/WBP_ButtonPanel.WBP_ButtonPanel_C")));
 
-	// The game's font; entries are plain text that lights up when hovered or pressed
-	static ConstructorHelpers::FObjectFinder<UFont> Comic(TEXT("/Game/Happiness/UI/Fonts/COMIC_Font.COMIC_Font"));
-	EntryFont = FSlateFontInfo(Comic.Object, 15);
-	SectionFont = FSlateFontInfo(Comic.Object, 18);
-	auto Fill = [](float Alpha)
-	{
-		FSlateBrush Brush;
-		Brush.DrawAs = ESlateBrushDrawType::RoundedBox;
-		Brush.TintColor = FSlateColor(FLinearColor(1.f, 1.f, 1.f, Alpha));
-		Brush.OutlineSettings = FSlateBrushOutlineSettings(FVector4(6.f, 6.f, 6.f, 6.f));
-		return Brush;
-	};
-	EntryStyle.SetNormal(Fill(0.f)).SetHovered(Fill(0.12f)).SetPressed(Fill(0.22f));
-	EntryStyle.SetNormalPadding(FMargin(0.f)).SetPressedPadding(FMargin(0.f));
+	static ConstructorHelpers::FObjectFinder<UFont> Serif(TEXT("/Game/Happiness/UI/Fonts/LessonsSerif_Font.LessonsSerif_Font"));
+	EntryFont = FSlateFontInfo(Serif.Object, 18);
+	SectionFont = FSlateFontInfo(Serif.Object, 21);
+	EntryColor = RulesInk;
+	SelectedColor = RulesCream;
+	SectionColor = RulesCream;
+	EntryStyle = MakeRulesEntryStyle(false, nullptr);
 }
 
 TArray<FRulesSubject> UGameRulesWidget::MakeSubjects()
@@ -98,7 +165,9 @@ TArray<FRulesSubject> UGameRulesWidget::MakeSubjects()
 		Subject.Section = Section;
 		Subject.Title = Title;
 		Subject.Description = Description;
+		Subject.Details = Description;
 		Subject.PictureNote = PictureNote;
+		Subject.BasicIndex = Result.Num() - 1;
 	};
 	auto Clue = [&Result](const FText& Section, ECampaignLesson Lesson, const FText& Description, const FText& Title = FText())
 	{
@@ -106,6 +175,7 @@ TArray<FRulesSubject> UGameRulesWidget::MakeSubjects()
 		Subject.Section = Section;
 		Subject.Title = Title.IsEmpty() ? UCampaignTree::GetLessonDisplayName(Lesson) : Title;
 		Subject.Description = Description;
+		Subject.Details = GetRulesLessonDetails(Lesson);
 		Subject.bClue = true;
 		Subject.Lesson = Lesson;
 	};
@@ -114,23 +184,24 @@ TArray<FRulesSubject> UGameRulesWidget::MakeSubjects()
 	Basic(Basics, LOCTEXT("Objective", "Objective"),
 		LOCTEXT("ObjectiveDesc", "Work out which icon goes in each column. Every row holds each of its icons exactly once. Use the clues to work out where each icon belongs."),
 		LOCTEXT("ObjectivePic", "A solved puzzle grid, with one row and one column highlighted"));
+	Result.Last().Details = LOCTEXT("ObjectiveDetails", "Every row contains each of that row's icons once. Each column holds one icon from every row. Read the clues, rule out impossible positions, and place an icon when you know its column.");
 	Basic(FText(), LOCTEXT("Layout", "Game Layout"),
-		LOCTEXT("LayoutDesc",
-			"Puzzle Area - the grid. Tap a cell to work on it.\n"
-			"Vertical Clues - clues about icons in the same column.\n"
-			"Horizontal Clues - clues about icons in different columns.\n"
-			"Clue Info - what the selected clue means."),
+		LOCTEXT("LayoutDesc", "The puzzle grid, clues, and controls each have their own area."),
 		FText());
+	Result.Last().Details = LOCTEXT("LayoutDetails", "Puzzle Area: tap a cell to work on it. Vertical Clues: find relationships within a column. Horizontal Clues: compare positions across columns. Clue Info: read what the selected clue means.");
 	Result.Last().bLayoutDiagram = true;
 	Basic(FText(), LOCTEXT("Grid", "Puzzle Grid"),
 		LOCTEXT("GridDesc", "Tap a cell to rule icons out, bring them back, or place its answer."),
 		LOCTEXT("GridPic", "A cell with all its icons, a cell with one ruled out, a cell with its answer placed, and the cell window with its buttons"));
+	Result.Last().Details = LOCTEXT("GridDetails", "Each cell begins with the icons that might belong there. Eliminate icons that clues rule out. If you change your mind, restore an icon. When you are sure of a cell's answer, place that icon.");
 	Basic(FText(), LOCTEXT("Clues", "Clues"),
 		LOCTEXT("CluesDesc", "Tap a clue to see what it means. Hide clues you're done with (HC); Unhide Clues in the pause menu brings them back."),
 		LOCTEXT("CluesPic", "A selected clue, with its explanation above the grid"));
+	Result.Last().Details = LOCTEXT("CluesDetails", "Vertical clues describe icons that share a column or cannot share one. Horizontal clues describe their left-to-right positions. Select a clue to read its meaning above the puzzle, and hide it when you no longer need it.");
 	Basic(FText(), LOCTEXT("Hints", "Hints"),
 		LOCTEXT("HintsDesc", "Stuck? H points to a clue that helps, and explains why. Each hint adds 10 seconds."),
 		LOCTEXT("HintsPic", "The hint panel pointing at a clue and the cell it helps with"));
+	Result.Last().Details = LOCTEXT("HintsDetails", "A hint identifies a useful clue and highlights the part of the puzzle it can help with. Read the explanation and make the deduction yourself. Each hint adds 10 seconds to your time.");
 
 	const FText Vertical = LOCTEXT("Vertical", "Vertical Clues");
 	Clue(Vertical, ECampaignLesson::VerticalTwo, LOCTEXT("SameColumnDesc", "These icons are in the same column."), LOCTEXT("SameColumn", "Same Column"));
@@ -140,7 +211,7 @@ TArray<FRulesSubject> UGameRulesWidget::MakeSubjects()
 	Clue(FText(), ECampaignLesson::EitherOr, LOCTEXT("EitherOrDesc", "The top icon shares a column with exactly one of the two below it."));
 
 	const FText Horizontal = LOCTEXT("Horizontal", "Horizontal Clues");
-	Clue(Horizontal, ECampaignLesson::NextTo, LOCTEXT("NextToDesc", "The icons are in neighboring columns, either way round."));
+	Clue(Horizontal, ECampaignLesson::NextTo, LOCTEXT("NextToDesc", "These two icons are in adjacent columns, next to each other in either order. They must be directly beside one another, with no column between them."));
 	Clue(FText(), ECampaignLesson::NotNextTo, LOCTEXT("NotNextToDesc", "The crossed-out icon is never in a column next to the other."));
 	Clue(FText(), ECampaignLesson::DirectlyLeftOf, LOCTEXT("DirectlyLeftOfDesc", "The first icon is in the column just left of the second."));
 	Clue(FText(), ECampaignLesson::LeftOf, LOCTEXT("LeftOfDesc", "The first icon is somewhere left of the second."));
@@ -160,6 +231,43 @@ TArray<FRulesSubject> UGameRulesWidget::MakeSubjects()
 void UGameRulesWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
+	FieldGuideTexture = LoadObject<UTexture2D>(nullptr, TEXT("/Game/General/Textures/T_GameRulesFieldGuide.T_GameRulesFieldGuide"));
+	if (FieldGuideTexture)
+	{
+		FSlateBrush Background;
+		Background.SetResourceObject(FieldGuideTexture);
+		Background.DrawAs = ESlateBrushDrawType::Image;
+		Background.TintColor = FSlateColor(FLinearColor::White);
+		Backdrop->SetBrush(Background);
+		Backdrop->SetBrushColor(FLinearColor::White);
+		FSlateBrush NoFrame;
+		NoFrame.DrawAs = ESlateBrushDrawType::NoDrawType;
+		IndexPanel->SetBrush(NoFrame);
+		DetailPaper->SetBrush(NoFrame);
+	}
+	CloseButtonTexture = LoadObject<UTexture2D>(nullptr, TEXT("/Game/General/Textures/T_LessonNotebookButtons.T_LessonNotebookButtons"));
+	TopicPillTexture = LoadObject<UTexture2D>(nullptr, TEXT("/Game/General/Textures/T_GameRulesTopicPillDark.T_GameRulesTopicPillDark"));
+	EntryStyle = MakeRulesEntryStyle(false, TopicPillTexture);
+	auto CloseFace = [this](const FLinearColor& Tint)
+	{
+		if (!CloseButtonTexture)
+		{
+			return MakeRulesSurface(RulesCream, RulesGold, 14.f, 3.f);
+		}
+		FSlateBrush Face;
+		Face.SetResourceObject(CloseButtonTexture);
+		Face.DrawAs = ESlateBrushDrawType::Image;
+		Face.ImageSize = FVector2D(190.f, 58.f);
+		Face.TintColor = FSlateColor(Tint);
+		Face.SetUVRegion(FBox2f(FVector2f(.03f, .06f), FVector2f(.98f, .485f)));
+		return Face;
+	};
+	FButtonStyle BackStyle;
+	BackStyle.SetNormal(CloseFace(FLinearColor::White));
+	BackStyle.SetHovered(CloseFace(FLinearColor(1.f, 1.f, 0.94f, 1.f)));
+	BackStyle.SetPressed(CloseFace(FLinearColor(0.87f, 0.89f, 0.79f, 1.f)));
+	BackStyle.SetNormalPadding(FMargin(0.f)).SetPressedPadding(FMargin(0.f));
+	CloseButton->SetStyle(BackStyle);
 	CloseButton->OnClicked.AddUniqueDynamic(this, &UGameRulesWidget::HandleClose);
 	if (Subjects.Num() == 0)
 	{
@@ -217,6 +325,9 @@ void UGameRulesWidget::BuildIndex()
 	EntryButtons.Reset();
 	EntryTexts.Reset();
 	EntryHandlers.Reset();
+	const UFont* Serif = LoadObject<UFont>(nullptr, TEXT("/Game/Happiness/UI/Fonts/LessonsSerif_Font.LessonsSerif_Font"));
+	const FSlateFontInfo RowFont(Serif, 19);
+	const FSlateFontInfo HeaderFont(Serif, 24);
 
 	for (int32 Index = 0; Index < Subjects.Num(); Index++)
 	{
@@ -225,30 +336,43 @@ void UGameRulesWidget::BuildIndex()
 		{
 			UTextBlock* Header = NewObject<UTextBlock>(this);
 			Header->SetText(Subject.Section);
-			Header->SetFont(SectionFont);
-			Header->SetColorAndOpacity(FSlateColor(SectionColor));
-			Header->SetShadowOffset(FVector2D(1.f, 1.f));
+			Header->SetFont(HeaderFont);
+			Header->SetColorAndOpacity(FSlateColor(RulesCream));
+			Header->SetJustification(ETextJustify::Center);
 			if (UVerticalBoxSlot* HeaderSlot = Cast<UVerticalBoxSlot>(SubjectList->AddChild(Header)))
 			{
-				HeaderSlot->SetPadding(FMargin(4.f, Index == 0 ? 0.f : 14.f, 4.f, 4.f));
+				HeaderSlot->SetPadding(FMargin(0.f, Index == 0 ? 5.f : 10.f, 0.f, 5.f));
 			}
 		}
 
 		UButton* Button = NewObject<UButton>(this);
-		Button->SetStyle(EntryStyle);
+		Button->SetStyle(MakeRulesEntryStyle(false, TopicPillTexture));
 		UTextBlock* Text = NewObject<UTextBlock>(this);
 		Text->SetText(Subject.Title);
-		Text->SetFont(EntryFont);
-		Text->SetColorAndOpacity(FSlateColor(EntryColor));
-		Text->SetShadowOffset(FVector2D(1.f, 1.f));
-		if (UButtonSlot* TextSlot = Cast<UButtonSlot>(Button->AddChild(Text)))
+		Text->SetFont(RowFont);
+		Text->SetColorAndOpacity(FSlateColor(RulesInk));
+		UHorizontalBox* EntryContent = NewObject<UHorizontalBox>(this);
+		if (UHorizontalBoxSlot* LabelSlot = EntryContent->AddChildToHorizontalBox(Text))
 		{
-			TextSlot->SetHorizontalAlignment(HAlign_Left);
-			TextSlot->SetPadding(FMargin(10.f, 4.f));
+			LabelSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+			LabelSlot->SetPadding(FMargin(20.f, 2.f, 0.f, 2.f));
+		}
+		UTextBlock* Arrow = NewObject<UTextBlock>(this);
+		Arrow->SetText(FText::FromString(TEXT(">")));
+		Arrow->SetFont(RowFont);
+		Arrow->SetColorAndOpacity(FSlateColor(RulesGold));
+		if (UHorizontalBoxSlot* ArrowSlot = EntryContent->AddChildToHorizontalBox(Arrow))
+		{
+			ArrowSlot->SetPadding(FMargin(0.f, 1.f, 17.f, 1.f));
+		}
+		if (UButtonSlot* ContentSlot = Cast<UButtonSlot>(Button->AddChild(EntryContent)))
+		{
+			ContentSlot->SetHorizontalAlignment(HAlign_Fill);
+			ContentSlot->SetVerticalAlignment(VAlign_Fill);
 		}
 		if (UVerticalBoxSlot* ButtonSlot = Cast<UVerticalBoxSlot>(SubjectList->AddChild(Button)))
 		{
-			ButtonSlot->SetPadding(FMargin(4.f, 2.f));
+			ButtonSlot->SetPadding(FMargin(4.f, 1.f));
 		}
 
 		URulesEntryHandler* Handler = NewObject<URulesEntryHandler>(this);
@@ -279,16 +403,22 @@ void UGameRulesWidget::Select(int32 Index)
 	Selected = Index;
 	const FRulesSubject& Subject = Subjects[Index];
 	TitleText->SetText(Subject.Title);
-	DescriptionText->SetText(Subject.Description);
+	if (SummaryText)
+	{
+		SummaryText->SetText(Subject.Description);
+	}
+	DescriptionText->SetText(Subject.Details);
 
 	for (int32 Entry = 0; Entry < EntryTexts.Num(); Entry++)
 	{
-		EntryTexts[Entry]->SetColorAndOpacity(FSlateColor(Entry == Index ? SelectedColor : EntryColor));
+		const bool bSelected = Entry == Index;
+		EntryTexts[Entry]->SetColorAndOpacity(FSlateColor(bSelected ? RulesCream : RulesInk));
+		EntryButtons[Entry]->SetStyle(MakeRulesEntryStyle(bSelected, TopicPillTexture));
 	}
 
 	ExampleBox->ClearChildren();
 	IllustrationBox->ClearChildren();
-	UUserWidget* Example = nullptr;
+	UWidget* Example = nullptr;
 	if (Subject.bClue)
 	{
 		Example = MakeExample(Subject.Lesson);
@@ -312,7 +442,44 @@ void UGameRulesWidget::Select(int32 Index)
 	if (Example)
 	{
 		Example->SetVisibility(ESlateVisibility::HitTestInvisible);
-		ExampleBox->AddChild(Example);
+		const UFont* Serif = LoadObject<UFont>(nullptr, TEXT("/Game/Happiness/UI/Fonts/LessonsSerif_Font.LessonsSerif_Font"));
+		USizeBox* CardSize = NewObject<USizeBox>(this);
+		CardSize->SetWidthOverride(1190.f);
+		CardSize->SetHeightOverride(180.f);
+		UBorder* Card = NewObject<UBorder>(this);
+		Card->SetBrush(MakeRulesSurface(FLinearColor(1.f, 0.985f, 0.94f, 1.f), RulesGold, 18.f, 3.f));
+		Card->SetPadding(FMargin(20.f, 12.f));
+		UHorizontalBox* Row = NewObject<UHorizontalBox>(this);
+		auto AddArea = [this, Row](UWidget* Content, float Width)
+		{
+			USizeBox* Area = NewObject<USizeBox>(this);
+			Area->SetWidthOverride(Width);
+			Area->SetContent(Content);
+			if (UHorizontalBoxSlot* Slot = Row->AddChildToHorizontalBox(Area))
+			{
+				Slot->SetVerticalAlignment(VAlign_Center);
+			}
+		};
+		UTextBlock* Lead = NewObject<UTextBlock>(this);
+		Lead->SetText(LOCTEXT("ExampleClue", "Example Clue:"));
+		Lead->SetFont(FSlateFontInfo(Serif, 28));
+		Lead->SetColorAndOpacity(FSlateColor(FLinearColor(0.02f, 0.09f, 0.02f, 1.f)));
+		AddArea(Lead, 265.f);
+		UScaleBox* ClueFit = NewObject<UScaleBox>(this);
+		ClueFit->SetStretch(EStretch::ScaleToFit);
+		ClueFit->AddChild(Example);
+		AddArea(ClueFit, 470.f);
+		UTextBlock* Explanation = NewObject<UTextBlock>(this);
+		Explanation->SetText(Subject.Lesson == ECampaignLesson::NextTo
+			? LOCTEXT("NextToExampleCaption", "The icons must sit side by side. Either one may be on the left.")
+			: Subject.Description);
+		Explanation->SetFont(FSlateFontInfo(Serif, 23));
+		Explanation->SetColorAndOpacity(FSlateColor(RulesInk));
+		Explanation->SetAutoWrapText(true);
+		AddArea(Explanation, 410.f);
+		Card->SetContent(Row);
+		CardSize->SetContent(Card);
+		ExampleBox->AddChild(CardSize);
 	}
 	ExampleBox->GetParent()->SetVisibility(Example ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 }
@@ -322,14 +489,24 @@ TArray<UObject*> UGameRulesWidget::GetIconSets() const
 	TArray<UObject*> Result;
 	const FArrayProperty* Property = PC ? FindFProperty<FArrayProperty>(PC->GetClass(), TEXT("HappinessIconSets")) : nullptr;
 	const FObjectPropertyBase* Element = Property ? CastField<FObjectPropertyBase>(Property->Inner) : nullptr;
-	if (!Element)
+	if (Element)
 	{
-		return Result;
+		FScriptArrayHelper Array(Property, Property->ContainerPtrToValuePtr<void>(PC));
+		for (int32 Set = 0; Set < Array.Num(); Set++)
+		{
+			Result.Add(Element->GetObjectPropertyValue(Array.GetRawPtr(Set)));
+		}
 	}
-	FScriptArrayHelper Array(Property, Property->ContainerPtrToValuePtr<void>(PC));
-	for (int32 Set = 0; Set < Array.Num(); Set++)
+	if (Result.Num() == 0)
 	{
-		Result.Add(Element->GetObjectPropertyValue(Array.GetRawPtr(Set)));
+		for (const TCHAR* Path : {
+			TEXT("/Game/Happiness/IconSets/IS_Flowers.IS_Flowers"),
+			TEXT("/Game/Happiness/IconSets/IS_Fruits.IS_Fruits"),
+			TEXT("/Game/Happiness/IconSets/IS_Balls.IS_Balls"),
+			TEXT("/Game/Happiness/IconSets/IS_Toys.IS_Toys") })
+		{
+			Result.Add(LoadObject<UObject>(nullptr, Path));
+		}
 	}
 	return Result;
 }
@@ -346,33 +523,76 @@ void UGameRulesWidget::AddBoards(const UPuzzle& Puzzle, const UClue& Clue, const
 	{
 		if (UHorizontalBoxSlot* BoardSlot = Row->AddChildToHorizontalBox(Board))
 		{
-			BoardSlot->SetPadding(FMargin(0.f, 0.f, 40.f, 0.f));
+			BoardSlot->SetPadding(FMargin(0.f, 0.f, 24.f, 0.f));
 			BoardSlot->SetVerticalAlignment(VAlign_Top);
 		}
 	};
-	AddBoard(MakeBoard(Example, Example.SolutionColumns(), INDEX_NONE, IconSets, LOCTEXT("Fits", "Fits the clue"), FitsColor));
+	AddBoard(MakeBoard(Example, Example.SolutionColumns(), INDEX_NONE, IconSets, LOCTEXT("Fits", "Works"), RulesSage));
 	TArray<int32> Broken;
 	int32 Moved = INDEX_NONE;
 	if (Example.FindBroken(Broken, Moved))
 	{
-		AddBoard(MakeBoard(Example, Broken, Moved, IconSets, LOCTEXT("Breaks", "Breaks the clue"), BreaksColor));
+		AddBoard(MakeBoard(Example, Broken, Moved, IconSets, LOCTEXT("Breaks", "Does not work"), FLinearColor(0.34f, 0.025f, 0.015f, 1.f)));
 	}
-	IllustrationBox->AddChild(Row);
+	if (UVerticalBoxSlot* RowSlot = Cast<UVerticalBoxSlot>(IllustrationBox->AddChild(Row)))
+	{
+		RowSlot->SetHorizontalAlignment(HAlign_Center);
+		RowSlot->SetPadding(FMargin(0.f, 12.f, 0.f, 12.f));
+	}
 }
 
 UWidget* UGameRulesWidget::MakeBoard(const FClueExample& Example, const TArray<int32>& Columns, int32 Highlight,
 	const TArray<UObject*>& IconSets, const FText& Caption, const FLinearColor& Color)
 {
 	UVerticalBox* Board = NewObject<UVerticalBox>(this);
+	const UFont* Serif = LoadObject<UFont>(nullptr, TEXT("/Game/Happiness/UI/Fonts/LessonsSerif_Font.LessonsSerif_Font"));
 
 	UTextBlock* Label = NewObject<UTextBlock>(this);
 	Label->SetText(Caption);
-	Label->SetFont(EntryFont);
+	Label->SetFont(FSlateFontInfo(Serif, 28));
 	Label->SetColorAndOpacity(FSlateColor(Color));
-	Label->SetShadowOffset(FVector2D(1.f, 1.f));
-	if (UVerticalBoxSlot* LabelSlot = Board->AddChildToVerticalBox(Label))
+	UHorizontalBox* Heading = NewObject<UHorizontalBox>(this);
+	USizeBox* MarkSize = NewObject<USizeBox>(this);
+	MarkSize->SetWidthOverride(40.f);
+	MarkSize->SetHeightOverride(40.f);
+	UBorder* MarkDisc = NewObject<UBorder>(this);
+	MarkDisc->SetBrush(MakeRulesSurface(Color, Color, 20.f, 0.f));
+	UCanvasPanel* MarkCanvas = NewObject<UCanvasPanel>(this);
+	MarkDisc->SetContent(MarkCanvas);
+	auto AddStroke = [this, MarkCanvas](FVector2D Position, FVector2D Size, float Angle)
 	{
-		LabelSlot->SetPadding(FMargin(2.f, 0.f, 0.f, 6.f));
+		UBorder* Stroke = NewObject<UBorder>(this);
+		Stroke->SetBrushColor(RulesCream);
+		if (UCanvasPanelSlot* Slot = MarkCanvas->AddChildToCanvas(Stroke))
+		{
+			Slot->SetPosition(Position);
+			Slot->SetSize(Size);
+		}
+		Stroke->SetRenderTransformPivot(FVector2D(0.5f, 0.f));
+		Stroke->SetRenderTransformAngle(Angle);
+	};
+	if (Highlight == INDEX_NONE)
+	{
+		AddStroke(FVector2D(11.f, 17.f), FVector2D(6.f, 12.f), -45.f);
+		AddStroke(FVector2D(29.f, 8.f), FVector2D(6.f, 24.f), 37.f);
+	}
+	else
+	{
+		AddStroke(FVector2D(12.f, 10.f), FVector2D(6.f, 25.f), -45.f);
+		AddStroke(FVector2D(29.f, 10.f), FVector2D(6.f, 25.f), 45.f);
+	}
+	MarkDisc->SetHorizontalAlignment(HAlign_Center);
+	MarkDisc->SetVerticalAlignment(VAlign_Center);
+	MarkSize->SetContent(MarkDisc);
+	Heading->AddChildToHorizontalBox(MarkSize);
+	if (UHorizontalBoxSlot* LabelSlot = Heading->AddChildToHorizontalBox(Label))
+	{
+		LabelSlot->SetPadding(FMargin(14.f, 0.f, 0.f, 0.f));
+		LabelSlot->SetVerticalAlignment(VAlign_Center);
+	}
+	if (UVerticalBoxSlot* HeadingSlot = Board->AddChildToVerticalBox(Heading))
+	{
+		HeadingSlot->SetPadding(FMargin(10.f, 4.f, 0.f, 12.f));
 	}
 
 	// The clue's rows (in the clue's order), every column
@@ -383,10 +603,10 @@ UWidget* UGameRulesWidget::MakeBoard(const FClueExample& Example, const TArray<i
 	}
 
 	UBorder* Frame = NewObject<UBorder>(this);
-	Frame->SetBrushColor(Color);
-	Frame->SetPadding(FMargin(3.f));
+	Frame->SetBrush(MakeRulesSurface(FLinearColor(1.f, 0.98f, 0.90f, 1.f), Color, 8.f, 2.f));
+	Frame->SetPadding(FMargin(7.f));
 	UUniformGridPanel* Grid = NewObject<UUniformGridPanel>(this);
-	Grid->SetSlotPadding(FMargin(2.f));
+	Grid->SetSlotPadding(FMargin(3.f));
 	for (int32 RowIndex = 0; RowIndex < Rows.Num(); RowIndex++)
 	{
 		for (int32 Column = 0; Column < Example.Size; Column++)
@@ -401,11 +621,13 @@ UWidget* UGameRulesWidget::MakeBoard(const FClueExample& Example, const TArray<i
 			}
 
 			USizeBox* CellSize = NewObject<USizeBox>(this);
-			CellSize->SetWidthOverride(BoardCellSize);
-			CellSize->SetHeightOverride(BoardCellSize);
+			CellSize->SetWidthOverride(FMath::Max(BoardCellSize, 78.f));
+			CellSize->SetHeightOverride(FMath::Max(BoardCellSize, 78.f));
 			UBorder* Cell = NewObject<UBorder>(this);
-			Cell->SetBrushColor(PieceHere != INDEX_NONE && PieceHere == Highlight ? BreaksColor : FLinearColor(0.08f, 0.09f, 0.12f, 1.f));
-			Cell->SetPadding(FMargin(4.f));
+			Cell->SetBrush(MakeRulesSurface(
+				PieceHere != INDEX_NONE && PieceHere == Highlight ? FLinearColor(1.f, 0.84f, 0.78f, 1.f) : RulesCream,
+				FLinearColor(0.70f, 0.62f, 0.45f, 1.f), 3.f, 1.f));
+			Cell->SetPadding(FMargin(3.f));
 			if (PieceHere != INDEX_NONE)
 			{
 				const FClueExamplePiece& Piece = Example.Pieces[PieceHere];
@@ -422,15 +644,39 @@ UWidget* UGameRulesWidget::MakeBoard(const FClueExample& Example, const TArray<i
 		}
 	}
 	Frame->SetContent(Grid);
-	Board->AddChildToVerticalBox(Frame);
-	return Board;
+	if (UVerticalBoxSlot* GridSlot = Board->AddChildToVerticalBox(Frame))
+	{
+		GridSlot->SetHorizontalAlignment(HAlign_Center);
+	}
+	UTextBlock* Note = NewObject<UTextBlock>(this);
+	Note->SetText(Highlight == INDEX_NONE
+		? LOCTEXT("ExampleWorksNote", "These positions follow the clue.")
+		: LOCTEXT("ExampleBreaksNote", "These positions contradict the clue."));
+	Note->SetFont(FSlateFontInfo(Serif, 18));
+	Note->SetColorAndOpacity(FSlateColor(RulesInk));
+	Note->SetJustification(ETextJustify::Center);
+	if (UVerticalBoxSlot* NoteSlot = Board->AddChildToVerticalBox(Note))
+	{
+		NoteSlot->SetPadding(FMargin(0.f, 8.f, 0.f, 0.f));
+	}
+	USizeBox* CardSize = NewObject<USizeBox>(this);
+	CardSize->SetWidthOverride(540.f);
+	CardSize->SetHeightOverride(140.f + Rows.Num() * FMath::Max(BoardCellSize, 78.f));
+	UBorder* Card = NewObject<UBorder>(this);
+	Card->SetBrush(MakeRulesSurface(Highlight == INDEX_NONE
+		? FLinearColor(0.94f, 0.97f, 0.87f, 1.f)
+		: FLinearColor(1.f, 0.90f, 0.86f, 1.f), Color, 20.f, 2.f));
+	Card->SetPadding(FMargin(20.f, 12.f));
+	Card->SetContent(Board);
+	CardSize->SetContent(Card);
+	return CardSize;
 }
 
 void UGameRulesWidget::AddPicture(const FRulesSubject& Subject)
 {
 	USizeBox* PictureSize = NewObject<USizeBox>(this);
-	PictureSize->SetWidthOverride(560.f);
-	PictureSize->SetHeightOverride(250.f);
+	PictureSize->SetWidthOverride(760.f);
+	PictureSize->SetHeightOverride(300.f);
 	if (UTexture2D* Picture = Pictures.FindRef(Subject.Title.ToString()))
 	{
 		UImage* Image = NewObject<UImage>(this);
@@ -439,22 +685,112 @@ void UGameRulesWidget::AddPicture(const FRulesSubject& Subject)
 	}
 	else
 	{
-		// Until there's artwork: a box saying what the picture should show
-		UBorder* Placeholder = NewObject<UBorder>(this);
-		Placeholder->SetBrushColor(FLinearColor(1.f, 1.f, 1.f, 0.08f));
-		Placeholder->SetPadding(FMargin(20.f));
-		Placeholder->SetHorizontalAlignment(HAlign_Center);
-		Placeholder->SetVerticalAlignment(VAlign_Center);
-		UTextBlock* Note = NewObject<UTextBlock>(this);
-		Note->SetText(FText::Format(LOCTEXT("Placeholder", "Picture to come:\n{0}"), Subject.PictureNote));
-		Note->SetFont(EntryFont);
-		Note->SetColorAndOpacity(FSlateColor(FLinearColor(1.f, 1.f, 1.f, 0.55f)));
-		Note->SetJustification(ETextJustify::Center);
-		Note->SetAutoWrapText(true);
-		Placeholder->SetContent(Note);
-		PictureSize->SetContent(Placeholder);
+		const UFont* Serif = LoadObject<UFont>(nullptr, TEXT("/Game/Happiness/UI/Fonts/LessonsSerif_Font.LessonsSerif_Font"));
+		auto MakeTile = [this, Serif](int32 Row, int32 IconIndex, bool bSelected, bool bEliminated) -> UWidget*
+		{
+			USizeBox* Size = NewObject<USizeBox>(this);
+			Size->SetWidthOverride(74.f);
+			Size->SetHeightOverride(74.f);
+			UBorder* Tile = NewObject<UBorder>(this);
+			Tile->SetBrush(MakeRulesSurface(RulesCream, bEliminated ? FLinearColor(0.48f, 0.11f, 0.08f, 1.f) : bSelected ? RulesSage : RulesGold, 5.f, bSelected ? 3.f : 1.f));
+			Tile->SetPadding(FMargin(3.f));
+			// Abstract symbols make the row and column rule readable at any icon set.
+			{
+				UOverlay* Layers = NewObject<UOverlay>(this);
+				UTextBlock* Symbol = NewObject<UTextBlock>(this);
+				Symbol->SetText(FText::FromString(FString::Chr(TEXT('A') + IconIndex)));
+				Symbol->SetFont(FSlateFontInfo(Serif, 35));
+				Symbol->SetColorAndOpacity(FSlateColor(Row == 0 ? RulesSage : Row == 1 ? RulesNavy : FLinearColor(0.59f, 0.22f, 0.14f, 1.f)));
+				if (UOverlaySlot* SymbolSlot = Layers->AddChildToOverlay(Symbol))
+				{
+					SymbolSlot->SetHorizontalAlignment(HAlign_Center);
+					SymbolSlot->SetVerticalAlignment(VAlign_Center);
+				}
+				if (bEliminated)
+				{
+					UTextBlock* Cross = NewObject<UTextBlock>(this);
+					Cross->SetText(FText::FromString(TEXT("×")));
+					Cross->SetFont(FSlateFontInfo(Serif, 47));
+					Cross->SetColorAndOpacity(FSlateColor(FLinearColor(0.50f, 0.07f, 0.05f, 1.f)));
+					if (UOverlaySlot* CrossSlot = Layers->AddChildToOverlay(Cross))
+					{
+						CrossSlot->SetHorizontalAlignment(HAlign_Center);
+						CrossSlot->SetVerticalAlignment(VAlign_Center);
+					}
+				}
+				Tile->SetContent(Layers);
+			}
+			Size->SetContent(Tile);
+			return Size;
+		};
+
+		UBorder* Frame = NewObject<UBorder>(this);
+		Frame->SetBrush(MakeRulesSurface(FLinearColor(1.f, 0.98f, 0.91f, 1.f), RulesGold));
+		Frame->SetPadding(FMargin(14.f));
+		UHorizontalBox* Content = NewObject<UHorizontalBox>(this);
+		if (Subject.BasicIndex == 0)
+		{
+			UUniformGridPanel* Grid = NewObject<UUniformGridPanel>(this);
+			Grid->SetSlotPadding(FMargin(3.f));
+			for (int32 Row = 0; Row < 3; ++Row)
+			{
+				for (int32 Column = 0; Column < 4; ++Column)
+				{
+					Grid->AddChildToUniformGrid(MakeTile(Row, (Column + Row) % 4, Column == 1, false), Row, Column);
+				}
+			}
+			Content->AddChildToHorizontalBox(Grid);
+			UTextBlock* Note = NewObject<UTextBlock>(this);
+			Note->SetText(LOCTEXT("ObjectiveVisual", "Each row uses every icon once.\n\nA column has one icon from each row."));
+			Note->SetFont(FSlateFontInfo(Serif, 21));
+			Note->SetColorAndOpacity(FSlateColor(RulesInk));
+			Note->SetAutoWrapText(true);
+			if (UHorizontalBoxSlot* NoteSlot = Content->AddChildToHorizontalBox(Note))
+			{
+				NoteSlot->SetPadding(FMargin(26.f, 0.f, 0.f, 0.f));
+				NoteSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+				NoteSlot->SetVerticalAlignment(VAlign_Center);
+			}
+		}
+		else
+		{
+			const FText Captions[3] = {
+				Subject.BasicIndex == 2 ? LOCTEXT("GridPossible", "Consider") : Subject.BasicIndex == 3 ? LOCTEXT("ClueSelect", "Select a clue") : LOCTEXT("HintAsk", "Ask for a hint"),
+				Subject.BasicIndex == 2 ? LOCTEXT("GridEliminate", "Eliminate") : Subject.BasicIndex == 3 ? LOCTEXT("ClueRead", "Read its meaning") : LOCTEXT("HintLook", "See the highlight"),
+				Subject.BasicIndex == 2 ? LOCTEXT("GridPlace", "Place") : Subject.BasicIndex == 3 ? LOCTEXT("ClueHide", "Hide when done") : LOCTEXT("HintDeduce", "Make the deduction")
+			};
+			for (int32 Step = 0; Step < 3; ++Step)
+			{
+				UVerticalBox* Card = NewObject<UVerticalBox>(this);
+				if (UVerticalBoxSlot* TileSlot = Card->AddChildToVerticalBox(MakeTile(Step % 3, Step, Step == 2, Subject.BasicIndex == 2 && Step == 1)))
+				{
+					TileSlot->SetHorizontalAlignment(HAlign_Center);
+					TileSlot->SetPadding(FMargin(0.f, 16.f, 0.f, 12.f));
+				}
+				UTextBlock* Label = NewObject<UTextBlock>(this);
+				Label->SetText(Captions[Step]);
+				Label->SetFont(FSlateFontInfo(Serif, 20));
+				Label->SetColorAndOpacity(FSlateColor(RulesInk));
+				Label->SetJustification(ETextJustify::Center);
+				Label->SetAutoWrapText(true);
+				Card->AddChildToVerticalBox(Label);
+				USizeBox* CardSize = NewObject<USizeBox>(this);
+				CardSize->SetWidthOverride(220.f);
+				CardSize->SetContent(Card);
+				if (UHorizontalBoxSlot* CardSlot = Content->AddChildToHorizontalBox(CardSize))
+				{
+					CardSlot->SetPadding(FMargin(6.f));
+				}
+			}
+		}
+		Frame->SetContent(Content);
+		PictureSize->SetContent(Frame);
 	}
-	IllustrationBox->AddChild(PictureSize);
+	if (UVerticalBoxSlot* PictureSlot = Cast<UVerticalBoxSlot>(IllustrationBox->AddChild(PictureSize)))
+	{
+		PictureSlot->SetHorizontalAlignment(HAlign_Center);
+		PictureSlot->SetPadding(FMargin(0.f, 8.f, 0.f, 12.f));
+	}
 }
 
 void UGameRulesWidget::AddLayoutDiagram()
@@ -468,11 +804,11 @@ void UGameRulesWidget::AddLayoutDiagram()
 	};
 	const FArea Areas[] =
 	{
-		{ TEXT("GamePanel"), LOCTEXT("AreaPuzzle", "Puzzle Area"), FLinearColor(0.25f, 0.6f, 1.f), FBox2D(FVector2D(0.061, 0.056), FVector2D(0.875, 0.722)) },
-		{ TEXT("ButtonPanel"), LOCTEXT("AreaButtons", "Buttons"), FLinearColor(1.f, 0.6f, 0.2f), FBox2D(FVector2D(0.0, 0.0), FVector2D(0.061, 0.743)) },
-		{ TEXT("VerticalCluePanel"), LOCTEXT("AreaVertical", "Vertical Clues"), FLinearColor(0.35f, 0.85f, 0.4f), FBox2D(FVector2D(0.006, 0.725), FVector2D(0.872, 0.994)) },
-		{ TEXT("HorizontalCluePanel"), LOCTEXT("AreaHorizontal", "Horizontal Clues"), FLinearColor(0.75f, 0.45f, 1.f), FBox2D(FVector2D(0.875, 0.007), FVector2D(1.0, 1.0)) },
-		{ TEXT("HelpPanel"), LOCTEXT("AreaInfo", "Clue Info"), FLinearColor(1.f, 0.9f, 0.3f), FBox2D(FVector2D(0.061, 0.007), FVector2D(0.875, 0.049)) },
+		{ TEXT("GamePanel"), LOCTEXT("AreaPuzzle", "Puzzle Area"), FLinearColor(0.37f, 0.57f, 0.59f), FBox2D(FVector2D(0.061, 0.056), FVector2D(0.875, 0.722)) },
+		{ TEXT("ButtonPanel"), LOCTEXT("AreaButtons", "Buttons"), FLinearColor(0.72f, 0.55f, 0.30f), FBox2D(FVector2D(0.0, 0.0), FVector2D(0.061, 0.743)) },
+		{ TEXT("VerticalCluePanel"), LOCTEXT("AreaVertical", "Vertical Clues"), FLinearColor(0.43f, 0.62f, 0.43f), FBox2D(FVector2D(0.006, 0.725), FVector2D(0.872, 0.994)) },
+		{ TEXT("HorizontalCluePanel"), LOCTEXT("AreaHorizontal", "Horizontal Clues"), FLinearColor(0.59f, 0.52f, 0.65f), FBox2D(FVector2D(0.875, 0.007), FVector2D(1.0, 1.0)) },
+		{ TEXT("HelpPanel"), LOCTEXT("AreaInfo", "Clue Info"), FLinearColor(0.77f, 0.67f, 0.43f), FBox2D(FVector2D(0.061, 0.007), FVector2D(0.875, 0.049)) },
 	};
 
 	// The puzzle screen (PC_Happiness's HappinessWidget): where its areas were last drawn (they hide while paused)
@@ -486,10 +822,10 @@ void UGameRulesWidget::AddLayoutDiagram()
 
 	USizeBox* DiagramSize = NewObject<USizeBox>(this);
 	DiagramSize->SetWidthOverride(LayoutDiagramSize.X);
-	DiagramSize->SetHeightOverride(LayoutDiagramSize.Y);
+	DiagramSize->SetHeightOverride(FMath::Min(LayoutDiagramSize.Y, 225.f));
 	UBorder* Frame = NewObject<UBorder>(this);
-	Frame->SetBrushColor(FLinearColor(0.08f, 0.09f, 0.12f, 1.f));
-	Frame->SetPadding(FMargin(0.f));
+	Frame->SetBrush(MakeRulesSurface(FLinearColor(1.f, 0.98f, 0.90f, 1.f), RulesGold));
+	Frame->SetPadding(FMargin(5.f));
 	UCanvasPanel* Canvas = NewObject<UCanvasPanel>(this);
 	Frame->SetContent(Canvas);
 	DiagramSize->SetContent(Frame);
@@ -528,7 +864,7 @@ void UGameRulesWidget::AddLayoutDiagram()
 		UBorder* Box = NewObject<UBorder>(this);
 		FSlateBrush Brush;
 		Brush.DrawAs = ESlateBrushDrawType::RoundedBox;
-		Brush.TintColor = FSlateColor(Area.Color.CopyWithNewOpacity(0.28f));
+		Brush.TintColor = FSlateColor(Area.Color.CopyWithNewOpacity(0.36f));
 		Brush.OutlineSettings = FSlateBrushOutlineSettings(FVector4(4.f, 4.f, 4.f, 4.f), FSlateColor(Area.Color), 2.f);
 		Box->SetBrush(Brush);
 		Box->SetHorizontalAlignment(HAlign_Center);
@@ -536,10 +872,9 @@ void UGameRulesWidget::AddLayoutDiagram()
 		UTextBlock* Label = NewObject<UTextBlock>(this);
 		Label->SetText(Area.Label);
 		FSlateFontInfo LabelFont = EntryFont;
-		LabelFont.Size = 12;
+		LabelFont.Size = 16;
 		Label->SetFont(LabelFont);
-		Label->SetColorAndOpacity(FSlateColor(FLinearColor::White));
-		Label->SetShadowOffset(FVector2D(1.f, 1.f));
+		Label->SetColorAndOpacity(FSlateColor(RulesInk));
 		Label->SetJustification(ETextJustify::Center);
 		Label->SetAutoWrapText(true);
 		Box->SetContent(Label);
@@ -555,120 +890,58 @@ void UGameRulesWidget::AddLayoutDiagram()
 
 void UGameRulesWidget::AddButtonLegend()
 {
-	// A button panel of our own, to copy its buttons' look from (whatever the panel's art is now)
-	UClass* PanelClass = ButtonPanelClass.LoadSynchronous();
-	UUserWidget* Panel = PanelClass ? CreateWidget<UUserWidget>(this, PanelClass) : nullptr;
-	if (!Panel || !Panel->WidgetTree)
+	const UFont* Serif = LoadObject<UFont>(nullptr, TEXT("/Game/Happiness/UI/Fonts/LessonsSerif_Font.LessonsSerif_Font"));
+	const TCHAR* ButtonNames[] = { TEXT("Pause"), TEXT("Hint"), TEXT("Undo"), TEXT("Hide") };
+	const FText Meanings[] =
 	{
-		return;
-	}
-
-	// What each button does, by its name in WBP_ButtonPanel
-	const TMap<FString, FText> Meanings =
-	{
-		{ TEXT("Button_P"), LOCTEXT("ButtonPause", "Pause menu") },
-		{ TEXT("Button_H"), LOCTEXT("ButtonHint", "Hint: shows a clue that helps, and why") },
-		{ TEXT("Button_U"), LOCTEXT("ButtonUndo", "Undo your last move") },
-		{ TEXT("Button_HC"), LOCTEXT("ButtonHide", "Hide the selected clue") },
-		{ TEXT("Button_Reset"), LOCTEXT("ButtonReset", "Reset the puzzle") },
-		{ TEXT("Button_Fix"), LOCTEXT("ButtonFix", "Fix mistakes") },
+		LOCTEXT("ButtonPause", "Pause the puzzle"),
+		LOCTEXT("ButtonHint", "Find a useful clue and learn why it helps"),
+		LOCTEXT("ButtonUndo", "Undo your last move"),
+		LOCTEXT("ButtonHide", "Hide the selected clue"),
 	};
-
 	UVerticalBox* Legend = NewObject<UVerticalBox>(this);
 	UTextBlock* Heading = NewObject<UTextBlock>(this);
 	Heading->SetText(LOCTEXT("ButtonsHeading", "Buttons"));
-	Heading->SetFont(SectionFont);
-	Heading->SetColorAndOpacity(FSlateColor(SectionColor));
-	Heading->SetShadowOffset(FVector2D(1.f, 1.f));
+	Heading->SetFont(FSlateFontInfo(Serif, 24));
+	Heading->SetColorAndOpacity(FSlateColor(RulesSage));
 	if (UVerticalBoxSlot* HeadingSlot = Legend->AddChildToVerticalBox(Heading))
 	{
-		HeadingSlot->SetPadding(FMargin(0.f, 14.f, 0.f, 4.f));
+		HeadingSlot->SetPadding(FMargin(0.f, 6.f, 0.f, 3.f));
 	}
 
-	Panel->WidgetTree->ForEachWidget([&](UWidget* Widget)
+	for (int32 Index = 0; Index < 4; ++Index)
 	{
-		// Only the buttons players see: not ones inside a hidden or collapsed box
-		const UButton* Source = Cast<UButton>(Widget);
-		if (!Source)
-		{
-			return;
-		}
-		for (const UWidget* Shown = Source; Shown; Shown = Shown->GetParent())
-		{
-			if (Shown->GetVisibility() == ESlateVisibility::Collapsed || Shown->GetVisibility() == ESlateVisibility::Hidden)
-			{
-				return;
-			}
-		}
-
-		// A small copy of the button, scaled from its size in the panel: its style (the art), and its icon or caption
-		const USizeBox* SourceSize = Cast<USizeBox>(Source->GetParent());
-		const float Height = SourceSize && SourceSize->GetHeightOverride() > 0.f ? SourceSize->GetHeightOverride() : LegendButtonSize;
-		const float Width = SourceSize && SourceSize->GetWidthOverride() > 0.f ? SourceSize->GetWidthOverride() : Height;
-		const float Scale = LegendButtonSize / Height;
-
-		UButton* Copy = NewObject<UButton>(this);
-		Copy->SetStyle(Source->GetStyle());
-		Copy->SetVisibility(ESlateVisibility::HitTestInvisible);
-		FText Label;
-		const UWidget* Content = Source->GetContent();
-		UWidget* ContentCopy = nullptr;
-		if (const UImage* Image = Cast<UImage>(Content))
-		{
-			UImage* Icon = NewObject<UImage>(this);
-			Icon->SetBrush(Image->GetBrush());
-			ContentCopy = Icon;
-		}
-		else if (const UTextBlock* Text = Cast<UTextBlock>(Content))
-		{
-			Label = Text->GetText();
-			UTextBlock* TextCopy = NewObject<UTextBlock>(this);
-			TextCopy->SetText(Text->GetText());
-			FSlateFontInfo Font = Text->GetFont();
-			Font.Size = FMath::Max(1.f, Font.Size * Scale);
-			TextCopy->SetFont(Font);
-			TextCopy->SetColorAndOpacity(Text->GetColorAndOpacity());
-			TextCopy->SetShadowOffset(Text->GetShadowOffset());
-			TextCopy->SetShadowColorAndOpacity(Text->GetShadowColorAndOpacity());
-			TextCopy->SetJustification(ETextJustify::Center);
-			ContentCopy = TextCopy;
-		}
-		if (ContentCopy)
-		{
-			Copy->SetContent(ContentCopy);
-			const UButtonSlot* SourceSlot = Cast<UButtonSlot>(Content->Slot);
-			if (UButtonSlot* CopySlot = Cast<UButtonSlot>(ContentCopy->Slot); CopySlot && SourceSlot)
-			{
-				const FMargin Padding = SourceSlot->GetPadding();
-				CopySlot->SetPadding(FMargin(Padding.Left * Scale, Padding.Top * Scale, Padding.Right * Scale, Padding.Bottom * Scale));
-				CopySlot->SetHorizontalAlignment(SourceSlot->GetHorizontalAlignment());
-				CopySlot->SetVerticalAlignment(SourceSlot->GetVerticalAlignment());
-			}
-		}
+		UBorder* ButtonTile = NewObject<UBorder>(this);
+		ButtonTile->SetBrush(MakeRulesSurface(RulesSage, RulesGold, 8.f, 2.f));
+		UTextBlock* ButtonName = NewObject<UTextBlock>(this);
+		ButtonName->SetText(FText::FromString(ButtonNames[Index]));
+		ButtonName->SetFont(FSlateFontInfo(Serif, 14));
+		ButtonName->SetColorAndOpacity(FSlateColor(RulesCream));
+		ButtonName->SetJustification(ETextJustify::Center);
+		ButtonTile->SetHorizontalAlignment(HAlign_Center);
+		ButtonTile->SetVerticalAlignment(VAlign_Center);
+		ButtonTile->SetContent(ButtonName);
 		USizeBox* ButtonSize = NewObject<USizeBox>(this);
-		ButtonSize->SetWidthOverride(Width * Scale);
-		ButtonSize->SetHeightOverride(LegendButtonSize);
-		ButtonSize->SetContent(Copy);
-
-		const FText* Meaning = Meanings.Find(Source->GetName());
+		ButtonSize->SetWidthOverride(52.f);
+		ButtonSize->SetHeightOverride(45.f);
+		ButtonSize->SetContent(ButtonTile);
 		UTextBlock* Description = NewObject<UTextBlock>(this);
-		Description->SetText(Meaning ? *Meaning : Label);
-		Description->SetFont(EntryFont);
-		Description->SetColorAndOpacity(FSlateColor(FLinearColor::White));
-		Description->SetShadowOffset(FVector2D(1.f, 1.f));
+		Description->SetText(Meanings[Index]);
+		Description->SetFont(FSlateFontInfo(Serif, 19));
+		Description->SetColorAndOpacity(FSlateColor(RulesInk));
 
 		UHorizontalBox* Line = NewObject<UHorizontalBox>(this);
 		Line->AddChildToHorizontalBox(ButtonSize);
 		if (UHorizontalBoxSlot* TextSlot = Line->AddChildToHorizontalBox(Description))
 		{
-			TextSlot->SetPadding(FMargin(12.f, 0.f, 0.f, 0.f));
+			TextSlot->SetPadding(FMargin(14.f, 0.f, 0.f, 0.f));
 			TextSlot->SetVerticalAlignment(VAlign_Center);
 		}
 		if (UVerticalBoxSlot* LineSlot = Legend->AddChildToVerticalBox(Line))
 		{
-			LineSlot->SetPadding(FMargin(0.f, 3.f));
+			LineSlot->SetPadding(FMargin(0.f, 1.f));
 		}
-	});
+	}
 	IllustrationBox->AddChild(Legend);
 }
 
@@ -708,26 +981,82 @@ bool UGameRulesWidget::FindExampleClue(ECampaignLesson Lesson, UPuzzle*& OutPuzz
 	return false;
 }
 
-UUserWidget* UGameRulesWidget::MakeExample(ECampaignLesson Lesson)
+UWidget* UGameRulesWidget::MakeExample(ECampaignLesson Lesson)
 {
 	UPuzzle* Puzzle = nullptr;
 	UClue* Clue = nullptr;
-	if (!PC || !FindExampleClue(Lesson, Puzzle, Clue))
+	if (!FindExampleClue(Lesson, Puzzle, Clue))
 	{
 		return nullptr;
 	}
 
-	// The game's icon sets (PC_Happiness's HappinessIconSets): the clue widget turns icon numbers into pictures with them
-	const FArrayProperty* IconSetsProperty = FindFProperty<FArrayProperty>(PC->GetClass(), TEXT("HappinessIconSets"));
-	if (!IconSetsProperty)
+	// The current player's icon sets, or sample sets when rendering this screen without a player.
+	const TArray<UObject*> IconSets = GetIconSets();
+	if (IconSets.Num() < Puzzle->m_iSize)
 	{
 		return nullptr;
 	}
-	FScriptArrayHelper IconSets(IconSetsProperty, IconSetsProperty->ContainerPtrToValuePtr<void>(PC));
-	const FObjectPropertyBase* IconSetElement = CastField<FObjectPropertyBase>(IconSetsProperty->Inner);
-	if (!IconSetElement || IconSets.Num() < Puzzle->m_iSize)
+	if (!PC)
 	{
-		return nullptr;
+		const TCHAR* PreviewRelation = TEXT("-");
+		switch (Lesson)
+		{
+		case ECampaignLesson::NextTo:
+		case ECampaignLesson::Gap:
+		case ECampaignLesson::Span:
+		case ECampaignLesson::Between:
+			PreviewRelation = TEXT("<->");
+			break;
+		case ECampaignLesson::DirectlyLeftOf:
+		case ECampaignLesson::LeftOf:
+		case ECampaignLesson::Chain:
+			PreviewRelation = TEXT("->");
+			break;
+		default:
+			break;
+		}
+		FClueExample Sample;
+		if (!Sample.Build(*Clue, *Puzzle))
+		{
+			return nullptr;
+		}
+		UHorizontalBox* Strip = NewObject<UHorizontalBox>(this);
+		const UFont* Serif = LoadObject<UFont>(nullptr, TEXT("/Game/Happiness/UI/Fonts/LessonsSerif_Font.LessonsSerif_Font"));
+		for (int32 PieceIndex = 0; PieceIndex < Sample.Pieces.Num(); ++PieceIndex)
+		{
+			const FClueExamplePiece& Piece = Sample.Pieces[PieceIndex];
+			UTexture2D* Texture = IconSets.IsValidIndex(Piece.Row) ? GetRulesIconTexture(IconSets[Piece.Row], Piece.Icon) : nullptr;
+			USizeBox* TileSize = NewObject<USizeBox>(this);
+			TileSize->SetWidthOverride(102.f);
+			TileSize->SetHeightOverride(102.f);
+			UBorder* TileFrame = NewObject<UBorder>(this);
+			TileFrame->SetBrush(MakeRulesSurface(RulesCream, RulesGold, 8.f, 2.f));
+			TileFrame->SetPadding(FMargin(5.f));
+			if (Texture)
+			{
+				UImage* TileArt = NewObject<UImage>(this);
+				TileArt->SetBrushFromTexture(Texture, false);
+				TileFrame->SetContent(TileArt);
+			}
+			TileSize->SetContent(TileFrame);
+			if (UHorizontalBoxSlot* TileSlot = Strip->AddChildToHorizontalBox(TileSize))
+			{
+				TileSlot->SetVerticalAlignment(VAlign_Center);
+			}
+			if (PieceIndex + 1 < Sample.Pieces.Num())
+			{
+				UTextBlock* Relation = NewObject<UTextBlock>(this);
+				Relation->SetText(FText::FromString(Clue->m_Type == eClueType::Vertical ? TEXT("+") : PreviewRelation));
+				Relation->SetFont(FSlateFontInfo(Serif, 44));
+				Relation->SetColorAndOpacity(FSlateColor(RulesSage));
+				if (UHorizontalBoxSlot* RelationSlot = Strip->AddChildToHorizontalBox(Relation))
+				{
+					RelationSlot->SetPadding(FMargin(18.f, 0.f));
+					RelationSlot->SetVerticalAlignment(VAlign_Center);
+				}
+			}
+		}
+		return Strip;
 	}
 
 	UClass* WidgetClass = (Clue->m_Type == eClueType::Vertical ? VerticalClueClass : HorizontalClueClass).LoadSynchronous();
@@ -757,10 +1086,12 @@ UUserWidget* UGameRulesWidget::MakeExample(ECampaignLesson Lesson)
 			Sets.Resize(IconSets.Num());
 			for (int32 Set = 0; Element && Set < IconSets.Num(); Set++)
 			{
-				Element->SetObjectPropertyValue(Sets.GetRawPtr(Set), IconSetElement->GetObjectPropertyValue(IconSets.GetRawPtr(Set)));
+				Element->SetObjectPropertyValue(Sets.GetRawPtr(Set), IconSets[Set]);
 			}
 		}
 	}
+	// The clue's widget tree must exist before Populate assigns its icon images.
+	Widget->TakeWidget();
 	Widget->ProcessEvent(Populate, Params);
 	for (TFieldIterator<FProperty> It(Populate); It && It->HasAnyPropertyFlags(CPF_Parm); ++It)
 	{

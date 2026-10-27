@@ -8,6 +8,7 @@
 
 class APlayerController;
 class UButton;
+class UBorder;
 class UPanelWidget;
 class UPuzzle;
 class UClue;
@@ -27,8 +28,12 @@ struct FRulesSubject
 	FText Title;
 	/** One or two lines: the picture does the explaining */
 	FText Description;
+	/** Additional guidance below the diagrams, scrollable independently of the examples */
+	FText Details;
 	/** Basics: what the picture should show, until there is artwork (Pictures) */
 	FText PictureNote;
+	/** Which Basics illustration to draw when there is no supplied picture */
+	int32 BasicIndex = -1;
 	/** Game Layout: a diagram of the puzzle screen's areas instead of a picture */
 	bool bLayoutDiagram = false;
 	/** A clue subject: its example is a generated clue of this type */
@@ -126,10 +131,23 @@ protected:
 	TObjectPtr<UPanelWidget> SubjectList;
 
 	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UBorder> Backdrop;
+
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UBorder> IndexPanel;
+
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UBorder> DetailPaper;
+
+	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UTextBlock> TitleText;
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UTextBlock> DescriptionText;
+
+	/** Short rule summary above the illustrations */
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> SummaryText;
 
 	/** Holds the example clue (scaled to fit) */
 	UPROPERTY(meta = (BindWidget))
@@ -150,7 +168,7 @@ private:
 	/** The clue subject of this type, or INDEX_NONE */
 	int32 FindLessonSubject(ECampaignLesson Lesson) const;
 	/** A clue widget showing a clue of this type, or null */
-	UUserWidget* MakeExample(ECampaignLesson Lesson);
+	UWidget* MakeExample(ECampaignLesson Lesson);
 	/** A generated puzzle with a clue of this type in it */
 	bool FindExampleClue(ECampaignLesson Lesson, UPuzzle*& OutPuzzle, UClue*& OutClue);
 	/** The game's icon sets (PC_Happiness's HappinessIconSets), or empty */
@@ -190,6 +208,16 @@ private:
 
 	UPROPERTY()
 	TMap<ECampaignLesson, TObjectPtr<UClue>> ExampleClues;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UTexture2D> FieldGuideTexture;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UTexture2D> CloseButtonTexture;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UTexture2D> TopicPillTexture;
+
 
 	UPROPERTY()
 	TObjectPtr<APlayerController> PC;
