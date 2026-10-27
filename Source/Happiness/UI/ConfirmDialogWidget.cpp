@@ -191,6 +191,7 @@ void UConfirmDialogWidget::BuildPlaqueLayout()
 		Icon->Color=bConfirm?ConfirmIvory:ConfirmInk; Icon->SetVisibility(ESlateVisibility::HitTestInvisible); IconSize->AddChild(Icon);
 		UHorizontalBoxSlot* IconSlot=Row->AddChildToHorizontalBox(IconSize); IconSlot->SetPadding(FMargin(0,0,16,0)); IconSlot->SetVerticalAlignment(VAlign_Center);
 		UTextBlock* Label=WidgetTree->ConstructWidget<UTextBlock>(); Label->SetText(Caption); TextStyle(Label,36,Icon->Color);
+		(bConfirm?ConfirmLabel:CancelLabel)=Label;
 		Row->AddChildToHorizontalBox(Label)->SetVerticalAlignment(VAlign_Center);
 		UButtonSlot* ButtonSlot=CastChecked<UButtonSlot>(Button->AddChild(Row));
 		ButtonSlot->SetHorizontalAlignment(HAlign_Center); ButtonSlot->SetVerticalAlignment(VAlign_Center);
@@ -229,7 +230,8 @@ void UConfirmDialogWidget::NativeConstruct()
 	}
 }
 
-void UConfirmDialogWidget::Ask(const FText& Question, const FString& Description, TFunction<void()> OnConfirm)
+void UConfirmDialogWidget::Ask(const FText& Question, const FString& Description, TFunction<void()> OnConfirm, TFunction<void()> OnCancel,
+	const FText& ConfirmText, const FText& CancelText)
 {
 	// The Blueprint's SetMessage sets its Message variable, which may be bound to the question's text
 	if(const FTextProperty* Message=FindFProperty<FTextProperty>(GetClass(),TEXT("Message")))
@@ -240,7 +242,10 @@ void UConfirmDialogWidget::Ask(const FText& Question, const FString& Description
 		QuestionText->SetText(Question);
 	SetVisibility(ESlateVisibility::Visible);
 	SetDescription(Description);
+	if(ConfirmLabel && !ConfirmText.IsEmpty()) ConfirmLabel->SetText(ConfirmText);
+	if(CancelLabel && !CancelText.IsEmpty()) CancelLabel->SetText(CancelText);
 	AskConfirmed=MoveTemp(OnConfirm);
+	AskCancelled=MoveTemp(OnCancel);
 	bAsking=true;
 }
 
@@ -254,7 +259,10 @@ void UConfirmDialogWidget::HandleConfirmPressed()
 
 void UConfirmDialogWidget::HandleCancelPressed()
 {
-	if(bAsking) SetVisibility(ESlateVisibility::Collapsed);
+	if(!bAsking) return;
+	TFunction<void()> Cancelled=MoveTemp(AskCancelled);
+	SetVisibility(ESlateVisibility::Collapsed);
+	if(Cancelled) Cancelled();
 }
 
 void UConfirmDialogWidget::SetDescription(FString Description)
@@ -274,7 +282,10 @@ void UConfirmDialogWidget::SetVisibility(ESlateVisibility InVisibility)
 	{
 		SetDescription(FString());
 		AskConfirmed.Reset();
+		AskCancelled.Reset();
 		bAsking=false;
+		if(ConfirmLabel) ConfirmLabel->SetText(LOCTEXT("Confirm","Confirm"));
+		if(CancelLabel) CancelLabel->SetText(LOCTEXT("Cancel","Cancel"));
 	}
 }
 

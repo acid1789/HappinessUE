@@ -9,9 +9,11 @@
 #include "Blueprint/WidgetTree.h"
 #include "Engine/Font.h"
 #include "HappinessClassic/DailyPuzzle.h"
+#include "HappinessClassic/PuzzleSlots.h"
 #include "Components/Image.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
+#include "UI/ConfirmDialogWidget.h"
 #include "UI/FireworksWidget.h"
 #include "UI/LessonsCompletePopup.h"
 #include "UI/PlayerLevelBadge.h"
@@ -25,6 +27,7 @@ UHappinessModeWidget::UHappinessModeWidget(const FObjectInitializer& ObjectIniti
 {
 	static ConstructorHelpers::FObjectFinder<USoundBase> Unlock(TEXT("/Game/General/Audio/Cues/PuzzleComplete.PuzzleComplete"));
 	UnlockSound = Unlock.Object;
+	ConfirmDialogClass = TSoftClassPtr<UConfirmDialogWidget>(FSoftObjectPath(TEXT("/Game/Happiness/UI/WBP_ConfirmDialog.WBP_ConfirmDialog_C")));
 }
 
 void UHappinessModeWidget::NativeConstruct()
@@ -446,7 +449,14 @@ void UHappinessModeWidget::HandleDailyClicked()
 	{
 		return;
 	}
+	if (!AskResumeOrAbandon(EPuzzleSlot::Daily, [this]() { PlayDaily(true); }, [this]() { PlayDaily(false); }))
+	{
+		PlayDaily(false);
+	}
+}
 
+void UHappinessModeWidget::PlayDaily(bool bResume)
+{
 	// Lessons and the daily puzzle don't mix
 	UCampaignSubsystem::StopPlayingLesson(this);
 	Hide();
@@ -455,6 +465,11 @@ void UHappinessModeWidget::HandleDailyClicked()
 	// Play it the way Free Play does: the game select screen this sits in has PlayHappiness(Number, Size, Difficulty)
 	int32 Number = 0, Size = 0, Difficulty = 0;
 	if (!UDailySubsystem::StartDaily(this, Number, Size, Difficulty))
+	{
+		return;
+	}
+	// Today's puzzle already started: carry on with it
+	if (bResume && ResumePuzzle(EPuzzleSlot::Daily))
 	{
 		return;
 	}
@@ -483,9 +498,138 @@ void UHappinessModeWidget::HandleDailyClicked()
 
 void UHappinessModeWidget::HandleClassicClicked()
 {
+	// Abandoned, the slot has no puzzle in progress, so Free Play opens its settings
+	if (!AskResumeOrAbandon(EPuzzleSlot::FreePlay, [this]() { PlayFreePlay(); }, [this]() { PlayFreePlay(); }))
+	{
+		PlayFreePlay();
+	}
+}
+
+void UHappinessModeWidget::PlayFreePlay()
+{
 	UDailySubsystem::StopDaily(this);
 	Hide();
+	// The game select screen goes on (WBP_GameSelect's ShowHappinessConfig): it loads the game save, which then holds
+	// Free Play's puzzle in progress, and resumes it, or with none opens the Free Play settings
+	UPuzzleSlotSubsystem* Slots = UPuzzleSlotSubsystem::Get(this);
+	if (Slots)
+	{
+		Slots->BeginResume(EPuzzleSlot::FreePlay);
+	}
 	OnClassicChosen.Broadcast();
+	if (Slots)
+	{
+		Slots->EndResume();
+	}
+}
+
+bool UHappinessModeWidget::AskResumeOrAbandon(EPuzzleSlot PuzzleSlot, TFunction<void()> OnResume, TFunction<void()> OnAbandon)
+{
+	UPuzzleSlotSubsystem* Slots = UPuzzleSlotSubsystem::Get(this);
+	if (!Slots || !Slots->CanResume(PuzzleSlot))
+	{
+		return false;
+	}
+	UConfirmDialogWidget* Dialog = GetConfirmDialog();
+	if (!Dialog)
+	{
+		// No dialog to ask with: carry on with the puzzle, as nothing is lost that way
+		OnResume();
+		return true;
+	}
+
+	FText Description;
+	switch (PuzzleSlot)
+	{
+	case EPuzzleSlot::Daily:
+		Description = LOCTEXT("DailyInProgress", "Today's daily puzzle is in progress. Abandoning it starts it again from the beginning.");
+		break;
+	case EPuzzleSlot::FreePlay:
+		Description = LOCTEXT("FreePlayInProgress", "You have a Free Play puzzle in progress. Abandoning it lets you choose a new one.");
+		break;
+	case EPuzzleSlot::Lessons:
+		Description = LOCTEXT("LessonInProgress", "You have a lesson puzzle in progress. Abandoning it takes you to the lessons.");
+		break;
+	default:
+		Description = LOCTEXT("CampaignInProgress", "You have a campaign puzzle in progress. Abandoning it takes you to the campaign.");
+		break;
+	}
+	TWeakObjectPtr<UHappinessModeWidget> WeakThis(this);
+	Dialog->Ask(LOCTEXT("ResumeQuestion", "Resume your puzzle?"), Description.ToString(),
+		[WeakThis, OnResume]()
+		{
+			if (WeakThis.IsValid())
+			{
+				OnResume();
+			}
+		},
+		[WeakThis, PuzzleSlot, OnAbandon]()
+		{
+			UPuzzleSlotSubsystem* AbandonSlots = WeakThis.IsValid() ? UPuzzleSlotSubsystem::Get(WeakThis.Get()) : nullptr;
+			if (AbandonSlots)
+			{
+				AbandonSlots->AbandonPuzzle(PuzzleSlot);
+				OnAbandon();
+			}
+		},
+		LOCTEXT("Resume", "Resume"), LOCTEXT("Abandon", "Abandon"));
+	return true;
+}
+
+UConfirmDialogWidget* UHappinessModeWidget::GetConfirmDialog()
+{
+	if (!ConfirmDialog)
+	{
+		UClass* DialogClass = ConfirmDialogClass.LoadSynchronous();
+		UCanvasPanel* Root = Cast<UCanvasPanel>(GetRootWidget());
+		ConfirmDialog = DialogClass && Root ? CreateWidget<UConfirmDialogWidget>(this, DialogClass) : nullptr;
+		if (UCanvasPanelSlot* DialogSlot = ConfirmDialog ? Root->AddChildToCanvas(ConfirmDialog) : nullptr)
+		{
+			// Over the whole screen, above everything else on it
+			DialogSlot->SetAnchors(FAnchors(0.f, 0.f, 1.f, 1.f));
+			DialogSlot->SetOffsets(FMargin(0.f));
+			DialogSlot->SetZOrder(60);
+		}
+		if (ConfirmDialog)
+		{
+			ConfirmDialog->SetVisibility(ESlateVisibility::Collapsed);
+		}
+	}
+	return ConfirmDialog;
+}
+
+bool UHappinessModeWidget::ResumePuzzle(EPuzzleSlot PuzzleSlot)
+{
+	UPuzzleSlotSubsystem* Slots = UPuzzleSlotSubsystem::Get(this);
+	FPuzzleSlotInfo Info;
+	if (!Slots || !Slots->CanResume(PuzzleSlot, &Info))
+	{
+		return false;
+	}
+	if (PuzzleSlot == EPuzzleSlot::Lessons || PuzzleSlot == EPuzzleSlot::Campaign)
+	{
+		// Back into its lesson session, so the puzzle set up is that one again
+		UCampaignSubsystem* Campaign = UCampaignSubsystem::Get(this);
+		if (!Campaign || !Campaign->ResumeLessonPuzzle(PuzzleSlot == EPuzzleSlot::Campaign ? ECampaignMode::Campaign : ECampaignMode::Lessons,
+			Info.Lesson, Info.Stage, Info.Seed))
+		{
+			return false;
+		}
+	}
+
+	// The game select screen this sits in (WBP_GameSelect) resumes the puzzle its load of the game save finds
+	UUserWidget* Screen = GetTypedOuter<UUserWidget>();
+	UFunction* Resume = Screen ? Screen->FindFunction(TEXT("ShowHappinessConfig")) : nullptr;
+	if (!Resume || Resume->ParmsSize > 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Resuming a puzzle: the screen holding the mode screen has no ShowHappinessConfig"));
+		return false;
+	}
+	Hide();
+	Slots->BeginResume(PuzzleSlot);
+	Screen->ProcessEvent(Resume, nullptr);
+	Slots->EndResume();
+	return true;
 }
 
 void UHappinessModeWidget::HandleLessonsClicked()
@@ -499,6 +643,25 @@ void UHappinessModeWidget::HandleCampaignClicked()
 }
 
 void UHappinessModeWidget::OpenTree(ECampaignMode Mode)
+{
+	// A lesson puzzle in progress in this track: back into it, or abandon it for the tree
+	const EPuzzleSlot PuzzleSlot = Mode == ECampaignMode::Campaign ? EPuzzleSlot::Campaign : EPuzzleSlot::Lessons;
+	if (!AskResumeOrAbandon(PuzzleSlot,
+		[this, Mode, PuzzleSlot]()
+		{
+			UDailySubsystem::StopDaily(this);
+			if (!ResumePuzzle(PuzzleSlot))
+			{
+				ShowTree(Mode);
+			}
+		},
+		[this, Mode]() { ShowTree(Mode); }))
+	{
+		ShowTree(Mode);
+	}
+}
+
+void UHappinessModeWidget::ShowTree(ECampaignMode Mode)
 {
 	UDailySubsystem::StopDaily(this);
 	if (UCampaignSubsystem* Campaign = UCampaignSubsystem::Get(this))

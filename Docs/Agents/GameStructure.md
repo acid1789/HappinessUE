@@ -2,8 +2,11 @@
 
 ## Modes
 
-From the game select screen, **Happiness** opens the mode screen (`WBP_HappinessMode`), unless a puzzle is in
-progress, in which case it goes straight back into that puzzle.
+The game always starts on the mode screen (`WBP_HappinessMode`). Each mode (Daily, Free Play, Lessons, Campaign)
+keeps its own puzzle in progress: choosing a mode with one asks whether to resume or abandon it (a `WBP_ConfirmDialog`
+the mode screen makes, `UHappinessModeWidget::AskResumeOrAbandon`), otherwise it goes into that mode's menus (see
+[Save data](#save-data)). Abandoning drops the puzzle from its slot (`UPuzzleSlotSubsystem::AbandonPuzzle`), then
+goes on as if there were none: Daily starts over, Free Play opens its settings, Lessons and Campaign open the tree.
 
 | Mode | What it is | Key code |
 |---|---|---|
@@ -55,8 +58,8 @@ The widget builds its own layout in C++ (`RebuildWidget`) with the existing hint
 The player controller `General/Blueprints/PC_Happiness` starts, loads and saves puzzles and holds the player's
 level and EXP (`HappinessLevel`, `HappinessExp`). Its `InputMode` (mouse, or touch on Android and iOS) must be set
 before any puzzle screen exists, so BeginPlay sets it first: `WBP_GamePanel` wires each cell for the mode when it
-builds the grid (touch: `Button_Cell` opens the cell dialog; mouse: the icons take clicks), and the game resumes a
-saved puzzle as soon as `WBP_GameSelect` is added to the viewport. Set after that, a resumed grid takes no taps.
+builds the grid (touch: `Button_Cell` opens the cell dialog; mouse: the icons take clicks). Set after that, a grid
+takes no taps.
 
 ## Puzzle code (`Source/Happiness/HappinessClassic/`)
 
@@ -121,9 +124,22 @@ already showing. No screen handles back itself.
 
 ## Save data
 
-Everything lives in one save slot, `HappinessSave`, written by `SG_Happiness` (parent class
-`UHappinessSaveGame`). It holds the puzzle in progress (resumed on relaunch), the lesson and campaign progress,
-the Free Play settings and pace, and the player's level. Each lesson's progress includes the time spent on its
+The game save is the slot `HappinessSave`, written by `SG_Happiness` (parent class `UHappinessSaveGame`). It holds
+the lesson and campaign progress, the Free Play settings and pace, and the player's level.
+
+Puzzles in progress have a slot per mode, `HappinessPuzzle_Daily`, `_FreePlay`, `_Lessons` and `_Campaign`
+(`UPuzzleSlotSubsystem`, `HappinessClassic/PuzzleSlots.*`): each an `SG_Happiness` holding just that mode's puzzle
+(every `SG_Happiness` variable but `Level` and `Experience`) and `FPuzzleSlotInfo` (the lesson, stage and seed of a
+lesson puzzle, the date of a daily one). `PC_Happiness`'s `SaveHappiness` still writes the whole game save, on every
+move; as it is written its puzzle is copied into the slot of the mode the puzzle was started in
+(`UPuzzleSlotSubsystem::NotePuzzleStarted`, called by `UCampaignSubsystem::InitPuzzleForPlay`). Resuming calls `UHappinessModeWidget::ResumePuzzle` (Free Play always goes through `WBP_GameSelect`'s `ShowHappinessConfig`,
+which resumes or opens the settings): between `BeginResume` and `EndResume`, loading the game save
+(`PC_Happiness`'s `LoadHappiness`) copies that slot's puzzle into it. A slot resumes while its puzzle can still be
+played: today's unsolved daily; a lesson puzzle whose stage is still on that seed
+(`UCampaignSubsystem::ResumeLessonPuzzle` restores its session). Finishing a puzzle (`HappinessFinished`) saves no
+puzzle into its slot. The pause menu's Main Menu saves the puzzle, like Save and Quit, rather than dropping it.
+`UHappinessSaveGame::HasActivePuzzle` is now always false, so `WBP_GameSelect` never resumes at startup. A save from
+before slots has its puzzle moved into the slot of the mode it was being played in (`MigrateOldSave`). Each lesson's progress includes the time spent on its
 puzzles (`FLessonProgress::PlaySeconds`, counted by `UCampaignSubsystem::TickPlayTime` while one is on screen,
 unpaused and unsolved), shown on the lesson popup left of its Back / Return to Lessons button.
 

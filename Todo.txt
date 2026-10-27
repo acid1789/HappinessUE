@@ -20,17 +20,18 @@ Streak Saver Backing
 
 --- Dev tasks ---
 Icon Set Selections
-Finish Lessons
 Master Rewards
-Total Play Time
-Rotate Not Overlay
 Final Unlock has empty box
+New Game
+Hint Clue Effect needs to be bound to clue
+No Hints on Master Stages
 
 --- Art Tasks ---
 Streak Saver Art
 Options Menu Visuals
 Selection isnt noticable
 Game Rules
+Finish Lesson Fireworks
 
 
 

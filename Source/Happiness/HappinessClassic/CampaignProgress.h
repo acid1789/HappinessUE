@@ -338,6 +338,18 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Campaign")
 	FLessonPuzzleResult FinishLessonPuzzle(UPuzzle* Puzzle);
 
+	/** Seed of the stage's open (or next) puzzle in the current mode, for its puzzle slot (UPuzzleSlotSubsystem) */
+	int32 GetStageSeed(ECampaignLesson Lesson, int32 Stage) const;
+
+	/** A lesson puzzle saved in its mode's puzzle slot can still be resumed: the stage's open puzzle is still Seed */
+	bool CanResumeLessonPuzzle(ECampaignMode Mode, ECampaignLesson Lesson, int32 Stage, int32 Seed) const;
+
+	/**
+	 * Back into the session of a lesson puzzle saved in its mode's puzzle slot, switching to Mode, so the next lesson
+	 * puzzle set up (InitPuzzleForPlay) is that one again. Saves. False if it can't be resumed.
+	 */
+	bool ResumeLessonPuzzle(ECampaignMode Mode, ECampaignLesson Lesson, int32 Stage, int32 Seed);
+
 	/** Leave the lesson session (e.g. a classic game is starting) */
 	UFUNCTION(BlueprintCallable, Category = "Campaign")
 	void EndLessonSession();

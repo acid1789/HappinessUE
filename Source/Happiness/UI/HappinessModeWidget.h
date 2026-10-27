@@ -3,9 +3,11 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "HappinessClassic/CampaignProgress.h"
+#include "HappinessClassic/PuzzleSlots.h"
 #include "HappinessModeWidget.generated.h"
 
 class UButton;
+class UConfirmDialogWidget;
 class UFireworksWidget;
 class ULessonsCompletePopup;
 class USoundBase;
@@ -19,6 +21,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnHappinessModeEvent);
 /**
  * Happiness mode select, between the game select screen and playing: Classic (the classic puzzle flow)
  * or Lessons (the campaign tree). The owner reacts to the events; the screen just hides itself.
+ * Each mode resumes its own puzzle in progress, if it has one (UPuzzleSlotSubsystem), rather than its menus.
  */
 UCLASS(Abstract)
 class HAPPINESS_API UHappinessModeWidget : public UUserWidget
@@ -82,6 +85,10 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Lessons Complete")
 	TObjectPtr<USoundBase> UnlockSound;
 
+	/** The dialog that asks whether to resume or abandon a mode's puzzle in progress (WBP_ConfirmDialog) */
+	UPROPERTY(EditAnywhere, Category = "Happiness Mode")
+	TSoftClassPtr<UConfirmDialogWidget> ConfirmDialogClass;
+
 protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
@@ -123,6 +130,10 @@ protected:
 	UPROPERTY(Transient)
 	TObjectPtr<ULessonsCompletePopup> LessonsCompletePopup;
 
+	/** Asks whether to resume a puzzle in progress, over the whole screen (made the first time it's needed) */
+	UPROPERTY(Transient)
+	TObjectPtr<UConfirmDialogWidget> ConfirmDialog;
+
 private:
 	UFUNCTION()
 	void RefreshAdRemoval();
@@ -161,6 +172,23 @@ private:
 	void RefreshDaily();
 
 	void OpenTree(ECampaignMode Mode);
+
+	/** PuzzleSlot's puzzle in progress, if it can be resumed: hide and play it. False if there's none. */
+	bool ResumePuzzle(EPuzzleSlot PuzzleSlot);
+
+	/**
+	 * PuzzleSlot has a puzzle in progress: ask whether to resume it (OnResume) or abandon it (it's dropped from its
+	 * slot, then OnAbandon). False, asking nothing, if there's none.
+	 */
+	bool AskResumeOrAbandon(EPuzzleSlot PuzzleSlot, TFunction<void()> OnResume, TFunction<void()> OnAbandon);
+	UConfirmDialogWidget* GetConfirmDialog();
+
+	/** Today's daily puzzle: its puzzle in progress if bResume and there is one, otherwise from the start */
+	void PlayDaily(bool bResume);
+	/** On to Free Play: its puzzle in progress, or its settings */
+	void PlayFreePlay();
+	/** The lesson tree in Mode */
+	void ShowTree(ECampaignMode Mode);
 	void RefreshCampaignLock();
 
 	/** Every lesson's completion: the congratulations, with fireworks over them */

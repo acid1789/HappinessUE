@@ -4,6 +4,7 @@
 #include "HappinessSaveGame.h"
 #include "FreePlaySettings.h"
 #include "DailyPuzzle.h"
+#include "PuzzleSlots.h"
 
 #include "Blueprint/UserWidget.h"
 #include "Engine/GameInstance.h"
@@ -580,6 +581,40 @@ bool UCampaignSubsystem::ConsumeLessonCompletion(ECampaignLesson& Lesson)
 	return true;
 }
 
+int32 UCampaignSubsystem::GetStageSeed(ECampaignLesson Lesson, int32 Stage) const
+{
+	const FLessonProgress* Progress = GetProgressMap().Find(Lesson);
+	return Progress && Progress->NextSeed.IsValidIndex(Stage) ? Progress->NextSeed[Stage] : 0;
+}
+
+bool UCampaignSubsystem::CanResumeLessonPuzzle(ECampaignMode Mode, ECampaignLesson Lesson, int32 Stage, int32 Seed) const
+{
+	// Solving the puzzle moved the stage on to its next seed
+	const FLessonProgress* Progress = (Mode == ECampaignMode::Campaign ? Data.CampaignLessons : Data.Lessons).Find(Lesson);
+	return Progress && Progress->NextSeed.IsValidIndex(Stage) && Progress->NextSeed[Stage] == Seed &&
+		(Mode == ECampaignMode::Lessons || IsCampaignModeUnlocked());
+}
+
+bool UCampaignSubsystem::ResumeLessonPuzzle(ECampaignMode Mode, ECampaignLesson Lesson, int32 Stage, int32 Seed)
+{
+	if (!CanResumeLessonPuzzle(Mode, Lesson, Stage, Seed))
+	{
+		return false;
+	}
+	SetMode(Mode);
+	if (!IsStageUnlocked(Lesson, Stage))
+	{
+		return false;
+	}
+	Data.bInSession = true;
+	Data.SessionLesson = Lesson;
+	Data.SessionStage = Stage;
+	Data.bPuzzleOpen = true;
+	Data.OpenSeed = Seed;
+	Save();
+	return true;
+}
+
 void UCampaignSubsystem::EndLessonSession()
 {
 	if (Data.bInSession)
@@ -695,6 +730,7 @@ void UCampaignSubsystem::InitPuzzleForPlay(const UObject* WorldContextObject, UP
 	{
 		if (Campaign->StartLessonPuzzle(Campaign->GetSessionLesson(), Campaign->GetSessionStage(), Puzzle))
 		{
+			UPuzzleSlotSubsystem::NotePuzzleStarted(WorldContextObject);
 			return;
 		}
 		// The lesson can't be played any more (shouldn't happen); fall back to a classic puzzle
@@ -709,6 +745,7 @@ void UCampaignSubsystem::InitPuzzleForPlay(const UObject* WorldContextObject, UP
 		Puzzle->m_ExcludedClues = Daily.ExcludedClueMask;
 		Puzzle->Init(Daily.Seed, Daily.Size, Daily.Difficulty);
 		Puzzle->GetRating();
+		UPuzzleSlotSubsystem::NotePuzzleStarted(WorldContextObject);
 		return;
 	}
 
@@ -721,6 +758,7 @@ void UCampaignSubsystem::InitPuzzleForPlay(const UObject* WorldContextObject, UP
 
 	// Rate it now, while the player is starting, rather than on the end screen
 	Puzzle->GetRating();
+	UPuzzleSlotSubsystem::NotePuzzleStarted(WorldContextObject);
 }
 
 bool UCampaignSubsystem::HandlePuzzleFinished(const UObject* WorldContextObject, UPuzzle* Puzzle)
