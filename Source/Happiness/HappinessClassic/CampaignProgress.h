@@ -276,6 +276,10 @@ public:
 	/** Generator seed for a stage's Seed-th puzzle; distinct for every mode, lesson and stage */
 	static int32 GetGenerationSeed(ECampaignMode Mode, ECampaignLesson Lesson, int32 Stage, int32 Seed);
 
+	/** Puzzles UPuzzle::InitCampaign makes for a stage, keeping the one with the longest solve: MasterCandidates on Master Mode stages, else 1 */
+	static int32 GetGenerationCandidates(ECampaignMode Mode, int32 Stage);
+	static constexpr int32 MasterCandidates = 3;
+
 	// ---- Progress ----
 
 	UFUNCTION(BlueprintPure, Category = "Campaign")

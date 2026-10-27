@@ -22,7 +22,7 @@ void UPuzzle::Init(int Seed, int Size, int Difficulty)
 	Generate();
 }
 
-bool UPuzzle::InitCampaign(int Seed, int Size, int Difficulty, ECampaignLesson Lesson, bool bAllClueTypes)
+bool UPuzzle::InitCampaign(int Seed, int Size, int Difficulty, ECampaignLesson Lesson, bool bAllClueTypes, int Candidates)
 {
 	if (!IsLessonAvailable(Lesson, Size))
 	{
@@ -44,13 +44,40 @@ bool UPuzzle::InitCampaign(int Seed, int Size, int Difficulty, ECampaignLesson L
 
 	m_Rand.Initialize(Seed);
 
-	// Keep generating from the same random stream until the lesson's clues are needed to solve the puzzle
-	for (int Attempt = 0; Attempt < 50; Attempt++)
+	// Keep generating from the same random stream until the lesson's clues are needed to solve the puzzle (Candidates
+	// times, keeping the one with the longest solve). Generate builds everything from the stream, so the best one is
+	// rebuilt from the stream as it was before it.
+	FRandomStream BestStream;
+	int32 BestSteps = -1;
+	int32 Found = 0;
+	for (int Attempt = 0; Attempt < 50 && Found < FMath::Max(Candidates, 1); Attempt++)
 	{
+		const FRandomStream Before = m_Rand;
 		Generate();
 
-		if (RequiresLesson(Lesson))
+		if (!RequiresLesson(Lesson))
+			continue;
+		Found++;
+		if (Candidates <= 1)
 			return true;
+
+		const FRandomStream After = m_Rand;
+		const int32 Steps = ComputeRating().Steps;
+		m_Rand = After;
+		if (Steps > BestSteps)
+		{
+			BestSteps = Steps;
+			BestStream = Before;
+		}
+	}
+
+	if (Found > 0)
+	{
+		m_Rand = BestStream;
+		Generate();
+		m_HintsUsed = m_LessonHintsUsed = 0;
+		m_Rating = -1.f;
+		return true;
 	}
 
 	UE_LOG(LogTemp, Warning, TEXT("InitCampaign: no puzzle requiring lesson %s (seed %d, size %d)"),

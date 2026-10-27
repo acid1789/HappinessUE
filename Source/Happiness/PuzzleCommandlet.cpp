@@ -465,7 +465,8 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 		if (bCampaign)
 		{
 			P.m_LessonClueBiasOverride = LessonBias;
-			if (!P.InitCampaign(Stage >= 0 ? UCampaignSubsystem::GetGenerationSeed(TrackMode, Lesson, Stage, Seed) : Seed, Size, Diff, Lesson, TrackMode == ECampaignMode::Campaign))
+			if (!P.InitCampaign(Stage >= 0 ? UCampaignSubsystem::GetGenerationSeed(TrackMode, Lesson, Stage, Seed) : Seed, Size, Diff, Lesson, TrackMode == ECampaignMode::Campaign,
+				Stage >= 0 ? UCampaignSubsystem::GetGenerationCandidates(TrackMode, Stage) : 1))
 				CampaignFails++;
 		}
 		else

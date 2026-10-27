@@ -406,6 +406,12 @@ int32 UCampaignSubsystem::GetGenerationSeed(ECampaignMode Mode, ECampaignLesson 
 	return Mode == ECampaignMode::Campaign ? (Seeds | (1 << 28)) : Seeds;
 }
 
+int32 UCampaignSubsystem::GetGenerationCandidates(ECampaignMode Mode, int32 Stage)
+{
+	// Master puzzles can come out much easier than their size and difficulty suggest: pick the longest of a few
+	return Stage >= GetNumStagesFor(Mode) && GetMasterStages(Mode).Num() > 0 ? MasterCandidates : 1;
+}
+
 bool UCampaignSubsystem::StartLessonPuzzle(ECampaignLesson Lesson, int32 Stage, UPuzzle* Puzzle)
 {
 	if (!Puzzle || !IsStageUnlocked(Lesson, Stage) || !UPuzzle::IsLessonAvailable(Lesson, GetStageSize(Stage)))
@@ -422,7 +428,8 @@ bool UCampaignSubsystem::StartLessonPuzzle(ECampaignLesson Lesson, int32 Stage, 
 	const bool bAllClueTypes = Data.Mode == ECampaignMode::Campaign;
 	for (int32 Attempt = 0; Attempt < 20; Attempt++, Seed++)
 	{
-		if (!Puzzle->InitCampaign(GetGenerationSeed(Data.Mode, Lesson, Stage, Seed), GetStageSize(Stage), GetStageDifficulty(Stage), Lesson, bAllClueTypes))
+		if (!Puzzle->InitCampaign(GetGenerationSeed(Data.Mode, Lesson, Stage, Seed), GetStageSize(Stage), GetStageDifficulty(Stage), Lesson, bAllClueTypes,
+			GetGenerationCandidates(Data.Mode, Stage)))
 		{
 			continue;
 		}

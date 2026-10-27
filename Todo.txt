@@ -16,21 +16,21 @@ Usage Analytics
 Quit to lessons?
 Campaign
 Streak Saver Backing
+Game Rules
 
 --- Dev tasks ---
 Icon Set Selections
-Master Rewards
+Master Reward Animation
 Final Unlock has empty box
 New Game
-Hint Clue Effect needs to be bound to clue
 Master Erase
 Master Difficulty
+Mastered Text doent fit in the box
 
 --- Art Tasks ---
 Streak Saver Art
 Options Menu Visuals
 Selection isnt noticable
-Game Rules
 Finish Lesson Fireworks
 
 
