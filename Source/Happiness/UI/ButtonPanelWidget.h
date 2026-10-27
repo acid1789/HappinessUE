@@ -9,7 +9,8 @@ class UWidget;
 /**
  * The puzzle's side button panel. When the player hasn't touched anything for a while, the hint button gives a
  * small wiggle (a little left, a little right, back), again every IdleSeconds while they stay idle, unless the
- * player turned "Animate Hint Button" off in the options.
+ * player turned "Animate Hint Button" off in the options. On Master Mode stages hints aren't allowed: the hint button
+ * is disabled and keeps still (UCampaignSubsystem::AreHintsAllowed).
  */
 UCLASS(Abstract)
 class HAPPINESS_API UButtonPanelWidget : public UUserWidget

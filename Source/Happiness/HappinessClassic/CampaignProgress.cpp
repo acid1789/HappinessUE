@@ -711,6 +711,12 @@ void UCampaignSubsystem::ResetAllProgress()
 	OnProgressChanged.Broadcast();
 }
 
+bool UCampaignSubsystem::AreHintsAllowed(const UObject* WorldContextObject)
+{
+	const UCampaignSubsystem* Campaign = Get(WorldContextObject);
+	return !Campaign || !Campaign->IsInLessonSession() || !IsMasterStage(Campaign->GetSessionStage());
+}
+
 UCampaignSubsystem* UCampaignSubsystem::Get(const UObject* WorldContextObject)
 {
 	const UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull) : nullptr;

@@ -15,7 +15,6 @@ Usage Analytics
 --- Design Tasks ---
 Quit to lessons?
 Campaign
-Deal with active puzzle/daily notification
 Streak Saver Backing
 
 --- Dev tasks ---

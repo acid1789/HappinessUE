@@ -3,6 +3,7 @@
 #include "Components/Widget.h"
 #include "Framework/Application/SlateApplication.h"
 #include "GameFramework/PlayerController.h"
+#include "HappinessClassic/CampaignProgress.h"
 
 void UButtonPanelWidget::NativeConstruct()
 {
@@ -13,7 +14,18 @@ void UButtonPanelWidget::NativeConstruct()
 void UButtonPanelWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
-	if (!Button_H || !FSlateApplication::IsInitialized() || IdleSeconds <= 0.f || WiggleSeconds <= 0.f)
+	if (!Button_H || !FSlateApplication::IsInitialized())
+	{
+		return;
+	}
+
+	// No hints on Master Mode stages
+	const bool bHintsAllowed = UCampaignSubsystem::AreHintsAllowed(this);
+	if (Button_H->GetIsEnabled() != bHintsAllowed)
+	{
+		Button_H->SetIsEnabled(bHintsAllowed);
+	}
+	if (IdleSeconds <= 0.f || WiggleSeconds <= 0.f)
 	{
 		return;
 	}
@@ -25,7 +37,7 @@ void UButtonPanelWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTi
 	// A wiggle at every IdleSeconds of idle time: left, right, back to straight. Off when the player turned
 	// "Animate Hint Button" off in the options.
 	float Angle = 0.f;
-	if (Idle >= IdleSeconds && IsAnimationEnabled())
+	if (bHintsAllowed && Idle >= IdleSeconds && IsAnimationEnabled())
 	{
 		const double Into = FMath::Fmod(Idle, (double)IdleSeconds);
 		if (Into < WiggleSeconds)
