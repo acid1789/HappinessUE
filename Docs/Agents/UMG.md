@@ -88,6 +88,8 @@ python Tools/umg.py reorder_widget_tree '{"root": "Content", "tree": "[\"TitleTe
   content (text) of an earlier child can draw over a later overlay. Overlays and popups need a higher
   `Slot.ZOrder`. Current values in `WBP_Happiness`: `HintInfo` 10, end screens 20. In `WBP_GameSelect`:
   `HappinessMode` 5, `CampaignTree` 10.
+  It bites code-built layouts too: in `UPlayerInfoPanel` a translucent tray placed before the reward row at the
+  same ZOrder drew over the rewards and washed them out; the tray is Z 1, the row Z 2.
 - **Rotating a widget at runtime:** Slate rounds every corner of a drawn image to a whole pixel after the render
   transform, so a slowly turning image seems to pulse in size as its corners snap one by one. Turn snapping off on
   that widget (`SetPixelSnapping(EWidgetPixelSnapping::Disabled)`, as `UClueWidget` does for the clues' "not" mark).

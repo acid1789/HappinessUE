@@ -13,7 +13,8 @@ class UTexture2D;
  * center, ringed by one icon per lesson tree column. A column's icon shows once every clue in it has completed
  * Campaign Master Mode (UCampaignSubsystem::IsMasterColumnCompleted); until then its place is empty.
  * Builds its own widgets (no Blueprint layout). Without art (SunTexture, IconTextures) it draws placeholders.
- * Display only: it never takes a touch, so the menu under it keeps working.
+ * Display only: it never takes a touch, so the menu under it keeps working. The mode screen puts a button over the
+ * sun (SetTapTarget) that opens the player info (UI/PlayerInfoPanel).
  *
  * UHappinessModeWidget puts it in the main menu (WBP_GameSelect's MainCanvas), behind the menu's screens, so it stays
  * up on all of them; it is hidden while CoveredBy (the puzzle screen) shows.
@@ -35,6 +36,15 @@ public:
 
 	/** Hidden while this widget is visible (and refreshed when it goes, as the level changes in games) */
 	void SetCoveredBy(UWidget* Widget) { CoveredBy = Widget; }
+
+	/** What takes the taps on the sun for the badge (it takes none itself): hidden with the badge while it's covered */
+	void SetTapTarget(UWidget* Widget) { TapTarget = Widget; }
+
+	/** Where the sun's center is in the badge */
+	static FVector2D GetSunCenter() { return FVector2D(BadgeSize * 0.5f); }
+
+	/** Master reward Index (clockwise from the top) from the 4x3 reward atlas, Size across */
+	static FSlateBrush MakeRewardBrush(UTexture2D* Atlas, int32 Index, float Size);
 
 	/** The sun behind the level; a gold disc while unset */
 	UPROPERTY(EditAnywhere, Category = "Player Level")
@@ -67,5 +77,6 @@ private:
 	TArray<TObjectPtr<UImage>> Icons;
 
 	TWeakObjectPtr<UWidget> CoveredBy;
+	TWeakObjectPtr<UWidget> TapTarget;
 	bool bCovered = false;
 };
