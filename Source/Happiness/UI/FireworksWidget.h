@@ -8,7 +8,8 @@
  * Code-drawn fireworks: rockets rise and burst into sparks that slow, fall and fade. Place it over the area they may
  * fill (it draws anywhere inside itself) and call Play with where to burst; the owner advances it every frame
  * (Advance), so it costs nothing while idle. The mode screen plays it over the Campaign button when every lesson has
- * been completed (UHappinessModeWidget).
+ * been completed (UHappinessModeWidget); the completed Master popup keeps it going while its reward waits
+ * (ULessonPopupWidget, with AddBursts).
  */
 UCLASS()
 class HAPPINESS_API UFireworksWidget : public UWidget
@@ -26,6 +27,15 @@ public:
 
 	/** Start the bursts. Scale sizes the sparks and their spread (1: about a 500-unit-wide button's worth). */
 	void Play(const TArray<FBurst>& InBursts, float InScale);
+
+	/**
+	 * More bursts after the ones playing (delays from now), keeping what is already in the air: call again when
+	 * HasBurstsLeft is false to keep the fireworks going. Starts them, as Play, if nothing is playing.
+	 */
+	void AddBursts(const TArray<FBurst>& InBursts, float InScale);
+
+	/** A rocket is still to burst */
+	bool HasBurstsLeft() const { return NextBurst < Bursts.Num(); }
 
 	/** Move the fireworks on by DeltaTime and redraw */
 	void Advance(float DeltaTime);

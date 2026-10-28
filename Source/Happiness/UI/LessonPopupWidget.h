@@ -24,6 +24,7 @@ class UPlayerLevelBadge;
 class UNativeWidgetHost;
 class UTextureRenderTarget2D;
 class SMasterCollapseMesh;
+class UFireworksWidget;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnLessonStageChosen, ECampaignLesson, Lesson, int32, Stage);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnLessonPopupClosed);
@@ -210,6 +211,13 @@ protected:
 private:
 	void ResetMasterCollapse();
 	void TickMasterCollapse(float DeltaTime);
+	/** While the completed Master popup's reward waits to go to the sun (Return to Campaign), fireworks over it, on and on */
+	void TickMasterFireworks(float DeltaTime);
+	bool QueueMasterFireworks();
+	/** The menu's badge, holding this clue's Master reward back for the popup to send it (null if it isn't) */
+	UPlayerLevelBadge* GetPendingRewardBadge() const;
+	UPROPERTY(Transient) TObjectPtr<UFireworksWidget> MasterFireworks;
+	mutable TWeakObjectPtr<UPlayerLevelBadge> RewardBadge;
 	float CollapseElapsed = -1.f;
 	TWeakObjectPtr<UPlayerLevelBadge> CollapseBadge;
 	int32 CollapseColumn = INDEX_NONE;

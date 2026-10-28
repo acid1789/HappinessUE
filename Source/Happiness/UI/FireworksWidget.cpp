@@ -133,6 +133,26 @@ void UFireworksWidget::Play(const TArray<FBurst>& InBursts, float InScale)
 	Random.GenerateNewSeed();
 }
 
+void UFireworksWidget::AddBursts(const TArray<FBurst>& InBursts, float InScale)
+{
+	if (!IsPlaying() && Flashes.Num() == 0)
+	{
+		Play(InBursts, InScale);
+		return;
+	}
+	// The bursts already gone are done with; the colors carry on round from where they were
+	const int32 Gone = NextBurst - NextBurst % UE_ARRAY_COUNT(BurstColors);
+	Bursts.RemoveAt(0, Gone);
+	NextBurst -= Gone;
+	for (FBurst Burst : InBursts)
+	{
+		Burst.Delay += Time;
+		Bursts.Add(Burst);
+	}
+	Bursts.Sort([](const FBurst& A, const FBurst& B) { return A.Delay < B.Delay; });
+	Scale = FMath::Max(InScale, 0.05f);
+}
+
 void UFireworksWidget::Stop()
 {
 	Bursts.Reset();

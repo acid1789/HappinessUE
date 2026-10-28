@@ -16,11 +16,11 @@ Usage Analytics
 Campaign
 Streak Saver Backing
 Game Rules
+Icon Set Selections
 
 --- Dev tasks ---
-Icon Set Selections
 Campaign Completion
-Final Campaign Unlock has empty box
+Power Button Pause
 
 --- Art Tasks ---
 Streak Saver Art
@@ -28,6 +28,7 @@ Options Menu Visuals
 Player Info Menu
 Finish Lesson Fireworks
 Master Erase
+Master Completion Sounds
 
 
 
