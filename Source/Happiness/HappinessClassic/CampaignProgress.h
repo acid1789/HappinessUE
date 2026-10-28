@@ -419,6 +419,9 @@ public:
 	 */
 	void DebugSetMaster(ECampaignLesson Lesson, int32 MasterPoints);
 
+	/** Debug: drop the celebrations waiting to play (a lesson's, every lesson's, the campaign's), as if already seen */
+	void DebugSkipCelebrations();
+
 	/** Debug: clear the current mode's progress, leaving the other mode's alone. Saves. */
 	void DebugResetMode();
 

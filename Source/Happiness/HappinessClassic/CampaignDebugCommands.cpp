@@ -13,7 +13,9 @@
 //
 //   Happiness.Campaign.<the same>             the same for the campaign (points are solved puzzles there)
 //   Happiness.Campaign.Master <Lesson> <N>    complete it and set its Master Mode puzzles solved (shown already)
-//   Happiness.Campaign.MasterAll              complete every lesson and all of its Master Mode puzzles
+//   Happiness.Campaign.MasterAll              complete every lesson and all of its Master Mode puzzles, as if
+//                                             everything had already been celebrated: every gem in place on the
+//                                             sun, the icon sets unlocked, Master Mode shown in every lesson
 //   Happiness.Campaign.CompleteAll            complete every lesson, the last as if just played: the campaign's
 //                                             congratulations play (a showing tree first celebrates the last lesson)
 //
@@ -24,6 +26,7 @@
 #include "CampaignTree.h"
 #include "UI/CampaignTreeWidget.h"
 #include "UI/HappinessModeWidget.h"
+#include "UI/PlayerLevelBadge.h"
 
 #include "HAL/IConsoleManager.h"
 #include "UObject/UObjectIterator.h"
@@ -323,14 +326,25 @@ namespace
 					}
 				});
 
-			AddCommand(CampaignTrack, TEXT("MasterAll"), TEXT(": completes every lesson and all of its Master Mode puzzles"),
-				[](UCampaignSubsystem& Campaign, const FTrack&, const TArray<FString>&, UWorld*, FOutputDevice& Ar)
+			AddCommand(CampaignTrack, TEXT("MasterAll"), TEXT(": completes every lesson and all of its Master Mode puzzles, everything already celebrated"),
+				[](UCampaignSubsystem& Campaign, const FTrack&, const TArray<FString>&, UWorld* World, FOutputDevice& Ar)
 				{
 					for (const TArray<ECampaignLesson>& Column : UCampaignTree::GetColumns())
 					{
 						for (ECampaignLesson Lesson : Column)
 						{
+							// Also marks Master Mode as shown, so no stage window replays its reveal
 							Campaign.DebugSetMaster(Lesson, UCampaignSubsystem::GetMasterMaxPoints());
+						}
+					}
+					// The end state, not the way there: no Lessons/Campaign Complete popups, no gems waiting on a
+					// Mastered window to fly in (the icon sets follow the progress by themselves)
+					Campaign.DebugSkipCelebrations();
+					for (TObjectIterator<UPlayerLevelBadge> Badge; Badge; ++Badge)
+					{
+						if (Badge->GetWorld() == World)
+						{
+							Badge->SkipPendingRewards();
 						}
 					}
 					Ar.Log(TEXT("Every lesson mastered"));

@@ -753,6 +753,13 @@ void UCampaignSubsystem::DebugSetMaster(ECampaignLesson Lesson, int32 MasterPoin
 	OnProgressChanged.Broadcast();
 }
 
+void UCampaignSubsystem::DebugSkipCelebrations()
+{
+	UncelebratedLesson.Reset();
+	bLessonsCompletionPending = false;
+	bCampaignCompletionPending = false;
+}
+
 void UCampaignSubsystem::DebugResetMode()
 {
 	(Data.Mode == ECampaignMode::Campaign ? Data.CampaignLessons : Data.Lessons).Reset();

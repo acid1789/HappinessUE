@@ -39,6 +39,9 @@ public:
 	bool GetPendingMasterReward(int32 Column, FGeometry& OutGeometry) const;
 	void RevealMasterReward(int32 Column);
 
+	/** Debug (Happiness.Campaign.MasterAll): every gem earned so far is already in place, without its reveal */
+	void SkipPendingRewards();
+
 	/** Hidden while this widget is visible (and refreshed when it goes, as the level changes in games) */
 	void SetCoveredBy(UWidget* Widget) { CoveredBy = Widget; }
 
