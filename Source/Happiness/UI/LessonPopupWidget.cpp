@@ -33,6 +33,9 @@
 #include "Rendering/DrawElements.h"
 #include "Styling/CoreStyle.h"
 #include "UObject/ConstructorHelpers.h"
+#include "Components/AudioComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "Sound/SoundBase.h"
 #include "Widgets/SLeafWidget.h"
 #include "Components/NativeWidgetHost.h"
 #include "Engine/TextureRenderTarget2D.h"
@@ -256,6 +259,10 @@ ULessonPopupWidget::ULessonPopupWidget(const FObjectInitializer& ObjectInitializ
 	NotebookButtonTexture = Buttons.Object;
 	NotebookLockTexture = Lock.Object;
 	NotebookFont = Font.Object;
+	static ConstructorHelpers::FObjectFinder<USoundBase> Erase(TEXT("/Game/Happiness/Audio/SFX_MasterErase.SFX_MasterErase"));
+	static ConstructorHelpers::FObjectFinder<USoundBase> Draw(TEXT("/Game/Happiness/Audio/SFX_MasterDraw.SFX_MasterDraw"));
+	EraseSound = Erase.Object;
+	DrawSound = Draw.Object;
 }
 
 FButtonStyle ULessonPopupWidget::NotebookButtonStyle(bool bPrimary) const
@@ -772,7 +779,7 @@ void ULessonPopupWidget::TickReveal(float DeltaTime)
 	RevealElapsed += DeltaTime;
 	if (RevealPhase == ERevealPhase::Drain)
 	{
-		if (StartRevealSheet()) { RevealPhase=ERevealPhase::Erase; RevealElapsed=0.f; }
+		if (StartRevealSheet()) { RevealPhase=ERevealPhase::Erase; RevealElapsed=0.f; PlayRevealSound(EraseSound); }
 		return;
 	}
 	if (!RevealSheet) return;
@@ -796,7 +803,11 @@ void ULessonPopupWidget::TickReveal(float DeltaTime)
 		Refresh();
 		RevealPhase=ERevealPhase::Text;
 	}
-	else if (RevealPhase==ERevealPhase::Text) RevealPhase=ERevealPhase::Draw;
+	else if (RevealPhase==ERevealPhase::Text)
+	{
+		RevealPhase=ERevealPhase::Draw;
+		PlayRevealSound(DrawSound);
+	}
 	else
 	{
 		RevealPhase=ERevealPhase::None;
@@ -810,8 +821,25 @@ void ULessonPopupWidget::SetEraseProgress(float Alpha)
 	if (RevealSheet) RevealSheet->Progress=Alpha;
 }
 
+void ULessonPopupWidget::PlayRevealSound(USoundBase* Sound)
+{
+	if (RevealAudio) RevealAudio->Stop();
+	RevealAudio = nullptr;
+	if (!Sound) return;
+	// Fit it to the animation: a different erase time plays it faster or slower
+	const float Length = Sound->GetDuration();
+	const float Pitch = Length > 0.f && Length < INDEFINITELY_LOOPING_DURATION ? FMath::Clamp(Length / FMath::Max(.1f, RevealEraseTime), .5f, 2.f) : 1.f;
+	RevealAudio = UGameplayStatics::SpawnSound2D(this, Sound, 1.f, Pitch);
+}
+
 void ULessonPopupWidget::HideEraser()
 {
+	// Closed or reset mid-reveal: its sound stops with it
+	if (RevealAudio)
+	{
+		RevealAudio->Stop();
+		RevealAudio = nullptr;
+	}
 	if (EraseCover) EraseCover->SetVisibility(ESlateVisibility::Collapsed);
 	if (Eraser) Eraser->SetVisibility(ESlateVisibility::Collapsed);
 	if (RevealHost)
