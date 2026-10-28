@@ -20,14 +20,14 @@ Game Rules
 --- Dev tasks ---
 Icon Set Selections
 Campaign Completion
-Master Reward Animation
-Final Unlock has empty box
-Master Erase
+Final Campaign Unlock has empty box
 
 --- Art Tasks ---
 Streak Saver Art
 Options Menu Visuals
+Player Info Menu
 Finish Lesson Fireworks
+Master Erase
 
 
 

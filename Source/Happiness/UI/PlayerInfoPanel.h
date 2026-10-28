@@ -10,12 +10,13 @@ class UFont;
 class UImage;
 class UTexture2D;
 class USoundBase;
+class UWidgetTree;
 
 /**
  * The player info panel, opened by tapping the player level badge's sun in the main menu (UHappinessModeWidget makes
  * it the first time). A window in the middle of the screen, clear of the sun (which stays up, above the dimmed menu):
  * Mastered Clues, one row of the badge's twelve Master rewards (faint until earned), then Options (WBP_Options),
- * Game Rules (WBP_GameRules) and Icon Sets. The close button (top right), tapping outside the window, or the sun
+ * Game Rules (WBP_GameRules) and Icon Sets (UIconSetsPanel). The close button (top right), tapping outside the window, or the sun
  * again, closes it.
  * Built in code, in the pause menu's garden style.
  */
@@ -33,6 +34,9 @@ public:
 	void Hide();
 
 	bool IsOpen() const { return IsVisible(); }
+
+	/** The panel's close button: a round ivory button with an ink cross (the icon sets screen's too) */
+	static UButton* MakeCloseButton(UWidgetTree& Tree, FName Name = TEXT("CloseButton"));
 
 	/** Called when the panel closes */
 	FSimpleMulticastDelegate OnClosed;
@@ -55,7 +59,7 @@ private:
 	void BuildLayout();
 	void Refresh();
 	/** Class's screen, made over the whole menu the first time (Screen keeps it), then shown */
-	UUserWidget* OpenScreen(TObjectPtr<UUserWidget>& Screen, TSoftClassPtr<UUserWidget>& Class);
+	UUserWidget* OpenScreen(TObjectPtr<UUserWidget>& Screen, UClass* Class);
 	void PlaySound(USoundBase* Sound) const;
 
 	UFUNCTION()
@@ -86,4 +90,5 @@ private:
 	UPROPERTY(Transient) TObjectPtr<UButton> CloseButton;
 	UPROPERTY(Transient) TObjectPtr<UUserWidget> OptionsWidget;
 	UPROPERTY(Transient) TObjectPtr<UUserWidget> RulesWidget;
+	UPROPERTY(Transient) TObjectPtr<UUserWidget> IconSetsWidget;
 };

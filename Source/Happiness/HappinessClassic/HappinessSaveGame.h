@@ -4,12 +4,13 @@
 #include "GameFramework/SaveGame.h"
 #include "CampaignProgress.h"
 #include "FreePlaySettings.h"
+#include "IconSets.h"
 #include "DailyPuzzle.h"
 #include "PuzzleSlots.h"
 #include "HappinessSaveGame.generated.h"
 
 /**
- * Parent of SG_Happiness, the game's save. Adds the campaign progress and the free play settings to it.
+ * Parent of SG_Happiness, the game's save. Adds the campaign progress, the free play settings and the icon set choices to it.
  *
  * Whenever a save game is written to disk it takes the running game's current campaign progress and free play
  * settings, so saving the game from Blueprint (which creates a fresh SG_Happiness each time) never loses them.
@@ -75,6 +76,10 @@ public:
 
 	UPROPERTY(SaveGame)
 	FDailySaveData Daily;
+
+	/** The icon sets the player turned off (UIconSetSubsystem) */
+	UPROPERTY(SaveGame)
+	FIconSetSaveData IconSetChoices;
 
 	/** Ads turned off (UAdsSubsystem) */
 	UPROPERTY(SaveGame)

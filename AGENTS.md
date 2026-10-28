@@ -63,6 +63,8 @@ Keep it true: when you learn something that would have saved you time, add it he
   (`Hint.cpp`, `Hint.h`, `Puzzle.cpp`, `Clue.cpp`, `CampaignTree.cpp`, ...); keep each file's endings.
 - When writing C++ through a shell heredoc, an escaped `\n` inside a string literal can turn into a real line
   break. Check string literals after scripted edits.
+- Python on Windows writes `\n` as CRLF in text mode (`open(p, 'w')`). For scripted edits read and write bytes
+  (`'rb'`/`'wb'`) or pass `newline=''`, so an LF file stays LF.
 - `Clue.cpp` and `Puzzle.cpp` start with `#pragma optimize("", off)` and end with `#pragma optimize("", on)`.
   Keep both: without the closing one it leaks into the next file of the unity build (warning C4426).
 - C++ widget defaults (sounds, colors) are more reliable set in the C++ constructor than on a Widget

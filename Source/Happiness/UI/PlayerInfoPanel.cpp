@@ -19,6 +19,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
 #include "UI/GameRulesWidget.h"
+#include "UI/IconSetsPanel.h"
 #include "UI/LessonPopupWidget.h"
 #include "UI/PauseMenuWidget.h"
 #include "UI/PlayerLevelBadge.h"
@@ -210,31 +211,37 @@ void UPlayerInfoPanel::BuildLayout()
 	IconSetsButton->OnClicked.AddUniqueDynamic(this, &UPlayerInfoPanel::HandleIconSetsClicked);
 
 	// Close: a round ivory button in the top right corner
-	CloseButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("CloseButton"));
-	FButtonStyle CloseStyle;
-	CloseStyle.Normal = CloseStyle.Hovered = CloseStyle.Pressed = CloseStyle.Disabled =
-		FSlateRoundedBoxBrush(FLinearColor(1.f, .97f, .86f), 33.f, FLinearColor(.78f, .6f, .25f), 3.f);
-	CloseStyle.Hovered.TintColor = FLinearColor(1.08f, 1.08f, 1.04f);
-	CloseStyle.Pressed.TintColor = FLinearColor(.83f, .88f, .78f);
-	CloseStyle.NormalPadding = CloseStyle.PressedPadding = FMargin(0.f);
-	CloseButton->SetStyle(CloseStyle);
-	CloseButton->SetCursor(EMouseCursor::Hand);
-	UPauseMenuGlyph* Cross = WidgetTree->ConstructWidget<UPauseMenuGlyph>();
-	Cross->Symbol = 9;
-	Cross->Color = InfoInk;
-	Cross->SetVisibility(ESlateVisibility::HitTestInvisible);
-	USizeBox* CrossSize = WidgetTree->ConstructWidget<USizeBox>();
-	CrossSize->SetWidthOverride(30.f);
-	CrossSize->SetHeightOverride(30.f);
-	CrossSize->AddChild(Cross);
-	UButtonSlot* CrossSlot = CastChecked<UButtonSlot>(CloseButton->AddChild(CrossSize));
-	CrossSlot->SetHorizontalAlignment(HAlign_Center);
-	CrossSlot->SetVerticalAlignment(VAlign_Center);
+	CloseButton = MakeCloseButton(*WidgetTree);
 	CloseButton->OnClicked.AddUniqueDynamic(this, &UPlayerInfoPanel::HandleCloseClicked);
 	// Right of the corner's leaves, inside the frame
 	Place(CloseButton, FVector2D(1088.f, 80.f), FVector2D(66.f, 66.f));
 
 	Refresh();
+}
+
+UButton* UPlayerInfoPanel::MakeCloseButton(UWidgetTree& Tree, FName Name)
+{
+	UButton* Button = Tree.ConstructWidget<UButton>(UButton::StaticClass(), Name);
+	FButtonStyle Style;
+	Style.Normal = Style.Hovered = Style.Pressed = Style.Disabled =
+		FSlateRoundedBoxBrush(FLinearColor(1.f, .97f, .86f), 33.f, FLinearColor(.78f, .6f, .25f), 3.f);
+	Style.Hovered.TintColor = FLinearColor(1.08f, 1.08f, 1.04f);
+	Style.Pressed.TintColor = FLinearColor(.83f, .88f, .78f);
+	Style.NormalPadding = Style.PressedPadding = FMargin(0.f);
+	Button->SetStyle(Style);
+	Button->SetCursor(EMouseCursor::Hand);
+	UPauseMenuGlyph* Cross = Tree.ConstructWidget<UPauseMenuGlyph>();
+	Cross->Symbol = 9;
+	Cross->Color = InfoInk;
+	Cross->SetVisibility(ESlateVisibility::HitTestInvisible);
+	USizeBox* CrossSize = Tree.ConstructWidget<USizeBox>();
+	CrossSize->SetWidthOverride(30.f);
+	CrossSize->SetHeightOverride(30.f);
+	CrossSize->AddChild(Cross);
+	UButtonSlot* CrossSlot = CastChecked<UButtonSlot>(Button->AddChild(CrossSize));
+	CrossSlot->SetHorizontalAlignment(HAlign_Center);
+	CrossSlot->SetVerticalAlignment(VAlign_Center);
+	return Button;
 }
 
 void UPlayerInfoPanel::Refresh()
@@ -269,12 +276,11 @@ void UPlayerInfoPanel::HandleCloseClicked()
 	Hide();
 }
 
-UUserWidget* UPlayerInfoPanel::OpenScreen(TObjectPtr<UUserWidget>& Screen, TSoftClassPtr<UUserWidget>& Class)
+UUserWidget* UPlayerInfoPanel::OpenScreen(TObjectPtr<UUserWidget>& Screen, UClass* Class)
 {
 	if (!Screen)
 	{
-		UClass* Loaded = Class.LoadSynchronous();
-		Screen = Loaded ? CreateWidget<UUserWidget>(this, Loaded) : nullptr;
+		Screen = Class ? CreateWidget<UUserWidget>(this, Class) : nullptr;
 		// Over the whole screen, in the menu above the raised badge (in the panel the sun would cover the screen's
 		// buttons); closing it returns to the panel
 		UCanvasPanel* Canvas = Cast<UCanvasPanel>(GetParent()) ? Cast<UCanvasPanel>(GetParent()) : Root.Get();
@@ -295,7 +301,7 @@ UUserWidget* UPlayerInfoPanel::OpenScreen(TObjectPtr<UUserWidget>& Screen, TSoft
 void UPlayerInfoPanel::HandleOptionsClicked()
 {
 	PlaySound(AcceptSound);
-	UUserWidget* Options = OpenScreen(OptionsWidget, OptionsClass);
+	UUserWidget* Options = OpenScreen(OptionsWidget, OptionsClass.LoadSynchronous());
 	// WBP_Options.Show(PC) loads the current settings into it (as from the pause menu)
 	if (UFunction* ShowFunction = Options ? Options->FindFunction(TEXT("Show")) : nullptr)
 	{
@@ -312,7 +318,7 @@ void UPlayerInfoPanel::HandleOptionsClicked()
 void UPlayerInfoPanel::HandleRulesClicked()
 {
 	PlaySound(AcceptSound);
-	if (UGameRulesWidget* Rules = Cast<UGameRulesWidget>(OpenScreen(RulesWidget, RulesClass)))
+	if (UGameRulesWidget* Rules = Cast<UGameRulesWidget>(OpenScreen(RulesWidget, RulesClass.LoadSynchronous())))
 	{
 		Rules->Show(GetOwningPlayer());
 	}
@@ -320,8 +326,11 @@ void UPlayerInfoPanel::HandleRulesClicked()
 
 void UPlayerInfoPanel::HandleIconSetsClicked()
 {
-	// No icon sets screen yet
 	PlaySound(AcceptSound);
+	if (UIconSetsPanel* IconSets = Cast<UIconSetsPanel>(OpenScreen(IconSetsWidget, UIconSetsPanel::StaticClass())))
+	{
+		IconSets->Show();
+	}
 }
 
 void UPlayerInfoPanel::PlaySound(USoundBase* Sound) const
