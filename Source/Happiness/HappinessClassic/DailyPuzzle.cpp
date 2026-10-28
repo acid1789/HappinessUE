@@ -1,4 +1,5 @@
 #include "DailyPuzzle.h"
+#include "CampaignProgress.h"
 #include "FreePlaySettings.h"
 #include "HappinessSaveGame.h"
 #include "Puzzle.h"
@@ -77,24 +78,38 @@ int32 UDailySubsystem::GetToday()
 	return ToDate(FDateTime::Now());
 }
 
-FDailyPuzzleSpec UDailySubsystem::GetSpec(int32 Date)
+FDailyPuzzleSpec UDailySubsystem::GetSpec(int32 Date, int32 LockedClueMask)
 {
 	// Everything comes from the date, in this order, so a date always gives the same puzzle
 	FRandomStream Rand(Date);
 	FDailyPuzzleSpec Spec;
 	Spec.Date = Date;
 
-	// A random set of at least 5 clue types
+	// A random set of at least 5 clue types, drawn from all of them so the size, difficulty and seed below don't
+	// depend on what the player has unlocked
 	TArray<ECampaignLesson> Clues = UFreePlaySubsystem::GetSelectableClues();
 	for (int32 i = Clues.Num() - 1; i > 0; i--)
 	{
 		Clues.Swap(i, Rand.RandRange(0, i));
 	}
 	const int32 Count = Rand.RandRange(FMath::Min(5, Clues.Num()), Clues.Num());
-	Spec.Clues = TArray<ECampaignLesson>(Clues.GetData(), Count);
-	for (int32 i = Count; i < Clues.Num(); i++)
+
+	// Locked ones drop out, and the next unlocked ones in the shuffled order stand in for them up to 5
+	auto IsLocked = [LockedClueMask](ECampaignLesson Clue) { return (LockedClueMask & (1 << int32(Clue))) != 0; };
+	int32 Chosen = 0;
+	for (int32 i = 0; i < Count; i++)
 	{
-		Spec.ExcludedClueMask |= 1 << int32(Clues[i]);
+		Chosen += IsLocked(Clues[i]) ? 0 : 1;
+	}
+	const TArray<ECampaignLesson> Unlocked = Clues.FilterByPredicate([&IsLocked](ECampaignLesson Clue) { return !IsLocked(Clue); });
+	Chosen = FMath::Max(Chosen, FMath::Min(5, Unlocked.Num()));
+	Spec.Clues = TArray<ECampaignLesson>(Unlocked.GetData(), Chosen);
+	for (ECampaignLesson Clue : Clues)
+	{
+		if (!Spec.Clues.Contains(Clue))
+		{
+			Spec.ExcludedClueMask |= 1 << int32(Clue);
+		}
 	}
 
 	// 4x4 to 7x7, mostly 5x5 and 6x6
@@ -103,6 +118,37 @@ FDailyPuzzleSpec UDailySubsystem::GetSpec(int32 Date)
 	Spec.Difficulty = Rand.RandRange(0, 2);
 	Spec.Seed = Rand.RandRange(1, 1 << 30);
 	return Spec;
+}
+
+FDailyPuzzleSpec UDailySubsystem::GetTodaySpec()
+{
+	const int32 Today = GetToday();
+	const UDailySubsystem* Daily = GetInstance();
+	return GetSpec(Today, Daily ? Daily->GetLockedCluesFor(Today) : GetLockedClueMask());
+}
+
+int32 UDailySubsystem::GetLockedClueMask()
+{
+	// Every lesson is unlocked once Campaign mode is (IsLessonUnlocked looks at the current mode's progress)
+	const UCampaignSubsystem* Campaign = UCampaignSubsystem::GetInstance();
+	if (!Campaign || Campaign->IsCampaignModeUnlocked())
+	{
+		return 0;
+	}
+	int32 Mask = 0;
+	for (ECampaignLesson Clue : UFreePlaySubsystem::GetSelectableClues())
+	{
+		if (!Campaign->IsLessonUnlocked(Clue))
+		{
+			Mask |= 1 << int32(Clue);
+		}
+	}
+	return Mask;
+}
+
+int32 UDailySubsystem::GetLockedCluesFor(int32 Date) const
+{
+	return Data.ActiveDate == Date ? Data.ActiveLockedClues : GetLockedClueMask();
 }
 
 UDailySubsystem::FStreakState UDailySubsystem::GetStreakState(int32 Date) const
@@ -189,7 +235,7 @@ void UDailySubsystem::DebugSetSaverDays(int32 Days)
 
 bool UDailySubsystem::StartDaily(const UObject* WorldContextObject, int32& Number, int32& Size, int32& Difficulty)
 {
-	const FDailyPuzzleSpec Spec = GetTodaySpec();
+	const FDailyPuzzleSpec Spec = GetSpec(GetToday());
 	Number = Spec.Seed;
 	Size = Spec.Size;
 	Difficulty = Spec.Difficulty;
@@ -199,6 +245,8 @@ bool UDailySubsystem::StartDaily(const UObject* WorldContextObject, int32& Numbe
 	{
 		return false;
 	}
+	// The clue types it leaves out are fixed the first time the date's puzzle starts
+	Daily->Data.ActiveLockedClues = Daily->GetLockedCluesFor(Spec.Date);
 	Daily->Data.bActive = true;
 	Daily->Data.ActiveDate = Spec.Date;
 	Daily->Save();
@@ -227,7 +275,7 @@ bool UDailySubsystem::GetActiveSpec(FDailyPuzzleSpec& OutSpec) const
 	{
 		return false;
 	}
-	OutSpec = GetSpec(Data.ActiveDate);
+	OutSpec = GetSpec(Data.ActiveDate, Data.ActiveLockedClues);
 	return true;
 }
 

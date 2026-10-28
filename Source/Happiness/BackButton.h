@@ -6,7 +6,7 @@
 
 /**
  * Android's back button sends the app to the background (like Home), from any screen: the game keeps its state and
- * resumes where it was; mid-puzzle the puzzle is paused first (WBP_Happiness's Pause). Caught before the UI sees it (a Slate input preprocessor), so no widget handles back itself.
+ * resumes where it was; mid-puzzle the puzzle is paused first (UAppPauseSubsystem::PausePuzzle). Caught before the UI sees it (a Slate input preprocessor), so no widget handles back itself.
  * The Java side is AndroidThunkJava_Happiness_MoveToBack in Happiness_UPL.xml. Android only.
  */
 UCLASS()

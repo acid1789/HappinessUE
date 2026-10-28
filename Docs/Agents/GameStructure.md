@@ -10,6 +10,7 @@ goes on as if there were none: Daily starts over, Free Play opens its settings, 
 
 | Mode | What it is | Key code |
 |---|---|---|
+| **Daily** | One puzzle per date, its size, difficulty, seed and clue types chosen from the date. Only clue types whose lessons the player has unlocked (`GetLockedClueMask`); the rest are left out without changing the size, difficulty or seed, and the mask is kept for that date once its puzzle starts (`FDailySaveData::ActiveLockedClues`). Test with `Tools/puzzle.sh -daily=YYYYMMDD -dailycolumns=N`. | `UDailySubsystem` (`HappinessClassic/DailyPuzzle.*`) |
 | **Free Play** | Any size 3–8 and difficulty, with a choice of clue types. Scored with EXP against a par time; EXP fills the player's level. | `UFreePlaySubsystem` (`HappinessClassic/FreePlaySettings.*`) |
 | **Lessons** | A tree of clue-type lessons (`WBP_CampaignTree`). Each lesson: 3x3 Easy, 3x3 Normal, 4x4 Easy, 4x4 Normal, then a 4x4 Hard final. Points per puzzle (3, minus hints) unlock stages. | `UCampaignSubsystem` (`HappinessClassic/CampaignProgress.*`), tree in `CampaignTree.cpp` |
 | **Campaign** | Unlocked by completing every lesson. The same tree on bigger boards: per clue 4×5x5 Normal, 5x5 Hard, 4×6x6 Normal, 6x6 Hard, 4×7x7 Normal, 7x7 Hard, then an 8x8 Easy final. One step per solved puzzle; scored with EXP like Free Play. | Same subsystem, `ECampaignMode::Campaign` |
@@ -23,10 +24,10 @@ functions (`GetNumStages`, `GetStageSize`, `GetMaxPoints`, ...) follow it.
 | Widget (`Content/...`) | C++ parent (`Source/Happiness/...`) | Role |
 |---|---|---|
 | `General/UI/WBP_GameSelect` | — | Main menu; hosts the mode screen, campaign tree and Free Play config. A new player (no `HappinessSave` at startup, `UCampaignSubsystem::ConsumeNewPlayerStart`) starts on the Lessons tree with Game Basics' popup open (`UHappinessModeWidget::StartNewPlayer`, on the mode screen's first tick); everyone else starts on the mode screen |
-| `Happiness/UI/WBP_HappinessMode` | `UI/HappinessModeWidget` | Free Play / Lessons / Campaign / Back ; top right, the player level badge (`UI/PlayerLevelBadge`, made in code): the level on `T_PlayerLevelSun`, ringed by twelve shaped rewards from `T_MasterRewardGems` (4×3 atlas). Each reward appears once every clue in that tree column has completed Campaign Master Mode (`UCampaignSubsystem::IsMasterColumnCompleted`). `SunTexture` and `IconTextures` remain art override hooks. The mode screen moves the badge into WBP_GameSelect's MainCanvas at Z 0 (`MoveBadgeToMenu`, after construction), so it stays up behind every menu screen (mode Z 5, tree Z 10, Free Play settings added later); it goes transparent while the puzzle screen (`WBP_Happiness`, in the same canvas) is visible (`UPlayerLevelBadge::SetCoveredBy`) and refreshes when it comes back. Tapping the sun opens the player info (`UI/PlayerInfoPanel`, made in code): the mode screen puts a clear `SunButton` over the sun, in the menu just above the badge (so the menu's screens still cover it; hidden with the badge, `SetTapTarget`). The panel goes over the whole menu (Z 50) with the badge raised above its dim (Z 55, `SetBadgeRaised`), so the sun stays up; its window keeps clear of the sun on both sides. It shows Mastered Clues (the badge's twelve rewards in a row, at `LockedRewardOpacity` (25%) until earned) and Options (`WBP_Options`), Game Rules (`WBP_GameRules`) and Icon Sets (no screen yet). Options and Game Rules open over the whole menu (Z 300, above the raised sun) and close back to the panel; its close button (top right, `UPauseMenuGlyph` symbol 9), tapping outside the window or the sun closes it. |
+| `Happiness/UI/WBP_HappinessMode` | `UI/HappinessModeWidget` | Free Play / Lessons / Campaign / Back ; top right, the player level badge (`UI/PlayerLevelBadge`, made in code): the level on `T_PlayerLevelSun`, ringed by twelve shaped rewards from `T_MasterRewardGems` (4×3 atlas). Each reward appears once every clue in that tree column has completed Campaign Master Mode (`UCampaignSubsystem::IsMasterColumnCompleted`). `SunTexture` and `IconTextures` remain art override hooks. The mode screen moves the badge into WBP_GameSelect's MainCanvas at Z 0 (`MoveBadgeToMenu`, after construction), so it stays up behind every menu screen (mode Z 5, tree Z 10, Free Play settings added later); it goes transparent while the puzzle screen (`WBP_Happiness`, in the same canvas) is visible (`UPlayerLevelBadge::SetCoveredBy`) and refreshes when it comes back. Tapping the sun opens the player info (`UI/PlayerInfoPanel`, made in code): the mode screen puts a clear `SunButton` over the sun, in the menu just above the badge (so the menu's screens still cover it; hidden with the badge, `SetTapTarget`). The panel goes over the whole menu (Z 50) with the badge raised above its dim (Z 55, `SetBadgeRaised`), so the sun stays up; its window keeps clear of the sun on both sides. It shows Mastered Clues (the badge's twelve rewards in a row, at `LockedRewardOpacity` (25%) until earned) and Options (`WBP_Options`), Game Rules (`WBP_GameRules`) and Icon Sets (`UI/IconSetsPanel`, see Icon sets). The three open over the whole menu (Z 300, above the raised sun) and close back to the panel; its close button (top right, `UPauseMenuGlyph` symbol 9), tapping outside the window or the sun closes it. |
 | `Happiness/UI/WBP_HappinessConfig` | — | Free Play setup: size, difficulty, clue selection (`WBP_ClueSelect`, `UI/ClueSelectWidget`) |
 | `Happiness/UI/WBP_CampaignTree` | `UI/CampaignTreeWidget` | The lesson tree (Lessons and Campaign). Bottom left in Lessons mode until every lesson is completed: `WBP_CompleteLessons` (`UI/CompleteLessonsPanel`), which asks with the screen's own `ConfirmDialog` (`UConfirmDialogWidget::Ask`), then completes every lesson, unlocking Campaign. When every lesson has just been completed (the last final, or that button), the tree closes to the mode screen, which opens the congratulations (`UI/LessonsCompletePopup`, made in code: the Garden Visitors and Campaign unlocks) with fireworks over them (`UI/FireworksWidget`, code-drawn). `UCampaignSubsystem::ConsumeLessonsCompletion` says when; like the lesson completion, it isn't saved |
-| `Happiness/UI/WBP_LessonPopup` | `UI/LessonPopupWidget` | A lesson's description, progress bar with stage ticks, stage buttons |
+| `Happiness/UI/WBP_LessonPopup` | `UI/LessonPopupWidget` | A lesson's description, progress bar with stage ticks, stage buttons. When a clue's Master Mode has just been completed, the popup (Mastered) holds its reward back from the sun's badge (`UPlayerLevelBadge::GetPendingMasterReward`) and plays fireworks over itself, round after round (`UFireworksWidget::AddBursts`), until Return to Campaign collapses it into the reward's place on the sun (`RevealMasterReward`). Preview: `Happiness.PreviewMasterReward` |
 | `Happiness/UI/WBP_Happiness` | — | The puzzle screen: board, clue panels, buttons, overlays |
 | `Happiness/UI/WBP_GamePanel` | `UI/GamePanelWidget` | Centers the board and sizes columns to the height of its two candidate-icon rows; the Blueprint still builds and updates the grid |
 | `Happiness/UI/WBP_Cell`, `WBP_Icon` | — | Board cells and candidate icons |
@@ -73,15 +74,24 @@ takes no taps.
 
 ## Icon sets
 
-Each puzzle row uses one icon set (`DA_IconSet` data assets in `Content/Happiness/IconSets/`; set and icon IDs are
-what a saved puzzle stores). `PC_Happiness.SoftIconSetCollection` names the default collection (`KatrinaCollection`,
-8 sets). At BeginPlay `PC_Happiness` swaps in the player's own collection from `UIconSetSubsystem::GetPlayerCollection`
-(`HappinessClassic/IconSets.*`): the default sets, then each unlocked set from `DA_IconSetUnlocks` (`UIconSetUnlocks`:
-set + `EIconSetUnlock` condition). It updates in place when campaign progress changes; nothing extra is saved.
-`IS_GardenVisitors` unlocks once every lesson is completed. To add an unlockable set, add it to `DA_IconSetUnlocks`
-(new conditions go in `EIconSetUnlock` / `UIconSetSubsystem::IsUnlocked`). `DA_IconSetUnlocks` is always cooked
-(Asset Manager rule in `DefaultGame.ini`), so the sets it lists ship. `SelectRandomIconSets` takes the first
-PuzzleSize sets of the collection, shuffled first when Scramble Icons is on.
+Each puzzle row uses one icon set (`DA_IconSet` data assets in `Content/Happiness/IconSets/`: `Id` and `Icons`, each a
+texture and an Id; set and icon IDs are what a saved puzzle stores). `PC_Happiness.SoftIconSetCollection` names the
+default collection (`KatrinaCollection`, 8 sets). At BeginPlay `PC_Happiness` swaps in the player's own collection from
+`UIconSetSubsystem::GetPlayerCollection` (`HappinessClassic/IconSets.*`): the default sets, then each unlocked set from
+`DA_IconSetUnlocks` (`UIconSetUnlocks`: set + `EIconSetUnlock` condition, `bHiddenUntilUnlocked`, optional
+`LockedReason`). It updates in place when campaign progress changes. `IS_GardenVisitors` unlocks once every lesson is
+completed. To add an unlockable set, add it to `DA_IconSetUnlocks` (new conditions go in `EIconSetUnlock` /
+`UIconSetSubsystem::IsUnlocked` / the default reason in `GetEntries`). `DA_IconSetUnlocks` is always cooked (Asset
+Manager rule in `DefaultGame.ini`), so the sets it lists ship. Its `SetNames` (by set Id) are the names the icon sets
+screen shows; a set without one shows its Id spaced out.
+
+The player can turn unlocked sets off on the icon sets screen (`UI/IconSetsPanel`, from the player info), down to
+`UIconSetSubsystem::MinEnabledSets` (8, the biggest puzzle's rows). The sets turned off (their Ids) are saved in
+`FIconSetSaveData` (`UHappinessSaveGame::IconSetChoices`; not `IconSets`, which is SG_Happiness's own variable). The player collection keeps every unlocked set, on or off, so a
+saved puzzle always finds its sets (`FindIconSet`). `SelectRandomIconSets` copies only the sets
+`UIconSetSubsystem::IsIconSetEnabled` allows, then takes the first PuzzleSize of them, shuffled first when Scramble
+Icons is on. The screen lists the default sets, then each unlockable set that is unlocked or not hidden; a locked one
+shows its reason ("Locked: Complete Lessons").
 
 ## Streak savers
 
@@ -115,13 +125,16 @@ itself (alerts and sound, no push); Android 13+ asks for `POST_NOTIFICATIONS` th
 `ic_notification` drawable if there is one, else the app icon. Test on a phone with `Happiness.Reminder.Test [seconds]`.
 Android and iOS only; it does nothing in the editor.
 
+## Leaving the app mid-puzzle
+
+When the app stops being active (the phone locked, Home, another app or a call on top: `FCoreDelegates::ApplicationWillDeactivateDelegate`, Android and iOS), `UAppPauseSubsystem` (`Source/Happiness/AppPause.*`) pauses a puzzle in progress, so the player comes back to the pause menu with the clock stopped (`PausePuzzle`: WBP_Happiness's `Pause`, unless the pause menu or an end screen is already showing). An interstitial covers the game too, and Android may hand the game that deactivation only after the ad has closed, so deactivations while one plays or within 2 s of its end are ignored (`UAdsSubsystem::IsInterstitialRecent`). `Happiness.SimulateAppDeactivate` does the same in PIE (dev builds).
+
 ## Android back button
 
 `UBackButtonSubsystem` (`Source/Happiness/BackButton.*`, Android only) catches the back button before the UI does (a
 Slate input preprocessor) and sends the app to the background with `moveTaskToBack` (Java side
 `AndroidThunkJava_Happiness_MoveToBack` in `Happiness_UPL.xml`), like Home: the game keeps its state. Mid-puzzle it
-first calls WBP_Happiness's `Pause` (saves the time, shows the pause menu), unless the pause menu or an end screen is
-already showing. No screen handles back itself.
+first pauses the puzzle (`UAppPauseSubsystem::PausePuzzle`, above). No screen handles back itself.
 
 ## Save data
 

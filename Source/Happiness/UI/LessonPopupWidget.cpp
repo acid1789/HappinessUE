@@ -4,6 +4,7 @@
 #include "UI/LessonProgressTicks.h"
 #include "UI/CampaignTreeWidget.h"
 #include "UI/PlayerLevelBadge.h"
+#include "UI/FireworksWidget.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
 
 #include "Blueprint/WidgetTree.h"
@@ -713,6 +714,7 @@ void ULessonPopupWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTi
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
 	TickMasterCollapse(InDeltaTime);
+	TickMasterFireworks(InDeltaTime);
 	if (RevealPhase != ERevealPhase::None)
 	{
 		TickReveal(InDeltaTime);
@@ -1055,8 +1057,82 @@ void ULessonPopupWidget::HandleCloseClicked()
 	Close();
 }
 
+UPlayerLevelBadge* ULessonPopupWidget::GetPendingRewardBadge() const
+{
+	if (!RewardBadge.IsValid())
+	{
+		TArray<UUserWidget*> Badges;
+		UWidgetBlueprintLibrary::GetAllWidgetsOfClass(this, Badges, UPlayerLevelBadge::StaticClass(), false);
+		RewardBadge = Badges.Num() > 0 ? Cast<UPlayerLevelBadge>(Badges[0]) : nullptr;
+	}
+	FGeometry GemGeometry;
+	UPlayerLevelBadge* Badge = RewardBadge.Get();
+	return Badge && Badge->GetPendingMasterReward(UCampaignTree::GetLessonColumn(Lesson), GemGeometry) ? Badge : nullptr;
+}
+
+void ULessonPopupWidget::TickMasterFireworks(float DeltaTime)
+{
+	// Only before Return to Campaign starts the collapse: then no more go up, and those in the air fade over it
+	const bool bWanted = IsVisible() && CollapseElapsed < 0.f && NotebookCanvas && IsShowingMaster() && GetPendingRewardBadge();
+	if (!MasterFireworks)
+	{
+		UCanvasPanel* Root = bWanted ? Cast<UCanvasPanel>(WidgetTree->RootWidget) : nullptr;
+		if (!Root)
+		{
+			return;
+		}
+		MasterFireworks = WidgetTree->ConstructWidget<UFireworksWidget>(UFireworksWidget::StaticClass(), TEXT("MasterFireworks"));
+		MasterFireworks->SetVisibility(ESlateVisibility::HitTestInvisible);
+		UCanvasPanelSlot* FireworksSlot = Root->AddChildToCanvas(MasterFireworks);
+		// Over the whole popup (and the collapse, Z 30); the popup takes the taps
+		FireworksSlot->SetAnchors(FAnchors(0, 0, 1, 1));
+		FireworksSlot->SetOffsets(FMargin(0));
+		FireworksSlot->SetZOrder(40);
+		// Laid out next frame
+		return;
+	}
+	if (bWanted && !MasterFireworks->HasBurstsLeft())
+	{
+		QueueMasterFireworks();
+	}
+	MasterFireworks->Advance(DeltaTime);
+}
+
+bool ULessonPopupWidget::QueueMasterFireworks()
+{
+	const FGeometry& Area = MasterFireworks->GetCachedGeometry();
+	const FGeometry& Target = NotebookCanvas->GetCachedGeometry();
+	if (Area.GetLocalSize().X <= 0.f || Target.GetLocalSize().X <= 0.f || Area.Scale <= 0.f)
+	{
+		return false;
+	}
+	// Round the notebook, in the fireworks' space; sizes go with the notebook's (1500 wide in its layout). As the
+	// lessons' congratulations (UHappinessModeWidget::PlayUnlockFireworks), a round about every 2.6 seconds.
+	const FVector2D Center = Area.AbsoluteToLocal(Target.GetAbsolutePositionAtCoordinates(FVector2D(.5f)));
+	const FVector2D Size = Target.GetAbsoluteSize() / Area.Scale;
+	const float Unit = 1.3f * Size.X / 1500.f;
+	// Offsets in notebook sizes, from its center
+	const struct { float X, Y, Delay; } Plan[] =
+	{
+		{ 0.f, -.3f, .2f }, { -.36f, -.14f, .55f }, { .36f, -.2f, .85f }, { -.2f, .16f, 1.2f },
+		{ .25f, .1f, 1.5f }, { 0.f, -.04f, 1.8f }, { -.42f, .3f, 2.1f }, { .42f, .28f, 2.35f },
+	};
+	TArray<UFireworksWidget::FBurst> Bursts;
+	for (const auto& Step : Plan)
+	{
+		UFireworksWidget::FBurst& Burst = Bursts.AddDefaulted_GetRef();
+		Burst.Position = Center + FVector2D(Step.X * Size.X, Step.Y * Size.Y);
+		Burst.Delay = Step.Delay;
+		// Each rocket climbs from the notebook's bottom edge
+		Burst.RocketRise = Center.Y + Size.Y * .5f - Burst.Position.Y;
+	}
+	MasterFireworks->AddBursts(Bursts, Unit);
+	return true;
+}
+
 void ULessonPopupWidget::ResetMasterCollapse()
 {
+	if (MasterFireworks) MasterFireworks->Stop();
 	if (CollapseHost) CollapseHost->RemoveFromParent();
 	CollapseHost = nullptr;
 	CollapseMesh.Reset();

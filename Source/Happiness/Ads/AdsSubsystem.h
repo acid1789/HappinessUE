@@ -77,6 +77,12 @@ public:
 	/** Play an interstitial if one is ready, then run Action (at once if not, or with ads off) */
 	void ShowInterstitialThen(FSimpleDelegate Action);
 
+	/**
+	 * An interstitial is playing, or ended less than Seconds ago. The ad covers the game, so the app is deactivated
+	 * for it, and Android may hand the game that event only once the ad has closed (UAppPauseSubsystem ignores it).
+	 */
+	bool IsInterstitialRecent(double Seconds) const;
+
 	/** Blueprint version: play an interstitial, then broadcast Target's event dispatcher DispatcherName (no params) */
 	UFUNCTION(BlueprintCallable, Category = "Ads", meta = (WorldContext = "WorldContextObject"))
 	static void ShowInterstitialThenBroadcast(const UObject* WorldContextObject, UObject* Target, FName DispatcherName);
@@ -115,6 +121,8 @@ private:
 	FSimpleDelegate PendingAction;
 	bool bShowing = false;
 	bool bStarted = false;
+	/** When the last interstitial ended (FPlatformTime::Seconds), or a long time ago */
+	double InterstitialEndTime = -1.e9;
 	FTimerHandle TimeoutTimer;
 	bool bTestAdPending = false;
 

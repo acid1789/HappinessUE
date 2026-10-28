@@ -412,16 +412,33 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 	}
 
 	// -daily=YYYYMMDD: exactly that date's daily puzzle (its size, difficulty, seed and clue types)
+	// -dailycolumns=N: as for a player who has unlocked the lessons of the first N tree columns only
 	int32 DailyDate = 0;
 	FString DailyLine;
 	if (FParse::Value(Cmd, TEXT("daily="), DailyDate))
 	{
-		const FDailyPuzzleSpec Daily = UDailySubsystem::GetSpec(DailyDate);
+		int32 DailyColumns = UCampaignTree::GetNumColumns();
+		FParse::Value(Cmd, TEXT("dailycolumns="), DailyColumns);
+		int32 LockedClues = 0;
+		for (int32 Column = DailyColumns; Column < UCampaignTree::GetNumColumns(); Column++)
+		{
+			for (ECampaignLesson Locked : UCampaignTree::GetColumnLessons(Column))
+			{
+				LockedClues |= 1 << int32(Locked);
+			}
+		}
+		const FDailyPuzzleSpec Daily = UDailySubsystem::GetSpec(DailyDate, LockedClues);
 		Size = Daily.Size;
 		Diff = Daily.Difficulty;
 		SeedMin = SeedMax = Daily.Seed;
 		ExcludedClues = Daily.ExcludedClueMask;
-		DailyLine = FString::Printf(TEXT("DAILY date=%d size=%d diff=%d seed=%d clueTypes=%d\n"), DailyDate, Size, Diff, Daily.Seed, Daily.Clues.Num());
+		TArray<FString> ClueNames;
+		for (ECampaignLesson Clue : Daily.Clues)
+		{
+			ClueNames.Add(StaticEnum<ECampaignLesson>()->GetNameStringByValue(int64(Clue)));
+		}
+		DailyLine = FString::Printf(TEXT("DAILY date=%d size=%d diff=%d seed=%d clueTypes=%d (%s)\n"), DailyDate, Size, Diff, Daily.Seed,
+			Daily.Clues.Num(), *FString::Join(ClueNames, TEXT(",")));
 	}
 
 	if (bCampaign && !UPuzzle::IsLessonAvailable(Lesson, Size))

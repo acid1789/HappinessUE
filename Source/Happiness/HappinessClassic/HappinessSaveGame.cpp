@@ -8,7 +8,7 @@ bool UHappinessSaveGame::bOldSaveReset = false;
 
 void UHappinessSaveGame::Serialize(FArchive& Ar)
 {
-	// Writing a save game: take the current campaign progress, free play and daily settings, and the ads switch. Not for the class default object (saved with the
+	// Writing a save game: take the current campaign progress, free play and daily settings, the ads switch and the icon set choices. Not for the class default object (saved with the
 	// Blueprint asset) or for reference collection and the like.
 	const bool bWritingSave = Ar.IsSaving() && !Ar.IsObjectReferenceCollector() && !Ar.IsCountingMemory() && !Ar.IsTransacting() &&
 		!HasAnyFlags(RF_ClassDefaultObject | RF_ArchetypeObject) && !UPuzzleSlotSubsystem::IsSlotIO();
@@ -29,6 +29,10 @@ void UHappinessSaveGame::Serialize(FArchive& Ar)
 		if (const UAdsSubsystem* AdsSubsystem = UAdsSubsystem::GetInstance())
 		{
 			bAdsDisabled = AdsSubsystem->GetAdsDisabledSaveData();
+		}
+		if (const UIconSetSubsystem* IconSetSubsystem = UIconSetSubsystem::GetInstance())
+		{
+			IconSetChoices = IconSetSubsystem->GetSaveData();
 		}
 		DataVersion = CurrentDataVersion;
 	}
