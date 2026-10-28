@@ -2,6 +2,10 @@
 
 #include "Rendering/DrawElements.h"
 #include "Widgets/SLeafWidget.h"
+#include "Engine/Texture2D.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Rendering/SlateRenderer.h"
+#include "UObject/ConstructorHelpers.h"
 
 namespace
 {
@@ -13,7 +17,6 @@ namespace
 	constexpr float SparkDrag = 2.4f;
 	constexpr float SparkGravity = 210.f;
 	constexpr float SparkHead = 11.f;
-	constexpr float SparkStreak = 4.f;
 	constexpr int32 SparksPerBurst = 48;
 	constexpr float FlashSize = 150.f;
 	constexpr float FlashTime = 0.3f;
@@ -38,6 +41,8 @@ namespace
 		void Construct(const FArguments&, UFireworksWidget* InOwner)
 		{
 			Owner = InOwner;
+			Sprite.SetResourceObject(InOwner->ParticleAtlas);
+			Sprite.DrawAs = ESlateBrushDrawType::Image;
 			Dot.DrawAs = ESlateBrushDrawType::RoundedBox;
 			Dot.TintColor = FSlateColor(FLinearColor::White);
 			Dot.OutlineSettings.RoundingType = ESlateBrushRoundingType::HalfHeightRadius;
@@ -62,10 +67,30 @@ namespace
 				FSlateDrawElement::MakeBox(Elements, DotLayer, Geometry.ToPaintGeometry(FVector2D(Size),
 					FSlateLayoutTransform(Center - FVector2D(Size * 0.5f))), &Dot, ESlateDrawEffect::None, Color);
 			};
+			auto DrawSprite = [&](int32 Tile, const FVector2D& Center, FVector2D Size, FLinearColor Color, int32 SpriteLayer, float Angle = 0.f)
+			{
+				if (!Sprite.GetResourceObject()) { DrawDot(Center, Size.X, Color, SpriteLayer); return; }
+				Color.A *= Opacity;
+				const FVector2D AxisX(FMath::Cos(Angle), FMath::Sin(Angle));
+				const FVector2D AxisY(-AxisX.Y, AxisX.X);
+				TArray<FSlateVertex> Vertices;
+				for (const FVector2D& UV : {FVector2D(0,0),FVector2D(1,0),FVector2D(0,1),FVector2D(1,1)})
+				{
+					const FVector2D Point = Center + AxisX * ((UV.X-.5f)*Size.X) + AxisY * ((UV.Y-.5f)*Size.Y);
+					const FVector2D AtlasUV = (FVector2D(Tile%2,Tile/2)+UV)*.5f;
+					Vertices.Add(FSlateVertex::Make<ESlateVertexRounding::Disabled>(Geometry.GetAccumulatedRenderTransform(),
+						FVector2f(Point),FVector2f(AtlasUV),Color.ToFColor(true)));
+				}
+				const TArray<SlateIndex> Indices = {0,1,2,1,3,2};
+				FSlateDrawElement::MakeCustomVerts(Elements,SpriteLayer,FSlateApplication::Get().GetRenderer()->GetResourceHandle(Sprite),
+					Vertices,Indices,nullptr,0,0);
+			};
 
 			for (const TPair<FVector2D, float>& Flash : Fireworks->GetFlashes())
 			{
-				DrawDot(Flash.Key, FlashSize * Scale * (1.4f - 0.4f * Flash.Value), FLinearColor(1.f, 0.97f, 0.85f, 0.45f * Flash.Value), Layer);
+				const float Size = FlashSize * Scale * (1.4f - 0.4f * Flash.Value);
+				DrawSprite(1,Flash.Key,FVector2D(Size),FLinearColor(1.f,.93f,.68f,.22f*Flash.Value),Layer);
+				DrawSprite(0,Flash.Key,FVector2D(Size*.4f),FLinearColor(1.f,.98f,.86f,.75f*Flash.Value),Layer+1);
 			}
 			for (const UFireworksWidget::FSpark& Spark : Fireworks->GetSparks())
 			{
@@ -84,21 +109,20 @@ namespace
 				Color.A = Alpha;
 				const float Head = SparkHead * Scale * Spark.Size;
 
-				// A streak behind it, longer the faster it goes
-				const FVector2D Tail = Spark.Position - Spark.Velocity * (Spark.bRocket ? 0.04f : 0.045f);
-				if (FVector2D::DistSquared(Tail, Spark.Position) > 1.f)
-				{
-					FLinearColor StreakColor = Color;
-					StreakColor.A *= 0.8f * Opacity;
-					const TArray<FVector2D> Points = { Tail, Spark.Position };
-					FSlateDrawElement::MakeLines(Elements, Layer, Geometry.ToPaintGeometry(), Points, ESlateDrawEffect::None,
-						StreakColor, true, SparkStreak * Scale * Spark.Size);
-				}
-				// A soft glow, then the bright head
+				// The comet's bright end sits on the spark; its painted tail follows the velocity.
+				const FVector2D TailDirection = -Spark.Velocity.GetSafeNormal();
+				const float Length = FMath::Max(Head*1.8f,float(Spark.Velocity.Size())*(Spark.bRocket ? .075f : .06f));
+				FLinearColor TrailColor = Color;
+				TrailColor.A *= .8f;
+				DrawSprite(2,Spark.Position+TailDirection*(Length*.35f),FVector2D(Head*.8f,Length),TrailColor,Layer,
+					FMath::Atan2(TailDirection.Y,TailDirection.X)-PI*.5f);
 				FLinearColor GlowColor = Color;
-				GlowColor.A *= 0.3f;
-				DrawDot(Spark.Position, Head * 2.8f, GlowColor, Layer);
-				DrawDot(Spark.Position, Head, FMath::Lerp(Color, FLinearColor(1.f, 1.f, 1.f, Color.A), 0.2f), Layer + 1);
+				GlowColor.A *= .23f;
+				DrawSprite(1,Spark.Position,FVector2D(Head*2.8f),GlowColor,Layer);
+				const bool bTwinkle = !Spark.bRocket && Spark.Size < .8f;
+				DrawSprite(bTwinkle ? 0 : 1,Spark.Position,FVector2D(Head*(bTwinkle ? 1.9f : .8f)),Color,Layer+1,
+					bTwinkle ? Spark.Age*.7f : 0.f);
+				DrawSprite(1,Spark.Position,FVector2D(Head*.32f),FLinearColor(1.f,.99f,.91f,Alpha*.95f),Layer+1);
 			}
 			return Layer + 1;
 		}
@@ -106,7 +130,15 @@ namespace
 	private:
 		TWeakObjectPtr<UFireworksWidget> Owner;
 		FSlateBrush Dot;
+		FSlateBrush Sprite;
 	};
+}
+
+UFireworksWidget::UFireworksWidget(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{
+	static ConstructorHelpers::FObjectFinder<UTexture2D> Art(TEXT("/Game/Happiness/UI/Textures/T_FireworkParticles.T_FireworkParticles"));
+	ParticleAtlas = Art.Object;
 }
 
 TSharedRef<SWidget> UFireworksWidget::RebuildWidget()

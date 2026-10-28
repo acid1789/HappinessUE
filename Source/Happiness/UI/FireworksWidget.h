@@ -4,8 +4,10 @@
 #include "Components/Widget.h"
 #include "FireworksWidget.generated.h"
 
+class UTexture2D;
+
 /**
- * Code-drawn fireworks: rockets rise and burst into sparks that slow, fall and fade. Place it over the area they may
+ * Sprite fireworks: rockets rise and burst into sparks that slow, fall and fade. Place it over the area they may
  * fill (it draws anywhere inside itself) and call Play with where to burst; the owner advances it every frame
  * (Advance), so it costs nothing while idle. The mode screen plays it over the Campaign button when every lesson has
  * been completed (UHappinessModeWidget); the completed Master popup keeps it going while its reward waits
@@ -17,6 +19,12 @@ class HAPPINESS_API UFireworksWidget : public UWidget
 	GENERATED_BODY()
 
 public:
+	UFireworksWidget(const FObjectInitializer& ObjectInitializer);
+
+	/** White-light twinkle, bloom and comet sprites in the first three cells of a 2x2 atlas. */
+	UPROPERTY(EditAnywhere, Category = "Fireworks|Art")
+	TObjectPtr<UTexture2D> ParticleAtlas;
+
 	/** One burst: where (in this widget's space), when after Play, and where its rocket starts (its height: below it) */
 	struct FBurst
 	{
