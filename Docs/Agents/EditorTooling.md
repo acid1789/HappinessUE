@@ -239,6 +239,8 @@ unexplained hints. Difficulty: 0 easy, 1 normal, 2 hard. Sizes 3–8.
 
 ## Testing in the game
 
+- Happiness.PreviewMasterTransition [column 1-12] previews the pencil erasing Campaign controls, flipping, and drawing Master Mode controls. No progress is saved. Defaults to column 1; menu only.
+
 - Happiness.PreviewMasterReward [column 1-12] opens the completed Master popup from the menu; press Return to Campaign to preview its collapse into the gem. Append close (Happiness.PreviewMasterReward 1 close) to play the Return action automatically. Happiness.MasterCollapseDuration controls the suction duration (default 0.6 seconds). Defaults to column 1; temporary display state only, no saved progress changes. Development builds only.
 
 - PIE console (`~`) command `Happiness.CompleteAllLessons` marks every lesson complete, which unlocks Campaign

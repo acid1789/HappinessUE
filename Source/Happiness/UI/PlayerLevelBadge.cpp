@@ -220,6 +220,22 @@ void UPlayerLevelBadge::PreviewMasterReward(int32 Column)
 }
 
 #if !UE_BUILD_SHIPPING
+static FAutoConsoleCommandWithWorldAndArgs GPreviewMasterTransition(
+	TEXT("Happiness.PreviewMasterTransition"),
+	TEXT("Happiness.PreviewMasterTransition [column 1-12]: preview the pencil erasing Campaign controls and drawing Master controls. Does not change saved progress."),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+	{
+		const int32 Column = Args.IsEmpty() ? 0 : FCString::Atoi(*Args[0]) - 1;
+		if (Column < 0 || Column >= UCampaignTree::GetNumColumns()) return;
+		TArray<UUserWidget*> Trees;
+		UWidgetBlueprintLibrary::GetAllWidgetsOfClass(World, Trees, UCampaignTreeWidget::StaticClass(), false);
+		if (Trees.IsEmpty()) return;
+		UCampaignTreeWidget* Tree = CastChecked<UCampaignTreeWidget>(Trees[0]);
+		if (!Tree->LessonPopup) return;
+		Tree->SetVisibility(ESlateVisibility::Visible);
+		Tree->LessonPopup->PreviewMasterTransition(UCampaignTree::GetColumnLessons(Column)[0]);
+	}));
+
 static FAutoConsoleCommandWithWorldAndArgs GPreviewMasterReward(
 	TEXT("Happiness.PreviewMasterReward"),
 	TEXT("Happiness.PreviewMasterReward [column 1-12]: opens the completed Master popup; press Return to Campaign to collapse it into its gem. Menu only; never changes saved progress."),

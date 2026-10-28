@@ -91,6 +91,97 @@ public:
 	}
 };
 
+class SMasterRevealSheet : public SLeafWidget
+{
+public:
+	SLATE_BEGIN_ARGS(SMasterRevealSheet) {} SLATE_END_ARGS()
+	void Construct(const FArguments&) { SetVisibility(EVisibility::HitTestInvisible); }
+	FSlateBrush Base, Campaign, Master;
+	FVector2D TopLeft, BottomRight;
+	int32 Phase = 0; // erase, turn, draw
+	float Progress = 0.f;
+	virtual FVector2D ComputeDesiredSize(float) const override { return FVector2D(1500, 950); }
+	virtual int32 OnPaint(const FPaintArgs&, const FGeometry& G, const FSlateRect&,
+		FSlateWindowElementList& E, int32 Layer, const FWidgetStyle&, bool) const override
+	{
+		const FVector2D Origin = G.AbsoluteToLocal(TopLeft);
+		const FVector2D Scale = (G.AbsoluteToLocal(BottomRight) - Origin) / FVector2D(1500, 950);
+		auto Rect = [&](const FSlateBrush& Brush, float L, float T, float R, float B)
+		{
+			if (R <= L || B <= T || !Brush.GetResourceObject()) return;
+			TArray<FSlateVertex> V;
+			for (const FVector2D& P : {FVector2D(L,T), FVector2D(R,T), FVector2D(L,B), FVector2D(R,B)})
+				V.Add(FSlateVertex::Make<ESlateVertexRounding::Disabled>(G.GetAccumulatedRenderTransform(),
+					FVector2f(Origin + P * Scale), FVector2f(P / FVector2D(1500,950)), FColor::White));
+			const TArray<SlateIndex> I = {0,1,2,1,3,2};
+			FSlateDrawElement::MakeCustomVerts(E, Layer, FSlateApplication::Get().GetRenderer()->GetResourceHandle(Brush), V,I,nullptr,0,0);
+		};
+		Rect(Base, 0, 0, 1500, 950);
+		constexpr float Edges[] = {610,654,704,824,935};
+		const float Steps = FMath::Clamp(Progress,0.f,1.f) * 4.f;
+		const int32 Step = FMath::Min(FMath::FloorToInt(Steps),3);
+		const float Along = FMath::Clamp(Steps - Step,0.f,1.f);
+		const int32 Row = Phase == 2 ? 3 - Step : Step;
+		constexpr int32 ErasePasses = 35; // Roughly 39 pixels per pass, matching the tilted eraser's footprint.
+		constexpr float ColumnWidth = 1350.f / ErasePasses;
+		const float EraseSteps = FMath::Clamp(Progress,0.f,1.f) * ErasePasses;
+		const int32 Pass = FMath::Min(FMath::FloorToInt(EraseSteps),ErasePasses-1);
+		const float PassAlong = FMath::Clamp(EraseSteps-Pass,0.f,1.f);
+		const float Vertical = FMath::Min(PassAlong/.85f,1.f);
+		const bool bDownward = Pass % 2 == 0;
+		const float EraseY = FMath::Lerp(Edges[0],Edges[4],bDownward ? Vertical : 1.f-Vertical);
+		const float ColumnRight = 1425.f-Pass*ColumnWidth;
+		const float ColumnLeft = ColumnRight-ColumnWidth;
+		if (Phase == 0)
+		{
+			// Completed columns on the right stay erased; the active column clears behind the vertical stroke.
+			Rect(Campaign,75,Edges[0],ColumnLeft,Edges[4]);
+			Rect(Campaign,ColumnLeft,bDownward ? EraseY : Edges[0],ColumnRight,bDownward ? Edges[4] : EraseY);
+		}
+		else if (Phase == 2)
+			for (int32 I = 0; I < 4; ++I)
+			{
+				const float Fraction = I > Row ? 1.f : I < Row ? 0.f : Along;
+				Rect(Master,75,Edges[I],75+1350*Fraction,Edges[I+1]);
+			}
+		const float EraserCenterOffset = FMath::Cos(FMath::DegreesToRadians(-55.f)) * 13.5f;
+		const float StrokeX = ColumnRight - ColumnWidth*.5f - EraserCenterOffset;
+		const float EraseX = FMath::Lerp(StrokeX,Pass == ErasePasses-1 ? 75.f : StrokeX-ColumnWidth,
+			FMath::Clamp((PassAlong-.85f)/.15f,0.f,1.f));
+		const FVector2D Contact(Phase == 0 ? EraseX : Phase == 1 ? 75.f : 75.f+1350.f*Along,
+			Phase == 0 ? EraseY : Phase == 1 ? FMath::Lerp(Edges[4],(Edges[3]+Edges[4])*.5f,Progress)
+			: (Edges[Row]+Edges[Row+1])*.5f + FMath::Sin(Along*PI*18.f)*(Edges[Row+1]-Edges[Row])*.18f);
+		const float Angle = FMath::DegreesToRadians(-55.f + (Phase == 0 ? 0.f : Phase == 2 ? 180.f : 180.f*FMath::InterpEaseInOut(0.f,1.f,Progress,2.f)));
+		const FVector2D Direction(FMath::Cos(Angle),FMath::Sin(Angle));
+		const FVector2D Normal(-Direction.Y,Direction.X);
+		const FVector2D Center = Phase == 1 ? Contact + FVector2D(FMath::Cos(FMath::DegreesToRadians(-55.f)),FMath::Sin(FMath::DegreesToRadians(-55.f)))*100.f
+			: Contact + Direction*(Phase == 0 ? 100.f : -100.f);
+		auto Fill = [&](TArray<FVector2D> Points, FLinearColor Color)
+		{
+			TArray<FSlateVertex> V;
+			TArray<SlateIndex> I;
+			for (const FVector2D& P : Points)
+			{
+				const FVector2D Q=Center+Direction*(P.X-85.f)+Normal*P.Y;
+				V.Add(FSlateVertex::Make<ESlateVertexRounding::Disabled>(G.GetAccumulatedRenderTransform(),FVector2f(Origin+Q*Scale),FVector2f(.5f,.5f),Color.ToFColor(true)));
+			}
+			for (int32 N=1;N+1<V.Num();++N) I.Append({0,SlateIndex(N),SlateIndex(N+1)});
+			FSlateDrawElement::MakeCustomVerts(E,Layer+1,FSlateApplication::Get().GetRenderer()->GetResourceHandle(*FCoreStyle::Get().GetBrush("WhiteBrush")),V,I,nullptr,0,0);
+		};
+		Fill({{-15,-11},{-10,-15},{12,-15},{12,15},{-10,15},{-15,11}},FLinearColor(.66f,.27f,.31f));
+		Fill({{-13,-9},{10,-9},{10,-2},{-13,-2}},FLinearColor(.94f,.53f,.52f));
+		Fill({{10,-16},{35,-16},{35,16},{10,16}},FLinearColor(.66f,.48f,.20f));
+		Fill({{12,-12},{33,-12},{33,10},{12,10}},FLinearColor(.92f,.87f,.65f));
+		Fill({{34,-14},{143,-14},{143,14},{34,14}},FLinearColor(.12f,.25f,.10f));
+		Fill({{35,-12},{142,-12},{142,-3},{35,-3}},FLinearColor(.43f,.59f,.24f));
+		Fill({{35,-2},{142,-2},{142,9},{35,9}},FLinearColor(.25f,.40f,.13f));
+		Fill({{143,-14},{185,0},{143,14}},FLinearColor(.78f,.57f,.30f));
+		Fill({{143,-12},{185,0},{143,0}},FLinearColor(.97f,.80f,.49f));
+		Fill({{172,-4.5},{185,0},{172,4.5}},FLinearColor(.08f,.07f,.05f));
+		return Layer+1;
+	}
+};
+
 #define LOCTEXT_NAMESPACE "LessonPopup"
 
 namespace
@@ -583,7 +674,7 @@ bool ULessonPopupWidget::IsShowingMaster() const
 {
 	// Not while the reveal animation runs: until it ends the popup shows the completed campaign
 	const UCampaignSubsystem* Campaign = GetCampaign();
-	return bPreviewMasterCompletion || (Campaign && Campaign->IsMasterRevealed(Lesson) && RevealPhase == ERevealPhase::None);
+	return bRevealMasterControls || bPreviewMasterCompletion || ((bPreviewMasterTransition || (Campaign && Campaign->IsMasterRevealed(Lesson))) && RevealPhase == ERevealPhase::None);
 }
 
 FText ULessonPopupWidget::GetMasterProgressText() const
@@ -593,6 +684,9 @@ FText ULessonPopupWidget::GetMasterProgressText() const
 	{
 		return FText::GetEmpty();
 	}
+	if (bPreviewMasterTransition)
+		return FText::Format(LOCTEXT("MasterProgressFormat", "Master  {0} / {1}  -  {2}"),
+			0, UCampaignSubsystem::GetMasterMaxPoints(), UCampaignSubsystem::GetStageDisplayName(UCampaignSubsystem::GetFirstMasterStage()));
 	const FText StageText = bPreviewMasterCompletion || Campaign->IsMasterCompleted(Lesson) ? LOCTEXT("MasterComplete", "Mastered")
 		: UCampaignSubsystem::GetStageDisplayName(Campaign->GetCurrentMasterStage(Lesson));
 	return FText::Format(LOCTEXT("MasterProgressFormat", "Master  {0} / {1}  -  {2}"),
@@ -625,108 +719,117 @@ void ULessonPopupWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTi
 	}
 }
 
+UTextureRenderTarget2D* ULessonPopupWidget::CaptureNotebook()
+{
+	// This capture is composited through Slate again, so keep it linear (like a RetainerBox).
+	FWidgetRenderer* Renderer = new FWidgetRenderer(false);
+	UTextureRenderTarget2D* Texture = Renderer->DrawWidget(NotebookCanvas->TakeWidget(), FVector2D(1500,950));
+	BeginCleanup(Renderer);
+	return Texture;
+}
+
+void ULessonPopupWidget::SetRevealControlsVisible(bool bVisible)
+{
+	for (UWidget* Child : NotebookCanvas->GetAllChildren())
+	{
+		const UCanvasPanelSlot* LayoutSlot = Cast<UCanvasPanelSlot>(Child->Slot);
+		if (LayoutSlot && LayoutSlot->GetPosition().Y >= 610.f)
+			Child->SetVisibility(bVisible ? ESlateVisibility::Visible : ESlateVisibility::Hidden);
+	}
+}
+
+bool ULessonPopupWidget::StartRevealSheet()
+{
+	if (!NotebookCanvas || NotebookCanvas->GetPaintSpaceGeometry().GetLocalSize().IsNearlyZero()) return false;
+	const FGeometry Geometry = NotebookCanvas->GetPaintSpaceGeometry();
+	RevealOldTexture = CaptureNotebook();
+	TArray<ESlateVisibility> ChildVisibility;
+	const TArray<UWidget*> Children = NotebookCanvas->GetAllChildren();
+	for (UWidget* Child : Children) ChildVisibility.Add(Child->GetVisibility());
+	SetRevealControlsVisible(false);
+	RevealBaseTexture = CaptureNotebook();
+	for (int32 Index=0; Index<Children.Num(); ++Index) Children[Index]->SetVisibility(ChildVisibility[Index]);
+	RevealSheet = SNew(SMasterRevealSheet);
+	RevealSheet->TopLeft = Geometry.LocalToAbsolute(FVector2D::ZeroVector);
+	RevealSheet->BottomRight = Geometry.LocalToAbsolute(Geometry.GetLocalSize());
+	RevealSheet->Base.SetResourceObject(RevealBaseTexture);
+	RevealSheet->Campaign.SetResourceObject(RevealOldTexture);
+	RevealHost = WidgetTree->ConstructWidget<UNativeWidgetHost>();
+	RevealHost->SetContent(RevealSheet.ToSharedRef());
+	RevealHost->SetVisibility(ESlateVisibility::HitTestInvisible);
+	UCanvasPanelSlot* HostSlot = CastChecked<UCanvasPanel>(WidgetTree->RootWidget)->AddChildToCanvas(RevealHost);
+	HostSlot->SetAnchors(FAnchors(0,0,1,1));
+	HostSlot->SetOffsets(FMargin(0));
+	HostSlot->SetZOrder(25);
+	NotebookCanvas->SetVisibility(ESlateVisibility::Hidden);
+	return true;
+}
+
 void ULessonPopupWidget::TickReveal(float DeltaTime)
 {
 	RevealElapsed += DeltaTime;
-	switch (RevealPhase)
+	if (RevealPhase == ERevealPhase::Drain)
 	{
-		case ERevealPhase::Drain:
-		{
-			const float Alpha = RevealDrainTime > 0.f ? FMath::Min(RevealElapsed / RevealDrainTime, 1.f) : 1.f;
-			if (LessonProgress)
-			{
-				LessonProgress->SetPercent(1.f - Alpha);
-			}
-			if (Alpha >= 1.f)
-			{
-				RevealPhase = ERevealPhase::Erase;
-				RevealElapsed = 0.f;
-				if (EraseCover)
-				{
-					// Painted in the panel's color, so covering the text erases it
-					FLinearColor Cover = Panel ? Panel->GetBrushColor() : FLinearColor::White;
-					Cover.A = 1.f;
-					EraseCover->SetColorAndOpacity(Cover);
-					EraseCover->SetVisibility(ESlateVisibility::HitTestInvisible);
-				}
-				if (Eraser)
-				{
-					Eraser->SetColorAndOpacity(EraserColor);
-					Eraser->SetVisibility(ESlateVisibility::HitTestInvisible);
-				}
-				SetEraseProgress(0.f);
-			}
-			break;
-		}
-
-		case ERevealPhase::Erase:
-		{
-			const float Alpha = RevealEraseTime > 0.f ? FMath::Min(RevealElapsed / RevealEraseTime, 1.f) : 1.f;
-			SetEraseProgress(Alpha);
-			if (Alpha >= 1.f)
-			{
-				// The line is gone: write the Master line in its place
-				RevealPhase = ERevealPhase::Text;
-				RevealElapsed = 0.f;
-				HideEraser();
-				if (ProgressText)
-				{
-					ProgressText->SetText(GetMasterProgressText());
-				}
-			}
-			break;
-		}
-
-		case ERevealPhase::Text:
-			if (RevealElapsed >= RevealTextHold)
-			{
-				// Then the Master buttons and the Master bar
-				RevealPhase = ERevealPhase::None;
-				Refresh();
-			}
-			break;
-
-		default:
-			break;
+		if (StartRevealSheet()) { RevealPhase=ERevealPhase::Erase; RevealElapsed=0.f; }
+		return;
+	}
+	if (!RevealSheet) return;
+	if (RevealPhase == ERevealPhase::Text && !RevealMasterTexture)
+	{
+		RevealMasterTexture = CaptureNotebook();
+		RevealSheet->Master.SetResourceObject(RevealMasterTexture);
+		NotebookCanvas->SetVisibility(ESlateVisibility::Hidden);
+	}
+	const float Duration = RevealPhase == ERevealPhase::Text ? .45f : FMath::Max(.1f, RevealEraseTime);
+	const float Alpha=FMath::Clamp(RevealElapsed/Duration,0.f,1.f);
+	RevealSheet->Phase=RevealPhase==ERevealPhase::Erase ? 0 : RevealPhase==ERevealPhase::Text ? 1 : 2;
+	RevealSheet->Progress=Alpha;
+	RevealSheet->Invalidate(EInvalidateWidgetReason::Paint);
+	if (Alpha<1.f) return;
+	RevealElapsed=0.f;
+	if (RevealPhase==ERevealPhase::Erase)
+	{
+		bRevealMasterControls=true;
+		NotebookCanvas->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+		Refresh();
+		RevealPhase=ERevealPhase::Text;
+	}
+	else if (RevealPhase==ERevealPhase::Text) RevealPhase=ERevealPhase::Draw;
+	else
+	{
+		RevealPhase=ERevealPhase::None;
+		HideEraser();
+		Refresh();
 	}
 }
 
 void ULessonPopupWidget::SetEraseProgress(float Alpha)
 {
-	// The eraser travels from the line's right edge to its left; the cover fills in behind it (to its right)
-	const UWidget* Line = EraseCover ? EraseCover->GetParent() : nullptr;
-	const FVector2D Size = Line ? Line->GetCachedGeometry().GetLocalSize() : FVector2D::ZeroVector;
-	const float Travel = FMath::Max(Size.X - EraserWidth, 0.f) * Alpha;
-	if (EraseCover)
-	{
-		EraseCover->SetDesiredSizeOverride(FVector2D(Alpha >= 1.f ? Size.X : Travel + EraserWidth * 0.5f, Size.Y));
-	}
-	if (Eraser)
-	{
-		Eraser->SetDesiredSizeOverride(FVector2D(EraserWidth, Size.Y));
-		if (UOverlaySlot* EraserSlot = Cast<UOverlaySlot>(Eraser->Slot))
-		{
-			EraserSlot->SetPadding(FMargin(0.f, 0.f, Travel, 0.f));
-		}
-	}
+	if (RevealSheet) RevealSheet->Progress=Alpha;
 }
 
 void ULessonPopupWidget::HideEraser()
 {
-	if (EraseCover)
+	if (EraseCover) EraseCover->SetVisibility(ESlateVisibility::Collapsed);
+	if (Eraser) Eraser->SetVisibility(ESlateVisibility::Collapsed);
+	if (RevealHost)
 	{
-		EraseCover->SetVisibility(ESlateVisibility::Collapsed);
+		RevealHost->RemoveFromParent();
+		if (NotebookCanvas) NotebookCanvas->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	}
-	if (Eraser)
-	{
-		Eraser->SetVisibility(ESlateVisibility::Collapsed);
-	}
+	RevealHost=nullptr;
+	RevealSheet.Reset();
+	RevealOldTexture=nullptr;
+	RevealBaseTexture=nullptr;
+	RevealMasterTexture=nullptr;
+	bRevealMasterControls=false;
 }
 
 void ULessonPopupWidget::ShowLessonAfterPuzzle(ECampaignLesson InLesson)
 {
 	ResetMasterCollapse();
 	bPreviewMasterCompletion = false;
+	bPreviewMasterTransition = false;
 	Lesson = InLesson;
 	Refresh();
 	SetVisibility(ESlateVisibility::Visible);
@@ -741,6 +844,16 @@ void ULessonPopupWidget::PreviewMasterCompletion(ECampaignLesson InLesson)
 	Refresh();
 }
 
+void ULessonPopupWidget::PreviewMasterTransition(ECampaignLesson InLesson)
+{
+	HideEraser();
+	ShowLessonAfterPuzzle(InLesson);
+	bPreviewMasterTransition = true;
+	RevealPhase = ERevealPhase::Drain;
+	RevealElapsed = 0.f;
+	Refresh();
+}
+
 void ULessonPopupWidget::Refresh()
 {
 	// Lessons and Campaign have different stages
@@ -750,18 +863,18 @@ void ULessonPopupWidget::Refresh()
 		BuildStageButtons();
 	}
 
-	const bool bCampaignMode = bPreviewMasterCompletion || UCampaignSubsystem::GetMode() == ECampaignMode::Campaign;
+	const bool bCampaignMode = bPreviewMasterTransition || bPreviewMasterCompletion || UCampaignSubsystem::GetMode() == ECampaignMode::Campaign;
 	const UCampaignSubsystem* Campaign = GetCampaign();
-	const int32 Points = Campaign ? Campaign->GetLessonPoints(Lesson) : 0;
+	const int32 Points = bPreviewMasterTransition ? UCampaignSubsystem::GetMaxPoints() : Campaign ? Campaign->GetLessonPoints(Lesson) : 0;
 	const int32 CurrentStage = Campaign ? Campaign->GetCurrentStage(Lesson) : 0;
-	const bool bCompleted = bPreviewMasterCompletion || (Campaign && Campaign->IsLessonCompleted(Lesson));
+	const bool bCompleted = bPreviewMasterTransition || bPreviewMasterCompletion || (Campaign && Campaign->IsLessonCompleted(Lesson));
 
 	// Once the final is done (Campaign), the popup follows Master Mode: its bar, text and Play button
 	const bool bMaster = IsShowingMaster();
-	const bool bMasterDone = bPreviewMasterCompletion || (bMaster && Campaign->IsMasterCompleted(Lesson));
-	const int32 MasterPoints = bPreviewMasterCompletion ? UCampaignSubsystem::GetMasterMaxPoints() : (bMaster ? Campaign->GetMasterPoints(Lesson) : 0);
+	const bool bMasterDone = bPreviewMasterCompletion || (!bPreviewMasterTransition && bMaster && Campaign->IsMasterCompleted(Lesson));
+	const int32 MasterPoints = bPreviewMasterTransition ? 0 : bPreviewMasterCompletion ? UCampaignSubsystem::GetMasterMaxPoints() : (bMaster ? Campaign->GetMasterPoints(Lesson) : 0);
 	const int32 MasterMax = UCampaignSubsystem::GetMasterMaxPoints();
-	const int32 CurrentMaster = bMaster ? Campaign->GetCurrentMasterStage(Lesson) : INDEX_NONE;
+	const int32 CurrentMaster = bPreviewMasterTransition ? UCampaignSubsystem::GetFirstMasterStage() : bMaster ? Campaign->GetCurrentMasterStage(Lesson) : INDEX_NONE;
 	const bool bAllDone = bCompleted && (!bMaster || bMasterDone);
 
 	if (TitleText)
@@ -788,9 +901,7 @@ void ULessonPopupWidget::Refresh()
 		if (UScrollBox* Explanation = DescriptionText ? Cast<UScrollBox>(DescriptionText->GetParent()) : nullptr)
 			Explanation->ScrollToStart();
 	}
-	// While the reveal erases the line and shows the Master line, the animation owns the bar and the line
-	const bool bRevealOwnsLine = RevealPhase == ERevealPhase::Erase || RevealPhase == ERevealPhase::Text;
-	if (LessonProgress && !bRevealOwnsLine)
+	if (LessonProgress)
 	{
 		LessonProgress->SetPercent(bMaster ? float(MasterPoints) / MasterMax : float(Points) / UCampaignSubsystem::GetMaxPoints());
 	}
@@ -811,11 +922,11 @@ void ULessonPopupWidget::Refresh()
 			ProgressTicks->ClearTickFractions();
 		}
 	}
-	if (ProgressText && !bRevealOwnsLine && bMaster)
+	if (ProgressText && bMaster)
 	{
 		ProgressText->SetText(GetMasterProgressText());
 	}
-	else if (ProgressText && !bRevealOwnsLine)
+	else if (ProgressText)
 	{
 		const FText StageText = !bCompleted ? UCampaignSubsystem::GetStageDisplayName(CurrentStage)
 			: (bCampaignMode ? LOCTEXT("CampaignComplete", "Complete") : LOCTEXT("LessonComplete", "Lesson complete"));
@@ -855,14 +966,14 @@ void ULessonPopupWidget::Refresh()
 	for (int32 i = 0; i < MasterButtons.Num(); i++)
 	{
 		const int32 Stage = FirstMaster + i;
-		const bool bUnlocked = bPreviewMasterCompletion || (Campaign && Campaign->IsStageUnlocked(Lesson, Stage));
+		const bool bUnlocked = bPreviewMasterTransition ? Stage == FirstMaster : bPreviewMasterCompletion || (Campaign && Campaign->IsStageUnlocked(Lesson, Stage));
 		const bool bIsCurrent = Stage == CurrentMaster && !bMasterDone;
 		StyleStage(MasterButtons[i], Stage, bUnlocked, bIsCurrent, bUnlocked && !bIsCurrent);
 	}
 
 	for (int32 Stage = 0; Stage < StageButtons.Num(); Stage++)
 	{
-		const bool bUnlocked = Campaign ? Campaign->IsStageUnlocked(Lesson, Stage) : Stage == 0;
+		const bool bUnlocked = bPreviewMasterTransition || (Campaign ? Campaign->IsStageUnlocked(Lesson, Stage) : Stage == 0);
 		const bool bIsCurrent = Stage == CurrentStage && !(Stage == UCampaignSubsystem::GetFinalStage() && bCompleted);
 
 		StyleStage(StageButtons[Stage], Stage, bUnlocked, bIsCurrent,

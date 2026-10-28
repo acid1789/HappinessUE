@@ -24,6 +24,7 @@ class UPlayerLevelBadge;
 class UNativeWidgetHost;
 class UTextureRenderTarget2D;
 class SMasterCollapseMesh;
+class SMasterRevealSheet;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnLessonStageChosen, ECampaignLesson, Lesson, int32, Stage);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnLessonPopupClosed);
@@ -74,7 +75,9 @@ public:
 	/** Display the completed Master state for an art preview without changing campaign progress. */
 	void PreviewMasterCompletion(ECampaignLesson InLesson);
 	void PreviewMasterReturn() { HandleCloseClicked(); }
+	void PreviewMasterTransition(ECampaignLesson InLesson);
 	bool bPreviewMasterCompletion = false;
+	bool bPreviewMasterTransition = false;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UTextBlock> TitleText;
@@ -101,10 +104,8 @@ public:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<ULessonProgressTicks> ProgressTicks;
 
-	// Master Mode reveal: the first time the player opens a cleared clue, the bar drains, an eraser wipes the
-	// progress line from right to left, the Master line appears, then the Master buttons and bar. EraseCover and
-	// Eraser sit over ProgressText (in an Overlay, aligned right, filling its height); EraseCover is painted in
-	// Panel's color so the text disappears as it grows.
+	// Master Mode reveal erases the control rows with a pencil, turns it, then draws the Master rows.
+	// Keep the old optional image bindings for existing Blueprints; the snapshot animation hides them.
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UBorder> Panel;
@@ -245,12 +246,22 @@ private:
 	enum class ERevealPhase : uint8
 	{
 		None,
-		Drain,	// the completed campaign bar empties
-		Erase,	// the eraser wipes the progress line, right to left
-		Text,	// the Master line shows, before the Master buttons and bar
+		Draw,
+		Drain,	// wait for layout before capturing the controls
+		Erase,	// erase control rows from right to left
+		Text,	// turn the pencil around before drawing
 	};
 	ERevealPhase RevealPhase = ERevealPhase::None;
 	float RevealElapsed = 0.f;
+	bool bRevealMasterControls = false;
+	bool StartRevealSheet();
+	UTextureRenderTarget2D* CaptureNotebook();
+	void SetRevealControlsVisible(bool bVisible);
+	UPROPERTY(Transient) TObjectPtr<UNativeWidgetHost> RevealHost;
+	UPROPERTY(Transient) TObjectPtr<UTextureRenderTarget2D> RevealOldTexture;
+	UPROPERTY(Transient) TObjectPtr<UTextureRenderTarget2D> RevealBaseTexture;
+	UPROPERTY(Transient) TObjectPtr<UTextureRenderTarget2D> RevealMasterTexture;
+	TSharedPtr<SMasterRevealSheet> RevealSheet;
 
 	void TickReveal(float DeltaTime);
 	/** 0: nothing erased, 1: the whole line covered */
