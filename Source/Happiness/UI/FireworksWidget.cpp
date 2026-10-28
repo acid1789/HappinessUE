@@ -6,6 +6,8 @@
 #include "Framework/Application/SlateApplication.h"
 #include "Rendering/SlateRenderer.h"
 #include "UObject/ConstructorHelpers.h"
+#include "Kismet/GameplayStatics.h"
+#include "Sound/SoundWave.h"
 
 namespace
 {
@@ -139,6 +141,12 @@ UFireworksWidget::UFireworksWidget(const FObjectInitializer& ObjectInitializer)
 {
 	static ConstructorHelpers::FObjectFinder<UTexture2D> Art(TEXT("/Game/Happiness/UI/Textures/T_FireworkParticles.T_FireworkParticles"));
 	ParticleAtlas = Art.Object;
+	static ConstructorHelpers::FObjectFinder<USoundWave> Launch(TEXT("/Game/General/Audio/Waves/FireworkLaunch.FireworkLaunch"));
+	static ConstructorHelpers::FObjectFinder<USoundWave> Burst01(TEXT("/Game/General/Audio/Waves/FireworkBurst01.FireworkBurst01"));
+	static ConstructorHelpers::FObjectFinder<USoundWave> Burst02(TEXT("/Game/General/Audio/Waves/FireworkBurst02.FireworkBurst02"));
+	static ConstructorHelpers::FObjectFinder<USoundWave> Burst03(TEXT("/Game/General/Audio/Waves/FireworkBurst03.FireworkBurst03"));
+	LaunchSound = Launch.Object;
+	BurstSounds = { Burst01.Object, Burst02.Object, Burst03.Object };
 }
 
 TSharedRef<SWidget> UFireworksWidget::RebuildWidget()
@@ -204,6 +212,11 @@ float UFireworksWidget::GetFirstBurstTime() const
 
 void UFireworksWidget::Explode(const FBurst& Burst, const FLinearColor& Color)
 {
+	if (BurstSounds.Num() > 0 && GetWorld() && GetWorld()->IsGameWorld())
+	{
+		UGameplayStatics::PlaySound2D(this, BurstSounds[NextBurstSound++ % BurstSounds.Num()], 0.7f,
+			FMath::Max(PlayRate, 0.1f), 0.f, nullptr, nullptr, true);
+	}
 	Flashes.Emplace(Burst.Position, 1.f);
 	for (int32 Index = 0; Index < SparksPerBurst; Index++)
 	{
@@ -233,7 +246,7 @@ void UFireworksWidget::Advance(float DeltaTime)
 	Sparks.RemoveAll([](const FSpark& Spark) { return Spark.bRocket; });
 	for (int32 Index = NextBurst; Index < Bursts.Num(); Index++)
 	{
-		const FBurst& Burst = Bursts[Index];
+		FBurst& Burst = Bursts[Index];
 		if (Time >= Burst.Delay)
 		{
 			Explode(Burst, BurstColors[Index % UE_ARRAY_COUNT(BurstColors)]);
@@ -244,6 +257,15 @@ void UFireworksWidget::Advance(float DeltaTime)
 		if (Burst.RocketRise <= 0.f || Time < RiseStart)
 		{
 			continue;
+		}
+		if (!Burst.bLaunchSoundPlayed)
+		{
+			Burst.bLaunchSoundPlayed = true;
+			if (LaunchSound && GetWorld() && GetWorld()->IsGameWorld())
+			{
+				UGameplayStatics::PlaySound2D(this, LaunchSound, 0.65f, FMath::Max(PlayRate, 0.1f),
+					FMath::Max(0.f, Time - RiseStart), nullptr, nullptr, true);
+			}
 		}
 		const float T = (Time - RiseStart) / RocketRiseTime;
 		const float Height = Burst.RocketRise * FMath::Square(1.f - T);
