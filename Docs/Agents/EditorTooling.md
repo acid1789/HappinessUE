@@ -158,6 +158,7 @@ python Tools/mcp_call.py editor_toolset.toolsets.asset.AssetTools duplicate   '{
 
 - **Compile results:** `compile_blueprint` returns nothing useful. Check the log instead: note the line count of
   `Saved/Logs/Happiness.log` before compiling and grep the new lines for `error|warning`.
+- **Changing an array length and its entries:** ObjectTools.set_properties can reject a full replacement as an ambiguous ArrayAdd. Clear the array with [] first, then set the complete new entries (for example, replacing an eight-icon set with twelve gems).
 - **Saving:** save every asset you changed with `AssetTools.save_assets`. A duplicated asset exists only in
   memory until saved. Saving fails while PIE is running.
 
