@@ -13,7 +13,8 @@ class UWidget;
 /**
  * Congratulations for completing every lesson, over the whole mode screen (UHappinessModeWidget makes it the first
  * time it's needed): what the player unlocked, the Garden Visitors icon set and Campaign mode, then Continue closes
- * it. Built in code, in the confirm dialog's garden plaque style.
+ * it. With bCampaignComplete, the same for completing the campaign: the Mythical Creatures icon set, and a pointer to
+ * Master Mode. Built in code, in the confirm dialog's garden plaque style.
  */
 UCLASS()
 class HAPPINESS_API ULessonsCompletePopup : public UUserWidget
@@ -30,6 +31,9 @@ public:
 
 	/** The plaque, without the dimmed screen around it (none until it's built) */
 	UWidget* GetWindow() const { return Window; }
+
+	/** The campaign's congratulations rather than the lessons'. Set before it's first shown (the layout is built once). */
+	bool bCampaignComplete = false;
 
 	/** Seconds the popup takes to fade in */
 	UPROPERTY(EditAnywhere, Category = "Lessons Complete")
@@ -50,6 +54,8 @@ private:
 	UPROPERTY() TObjectPtr<UFont> PlaqueFont;
 	/** A few of the Garden Visitors, for its card */
 	UPROPERTY() TArray<TObjectPtr<UTexture2D>> VisitorTextures;
+	/** A few of the Mythical Creatures, for theirs */
+	UPROPERTY() TArray<TObjectPtr<UTexture2D>> CreatureTextures;
 
 	UPROPERTY(Transient) TObjectPtr<UWidget> Window;
 	UPROPERTY(Transient) TObjectPtr<UImage> CampaignImage;

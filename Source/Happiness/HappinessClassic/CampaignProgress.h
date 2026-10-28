@@ -192,6 +192,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Campaign")
 	bool IsCampaignModeUnlocked() const;
 
+	/** Every lesson's Campaign mode final is completed, whatever the current mode (Master Mode doesn't count) */
+	UFUNCTION(BlueprintPure, Category = "Campaign")
+	bool IsCampaignCompleted() const;
+
 	// ---- Stage definitions (current mode) ----
 
 	UFUNCTION(BlueprintPure, Category = "Campaign")
@@ -375,6 +379,13 @@ public:
 	/** IsLessonsCompletionPending, once */
 	bool ConsumeLessonsCompletion();
 
+	/** Every lesson's Campaign final has just been completed (the Mythical Creatures unlocked), and the mode screen
+	 *  hasn't celebrated it yet (UHappinessModeWidget). Not saved, like the lessons' completion. */
+	bool IsCampaignCompletionPending() const { return bCampaignCompletionPending; }
+
+	/** IsCampaignCompletionPending, once */
+	bool ConsumeCampaignCompletion();
+
 	/** The game started with no game save at all (a new player): true once, for the menu to open on Game Basics */
 	bool ConsumeNewPlayerStart();
 
@@ -467,6 +478,7 @@ private:
 	FLessonPuzzleResult LastResult;
 	TOptional<ECampaignLesson> UncelebratedLesson;
 	bool bLessonsCompletionPending = false;
+	bool bCampaignCompletionPending = false;
 	bool bNewPlayerStart = false;
 	static TWeakObjectPtr<UCampaignSubsystem> Instance;
 };

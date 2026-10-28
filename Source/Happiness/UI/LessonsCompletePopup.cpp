@@ -45,6 +45,10 @@ ULessonsCompletePopup::ULessonsCompletePopup(const FObjectInitializer& ObjectIni
 	static ConstructorHelpers::FObjectFinder<UTexture2D> Ladybug(TEXT("/Game/Happiness/IconSets/Icons/GardenVisitors/T_Ladybug.T_Ladybug"));
 	static ConstructorHelpers::FObjectFinder<UTexture2D> Butterfly(TEXT("/Game/Happiness/IconSets/Icons/GardenVisitors/T_Butterfly.T_Butterfly"));
 	static ConstructorHelpers::FObjectFinder<UTexture2D> Snail(TEXT("/Game/Happiness/IconSets/Icons/GardenVisitors/T_Snail.T_Snail"));
+	static ConstructorHelpers::FObjectFinder<UTexture2D> Dragon(TEXT("/Game/Happiness/IconSets/Icons/MythicalCreatures/T_Dragon.T_Dragon"));
+	static ConstructorHelpers::FObjectFinder<UTexture2D> Unicorn(TEXT("/Game/Happiness/IconSets/Icons/MythicalCreatures/T_Unicorn.T_Unicorn"));
+	static ConstructorHelpers::FObjectFinder<UTexture2D> Phoenix(TEXT("/Game/Happiness/IconSets/Icons/MythicalCreatures/T_Phoenix.T_Phoenix"));
+	static ConstructorHelpers::FObjectFinder<UTexture2D> Kraken(TEXT("/Game/Happiness/IconSets/Icons/MythicalCreatures/T_Kraken.T_Kraken"));
 	PlaqueTexture = Plaque.Object;
 	ButtonTexture = Button.Object;
 	PlaqueFont = Font.Object;
@@ -53,6 +57,13 @@ ULessonsCompletePopup::ULessonsCompletePopup(const FObjectInitializer& ObjectIni
 		if (Visitor)
 		{
 			VisitorTextures.Add(Visitor);
+		}
+	}
+	for (UTexture2D* Creature : { Dragon.Object, Unicorn.Object, Phoenix.Object, Kraken.Object })
+	{
+		if (Creature)
+		{
+			CreatureTextures.Add(Creature);
 		}
 	}
 }
@@ -126,7 +137,8 @@ void ULessonsCompletePopup::BuildLayout()
 		return Block;
 	};
 
-	Content->AddChildToVerticalBox(MakeText(LOCTEXT("Title", "Lessons Complete!"), 58, PopupInk))->SetHorizontalAlignment(HAlign_Center);
+	const FText Title = bCampaignComplete ? LOCTEXT("CampaignTitle", "Campaign Complete!") : LOCTEXT("Title", "Lessons Complete!");
+	Content->AddChildToVerticalBox(MakeText(Title, 58, PopupInk))->SetHorizontalAlignment(HAlign_Center);
 
 	// The dialog's leaf divider
 	USizeBox* DividerSize = WidgetTree->ConstructWidget<USizeBox>();
@@ -150,8 +162,9 @@ void ULessonsCompletePopup::BuildLayout()
 	LeafSlot->SetSize(FVector2D(60.f, 55.f));
 	Content->AddChildToVerticalBox(DividerSize)->SetHorizontalAlignment(HAlign_Center);
 
-	Content->AddChildToVerticalBox(MakeText(LOCTEXT("Message", "You've learned every clue. Two new things are yours:"),
-		30, PopupInk, 1140.f))->SetHorizontalAlignment(HAlign_Center);
+	const FText Message = bCampaignComplete ? LOCTEXT("CampaignMessage", "Look for Master Challenges!")
+		: LOCTEXT("Message", "You've learned every clue. Two new things are yours:");
+	Content->AddChildToVerticalBox(MakeText(Message, 30, PopupInk, 1140.f))->SetHorizontalAlignment(HAlign_Center);
 
 	// One card per unlock: a picture, its name and what it is
 	UHorizontalBox* Cards = WidgetTree->ConstructWidget<UHorizontalBox>();
@@ -178,22 +191,34 @@ void ULessonsCompletePopup::BuildLayout()
 		Cards->AddChildToHorizontalBox(CardSize)->SetPadding(FMargin(bFirst ? 0.f : 44.f, 0.f, 0.f, 0.f));
 	};
 
-	UHorizontalBox* Visitors = WidgetTree->ConstructWidget<UHorizontalBox>();
-	for (int32 Index = 0; Index < VisitorTextures.Num(); Index++)
+	// An icon set's card art: a few of its icons in a row
+	auto MakeIconRow = [this](const TArray<TObjectPtr<UTexture2D>>& Icons)
 	{
-		UImage* Visitor = WidgetTree->ConstructWidget<UImage>();
-		FSlateBrush VisitorBrush;
-		VisitorBrush.SetResourceObject(VisitorTextures[Index]);
-		VisitorBrush.ImageSize = FVector2D(96.f);
-		Visitor->SetBrush(VisitorBrush);
-		UHorizontalBoxSlot* VisitorSlot = Visitors->AddChildToHorizontalBox(Visitor);
-		VisitorSlot->SetVerticalAlignment(VAlign_Center);
-		VisitorSlot->SetPadding(FMargin(Index == 0 ? 0.f : 6.f, 0.f, 0.f, 0.f));
+		UHorizontalBox* Row = WidgetTree->ConstructWidget<UHorizontalBox>();
+		for (int32 Index = 0; Index < Icons.Num(); Index++)
+		{
+			UImage* Icon = WidgetTree->ConstructWidget<UImage>();
+			FSlateBrush IconBrush;
+			IconBrush.SetResourceObject(Icons[Index]);
+			IconBrush.ImageSize = FVector2D(96.f);
+			Icon->SetBrush(IconBrush);
+			UHorizontalBoxSlot* IconSlot = Row->AddChildToHorizontalBox(Icon);
+			IconSlot->SetVerticalAlignment(VAlign_Center);
+			IconSlot->SetPadding(FMargin(Index == 0 ? 0.f : 6.f, 0.f, 0.f, 0.f));
+		}
+		return Row;
+	};
+	const FText SetLine = LOCTEXT("GardenVisitorsLine", "A new icon set for your puzzles");
+	if (bCampaignComplete)
+	{
+		AddCard(MakeIconRow(CreatureTextures), LOCTEXT("MythicalCreatures", "Mythical Creatures"), SetLine, true);
 	}
-	AddCard(Visitors, LOCTEXT("GardenVisitors", "Garden Visitors"), LOCTEXT("GardenVisitorsLine", "A new icon set for your puzzles"), true);
-
-	CampaignImage = WidgetTree->ConstructWidget<UImage>();
-	AddCard(CampaignImage, LOCTEXT("Campaign", "Campaign"), LOCTEXT("CampaignLine", "Every clue again, on bigger boards"), false);
+	else
+	{
+		AddCard(MakeIconRow(VisitorTextures), LOCTEXT("GardenVisitors", "Garden Visitors"), SetLine, true);
+		CampaignImage = WidgetTree->ConstructWidget<UImage>();
+		AddCard(CampaignImage, LOCTEXT("Campaign", "Campaign"), LOCTEXT("CampaignLine", "Every clue again, on bigger boards"), false);
+	}
 	UVerticalBoxSlot* CardsSlot = Content->AddChildToVerticalBox(Cards);
 	CardsSlot->SetHorizontalAlignment(HAlign_Center);
 	CardsSlot->SetPadding(FMargin(0.f, 26.f, 0.f, 34.f));
