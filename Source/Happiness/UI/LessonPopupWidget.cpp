@@ -3,6 +3,8 @@
 #include "HappinessClassic/CampaignTree.h"
 #include "UI/LessonProgressTicks.h"
 #include "UI/CampaignTreeWidget.h"
+#include "UI/PlayerLevelBadge.h"
+#include "Blueprint/WidgetBlueprintLibrary.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "Brushes/SlateRoundedBoxBrush.h"
@@ -31,6 +33,63 @@
 #include "Styling/CoreStyle.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Widgets/SLeafWidget.h"
+#include "Components/NativeWidgetHost.h"
+#include "Engine/TextureRenderTarget2D.h"
+#include "Slate/WidgetRenderer.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Rendering/SlateRenderer.h"
+#include "HAL/IConsoleManager.h"
+
+static TAutoConsoleVariable<float> GMasterCollapseDuration(
+	TEXT("Happiness.MasterCollapseDuration"), .6f,
+	TEXT("Duration in seconds of the mastery popup suction; increase to inspect the deformation."), ECVF_Cheat);
+
+/** A captured popup drawn as a deformable sheet, with the nearest parts entering the reward point first. */
+class SMasterCollapseMesh : public SLeafWidget
+{
+public:
+	SLATE_BEGIN_ARGS(SMasterCollapseMesh) {} SLATE_END_ARGS()
+	void Construct(const FArguments&) { SetVisibility(EVisibility::HitTestInvisible); }
+	FSlateBrush Brush;
+	FVector2D SourceTopLeft, SourceBottomRight, Target;
+	float Progress = 0.f;
+	virtual FVector2D ComputeDesiredSize(float) const override { return FVector2D(1500, 950); }
+	virtual int32 OnPaint(const FPaintArgs&, const FGeometry& G, const FSlateRect&,
+		FSlateWindowElementList& Elements, int32 Layer, const FWidgetStyle&, bool) const override
+	{
+		const FVector2D Origin = G.AbsoluteToLocal(SourceTopLeft);
+		const FVector2D Size = G.AbsoluteToLocal(SourceBottomRight) - Origin;
+		const FVector2D Hole = G.AbsoluteToLocal(Target);
+		float MaxDistance = 1.f;
+		for (const FVector2D& Corner : {Origin, Origin + Size, Origin + FVector2D(Size.X, 0), Origin + FVector2D(0, Size.Y)})
+			MaxDistance = FMath::Max(MaxDistance, float(FVector2D::Distance(Corner, Hole)));
+		constexpr int32 Columns = 64, Rows = 40;
+		TArray<FSlateVertex> Vertices;
+		TArray<SlateIndex> Indices;
+		Vertices.Reserve((Columns + 1) * (Rows + 1));
+		for (int32 Y = 0; Y <= Rows; ++Y) for (int32 X = 0; X <= Columns; ++X)
+		{
+			const FVector2D UV(double(X) / Columns, double(Y) / Rows);
+			const FVector2D Point = Origin + UV * Size;
+			const FVector2D Delta = Point - Hole;
+			const float Delay = .65f * Delta.Size() / MaxDistance;
+			const float T = FMath::Clamp((Progress - Delay) / (1.f - Delay), 0.f, 1.f);
+			const float Pull = FMath::InterpEaseInOut(0.f, 1.f, T, 2.f);
+			// Staggered suction bends the sheet into a funnel while keeping it between its origin and the hole.
+			const FVector2D Position = Hole + Delta * (1.f - Pull);
+			Vertices.Add(FSlateVertex::Make<ESlateVertexRounding::Disabled>(G.GetAccumulatedRenderTransform(),
+				FVector2f(Position), FVector2f(UV), FColor::White));
+		}
+		for (int32 Y = 0; Y < Rows; ++Y) for (int32 X = 0; X < Columns; ++X)
+		{
+			const SlateIndex A = Y * (Columns + 1) + X, B = A + 1, C = A + Columns + 1, D = C + 1;
+			Indices.Append({A, B, C, B, D, C});
+		}
+		const FSlateResourceHandle Resource = FSlateApplication::Get().GetRenderer()->GetResourceHandle(Brush);
+		FSlateDrawElement::MakeCustomVerts(Elements, Layer, Resource, Vertices, Indices, nullptr, 0, 0);
+		return Layer;
+	}
+};
 
 #define LOCTEXT_NAMESPACE "LessonPopup"
 
@@ -524,7 +583,7 @@ bool ULessonPopupWidget::IsShowingMaster() const
 {
 	// Not while the reveal animation runs: until it ends the popup shows the completed campaign
 	const UCampaignSubsystem* Campaign = GetCampaign();
-	return Campaign && Campaign->IsMasterRevealed(Lesson) && RevealPhase == ERevealPhase::None;
+	return bPreviewMasterCompletion || (Campaign && Campaign->IsMasterRevealed(Lesson) && RevealPhase == ERevealPhase::None);
 }
 
 FText ULessonPopupWidget::GetMasterProgressText() const
@@ -534,10 +593,10 @@ FText ULessonPopupWidget::GetMasterProgressText() const
 	{
 		return FText::GetEmpty();
 	}
-	const FText StageText = Campaign->IsMasterCompleted(Lesson) ? LOCTEXT("MasterComplete", "Mastered")
+	const FText StageText = bPreviewMasterCompletion || Campaign->IsMasterCompleted(Lesson) ? LOCTEXT("MasterComplete", "Mastered")
 		: UCampaignSubsystem::GetStageDisplayName(Campaign->GetCurrentMasterStage(Lesson));
 	return FText::Format(LOCTEXT("MasterProgressFormat", "Master  {0} / {1}  -  {2}"),
-		Campaign->GetMasterPoints(Lesson), UCampaignSubsystem::GetMasterMaxPoints(), StageText);
+		bPreviewMasterCompletion ? UCampaignSubsystem::GetMasterMaxPoints() : Campaign->GetMasterPoints(Lesson), UCampaignSubsystem::GetMasterMaxPoints(), StageText);
 }
 
 void ULessonPopupWidget::ShowLesson(ECampaignLesson InLesson)
@@ -559,6 +618,7 @@ void ULessonPopupWidget::ShowLesson(ECampaignLesson InLesson)
 void ULessonPopupWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
+	TickMasterCollapse(InDeltaTime);
 	if (RevealPhase != ERevealPhase::None)
 	{
 		TickReveal(InDeltaTime);
@@ -665,9 +725,20 @@ void ULessonPopupWidget::HideEraser()
 
 void ULessonPopupWidget::ShowLessonAfterPuzzle(ECampaignLesson InLesson)
 {
+	ResetMasterCollapse();
+	bPreviewMasterCompletion = false;
 	Lesson = InLesson;
 	Refresh();
 	SetVisibility(ESlateVisibility::Visible);
+}
+
+void ULessonPopupWidget::PreviewMasterCompletion(ECampaignLesson InLesson)
+{
+	RevealPhase = ERevealPhase::None;
+	HideEraser();
+	ShowLessonAfterPuzzle(InLesson);
+	bPreviewMasterCompletion = true;
+	Refresh();
 }
 
 void ULessonPopupWidget::Refresh()
@@ -679,16 +750,16 @@ void ULessonPopupWidget::Refresh()
 		BuildStageButtons();
 	}
 
-	const bool bCampaignMode = UCampaignSubsystem::GetMode() == ECampaignMode::Campaign;
+	const bool bCampaignMode = bPreviewMasterCompletion || UCampaignSubsystem::GetMode() == ECampaignMode::Campaign;
 	const UCampaignSubsystem* Campaign = GetCampaign();
 	const int32 Points = Campaign ? Campaign->GetLessonPoints(Lesson) : 0;
 	const int32 CurrentStage = Campaign ? Campaign->GetCurrentStage(Lesson) : 0;
-	const bool bCompleted = Campaign && Campaign->IsLessonCompleted(Lesson);
+	const bool bCompleted = bPreviewMasterCompletion || (Campaign && Campaign->IsLessonCompleted(Lesson));
 
 	// Once the final is done (Campaign), the popup follows Master Mode: its bar, text and Play button
 	const bool bMaster = IsShowingMaster();
-	const bool bMasterDone = bMaster && Campaign->IsMasterCompleted(Lesson);
-	const int32 MasterPoints = bMaster ? Campaign->GetMasterPoints(Lesson) : 0;
+	const bool bMasterDone = bPreviewMasterCompletion || (bMaster && Campaign->IsMasterCompleted(Lesson));
+	const int32 MasterPoints = bPreviewMasterCompletion ? UCampaignSubsystem::GetMasterMaxPoints() : (bMaster ? Campaign->GetMasterPoints(Lesson) : 0);
 	const int32 MasterMax = UCampaignSubsystem::GetMasterMaxPoints();
 	const int32 CurrentMaster = bMaster ? Campaign->GetCurrentMasterStage(Lesson) : INDEX_NONE;
 	const bool bAllDone = bCompleted && (!bMaster || bMasterDone);
@@ -784,7 +855,7 @@ void ULessonPopupWidget::Refresh()
 	for (int32 i = 0; i < MasterButtons.Num(); i++)
 	{
 		const int32 Stage = FirstMaster + i;
-		const bool bUnlocked = Campaign && Campaign->IsStageUnlocked(Lesson, Stage);
+		const bool bUnlocked = bPreviewMasterCompletion || (Campaign && Campaign->IsStageUnlocked(Lesson, Stage));
 		const bool bIsCurrent = Stage == CurrentMaster && !bMasterDone;
 		StyleStage(MasterButtons[i], Stage, bUnlocked, bIsCurrent, bUnlocked && !bIsCurrent);
 	}
@@ -814,9 +885,11 @@ void ULessonPopupWidget::ChooseStage(int32 Stage)
 
 void ULessonPopupWidget::Close()
 {
+	if (CollapseBadge.IsValid()) CollapseBadge->RevealMasterReward(CollapseColumn);
 	RevealPhase = ERevealPhase::None;
 	HideEraser();
 	SetVisibility(ESlateVisibility::Collapsed);
+	ResetMasterCollapse();
 	OnClosed.Broadcast();
 }
 
@@ -830,7 +903,88 @@ void ULessonPopupWidget::HandlePlayClicked()
 
 void ULessonPopupWidget::HandleCloseClicked()
 {
+	if (CollapseElapsed >= 0.f) return;
+	const int32 Column = UCampaignTree::GetLessonColumn(Lesson);
+	TArray<UUserWidget*> Badges;
+	UWidgetBlueprintLibrary::GetAllWidgetsOfClass(this, Badges, UPlayerLevelBadge::StaticClass(), false);
+	for (UUserWidget* Widget : Badges)
+	{
+		UPlayerLevelBadge* Badge = CastChecked<UPlayerLevelBadge>(Widget);
+		FGeometry GemGeometry;
+		if (NotebookCanvas && Badge->GetPendingMasterReward(Column, GemGeometry))
+		{
+			// OnPaint's geometry is window-relative; cached/tick geometry includes the desktop window offset.
+			const FGeometry Frame = NotebookCanvas->GetPaintSpaceGeometry();
+			const FVector2D Size = Frame.GetLocalSize();
+			if (Size.IsNearlyZero()) break;
+			CollapseBadge = Badge;
+			CollapseColumn = Column;
+			CollapseElapsed = 0.f;
+			CollapseMesh = SNew(SMasterCollapseMesh);
+			CollapseMesh->SourceTopLeft = Frame.LocalToAbsolute(FVector2D::ZeroVector);
+			CollapseMesh->SourceBottomRight = Frame.LocalToAbsolute(Size);
+			CollapseMesh->Target = GemGeometry.LocalToAbsolute(GemGeometry.GetLocalSize() * .5f);
+			FWidgetRenderer* Renderer = new FWidgetRenderer(true);
+			CollapseTexture = Renderer->DrawWidget(NotebookCanvas->TakeWidget(), Size);
+			BeginCleanup(Renderer);
+			CollapseMesh->Brush.SetResourceObject(CollapseTexture);
+			CollapseMesh->Brush.DrawAs = ESlateBrushDrawType::Image;
+			CollapseMesh->Brush.ImageSize = Size;
+			CollapseHost = WidgetTree->ConstructWidget<UNativeWidgetHost>();
+			CollapseHost->SetContent(CollapseMesh.ToSharedRef());
+			CollapseHost->SetVisibility(ESlateVisibility::HitTestInvisible);
+			UCanvasPanelSlot* HostSlot = CastChecked<UCanvasPanel>(WidgetTree->RootWidget)->AddChildToCanvas(CollapseHost);
+			HostSlot->SetAnchors(FAnchors(0, 0, 1, 1));
+			HostSlot->SetOffsets(FMargin(0));
+			HostSlot->SetZOrder(30);
+			NotebookCanvas->SetVisibility(ESlateVisibility::Hidden);
+			return;
+		}
+	}
 	Close();
+}
+
+void ULessonPopupWidget::ResetMasterCollapse()
+{
+	if (CollapseHost) CollapseHost->RemoveFromParent();
+	CollapseHost = nullptr;
+	CollapseMesh.Reset();
+	CollapseTexture = nullptr;
+	CollapseElapsed = -1.f;
+	CollapseBadge.Reset();
+	CollapseColumn = INDEX_NONE;
+	if (NotebookCanvas)
+	{
+		NotebookCanvas->SetRenderScale(FVector2D(1.f));
+		NotebookCanvas->SetRenderTranslation(FVector2D::ZeroVector);
+		NotebookCanvas->SetRenderOpacity(1.f);
+		NotebookCanvas->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	}
+	if (WidgetTree) WidgetTree->ForEachWidget([](UWidget* Widget)
+	{
+		if (Widget->GetFName() == TEXT("Dim") || Widget->IsA<UBackgroundBlur>()) Widget->SetRenderOpacity(1.f);
+	});
+}
+
+void ULessonPopupWidget::TickMasterCollapse(float DeltaTime)
+{
+	if (CollapseElapsed < 0.f || !NotebookCanvas) return;
+	CollapseElapsed += DeltaTime;
+	const float Alpha = FMath::Clamp(CollapseElapsed / FMath::Max(.1f, GMasterCollapseDuration.GetValueOnGameThread()), 0.f, 1.f);
+	if (CollapseMesh)
+	{
+		FGeometry GemGeometry;
+		if (CollapseBadge.IsValid() && CollapseBadge->GetPendingMasterReward(CollapseColumn, GemGeometry))
+			CollapseMesh->Target = GemGeometry.LocalToAbsolute(GemGeometry.GetLocalSize() * .5f);
+		CollapseMesh->Progress = Alpha;
+		CollapseMesh->Invalidate(EInvalidateWidgetReason::Paint);
+	}
+	if (WidgetTree) WidgetTree->ForEachWidget([Alpha](UWidget* Widget)
+	{
+		if (Widget->GetFName() == TEXT("Dim") || Widget->IsA<UBackgroundBlur>())
+			Widget->SetRenderOpacity(1.f - FMath::Clamp(Alpha * 3.f, 0.f, 1.f));
+	});
+	if (Alpha >= 1.f) Close();
 }
 
 void ULessonPopupWidget::HandleLearnMoreClicked()

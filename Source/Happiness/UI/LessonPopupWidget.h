@@ -20,6 +20,10 @@ class USizeBox;
 class UTexture2D;
 class UFont;
 class ULessonClueDiagram;
+class UPlayerLevelBadge;
+class UNativeWidgetHost;
+class UTextureRenderTarget2D;
+class SMasterCollapseMesh;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnLessonStageChosen, ECampaignLesson, Lesson, int32, Stage);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnLessonPopupClosed);
@@ -66,6 +70,11 @@ class HAPPINESS_API ULessonPopupWidget : public UUserWidget
 
 public:
 	ULessonPopupWidget(const FObjectInitializer& ObjectInitializer);
+
+	/** Display the completed Master state for an art preview without changing campaign progress. */
+	void PreviewMasterCompletion(ECampaignLesson InLesson);
+	void PreviewMasterReturn() { HandleCloseClicked(); }
+	bool bPreviewMasterCompletion = false;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UTextBlock> TitleText;
@@ -199,6 +208,14 @@ protected:
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 private:
+	void ResetMasterCollapse();
+	void TickMasterCollapse(float DeltaTime);
+	float CollapseElapsed = -1.f;
+	TWeakObjectPtr<UPlayerLevelBadge> CollapseBadge;
+	int32 CollapseColumn = INDEX_NONE;
+	UPROPERTY(Transient) TObjectPtr<UNativeWidgetHost> CollapseHost;
+	UPROPERTY(Transient) TObjectPtr<UTextureRenderTarget2D> CollapseTexture;
+	TSharedPtr<SMasterCollapseMesh> CollapseMesh;
 	UFUNCTION()
 	void HandlePlayClicked();
 
