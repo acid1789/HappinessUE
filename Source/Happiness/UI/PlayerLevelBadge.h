@@ -33,6 +33,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Player Level")
 	void Refresh();
 
+	/** Development preview; does not award or save a reward. Run while the menu is showing. */
+	void PreviewMasterReward(int32 Column);
+	bool GetPendingMasterReward(int32 Column, FGeometry& OutGeometry) const;
+	void RevealMasterReward(int32 Column);
+
 	/** Hidden while this widget is visible (and refreshed when it goes, as the level changes in games) */
 	void SetCoveredBy(UWidget* Widget) { CoveredBy = Widget; }
 
@@ -56,6 +61,9 @@ protected:
 
 private:
 	void BuildLayout();
+	TArray<bool> KnownRewards;
+	TArray<int32> PendingRewards;
+	int32 PreviewRewardIndex = INDEX_NONE;
 
 	UFUNCTION()
 	void HandleProgressChanged();

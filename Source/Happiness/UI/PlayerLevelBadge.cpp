@@ -11,6 +11,12 @@
 #include "HappinessClassic/CampaignProgress.h"
 #include "HappinessClassic/CampaignTree.h"
 #include "UObject/ConstructorHelpers.h"
+#include "UI/LessonPopupWidget.h"
+#include "Blueprint/WidgetBlueprintLibrary.h"
+#include "UI/CampaignTreeWidget.h"
+#include "HAL/IConsoleManager.h"
+#include "TimerManager.h"
+#include "Layout/ArrangedChildren.h"
 
 namespace
 {
@@ -181,9 +187,109 @@ void UPlayerLevelBadge::Refresh()
 		LevelText->SetText(FText::AsNumber(Level));
 	}
 	const UCampaignSubsystem* Campaign = UCampaignSubsystem::Get(this);
+	const bool bRewardsInitialized = KnownRewards.Num() == Icons.Num();
+	KnownRewards.SetNum(Icons.Num());
 	for (int32 Index = 0; Index < Icons.Num(); Index++)
 	{
 		const bool bUnlocked = Campaign && Campaign->IsMasterColumnCompleted(Index);
-		Icons[Index]->SetVisibility(bUnlocked ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Hidden);
+		if (bRewardsInitialized && bUnlocked && !KnownRewards[Index]) PendingRewards.AddUnique(Index);
+		KnownRewards[Index] = bUnlocked;
+		Icons[Index]->SetVisibility((bUnlocked || Index == PreviewRewardIndex) && !PendingRewards.Contains(Index) ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Hidden);
 	}
+}
+
+void UPlayerLevelBadge::PreviewMasterReward(int32 Column)
+{
+	PendingRewards.Reset();
+	PreviewRewardIndex = Column;
+	PendingRewards.Add(Column);
+	Refresh();
+}
+
+#if !UE_BUILD_SHIPPING
+static FAutoConsoleCommandWithWorldAndArgs GPreviewMasterReward(
+	TEXT("Happiness.PreviewMasterReward"),
+	TEXT("Happiness.PreviewMasterReward [column 1-12]: opens the completed Master popup; press Return to Campaign to collapse it into its gem. Menu only; never changes saved progress."),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+	{
+		const int32 Column = Args.IsEmpty() ? 0 : FCString::Atoi(*Args[0]) - 1;
+		if (Column < 0 || Column >= UCampaignTree::GetNumColumns())
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Use Happiness.PreviewMasterReward [column 1-12]"));
+			return;
+		}
+		TArray<UUserWidget*> Trees, Badges;
+		UWidgetBlueprintLibrary::GetAllWidgetsOfClass(World, Trees, UCampaignTreeWidget::StaticClass(), false);
+		UWidgetBlueprintLibrary::GetAllWidgetsOfClass(World, Badges, UPlayerLevelBadge::StaticClass(), false);
+		if (Trees.IsEmpty() || Badges.IsEmpty())
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Open the main Happiness menu before previewing a Master reward."));
+			return;
+		}
+		UCampaignTreeWidget* Tree = CastChecked<UCampaignTreeWidget>(Trees[0]);
+		if (!Tree->LessonPopup) return;
+		Tree->SetVisibility(ESlateVisibility::Visible);
+		Tree->LessonPopup->PreviewMasterCompletion(UCampaignTree::GetColumnLessons(Column)[0]);
+		CastChecked<UPlayerLevelBadge>(Badges[0])->PreviewMasterReward(Column);
+		if (Args.Num() > 1 && Args[1].Equals(TEXT("close"), ESearchCase::IgnoreCase))
+		{
+			FTimerHandle Timer;
+			TWeakObjectPtr<ULessonPopupWidget> Popup = Tree->LessonPopup.Get();
+			World->GetTimerManager().SetTimer(Timer, FTimerDelegate::CreateLambda([Popup]
+			{
+				if (Popup.IsValid()) Popup->PreviewMasterReturn();
+			}), .3f, false);
+		}
+		UE_LOG(LogTemp, Display, TEXT("Previewing Master reward for column %d (no saved progress changed)."), Column + 1);
+	}));
+#endif
+
+bool UPlayerLevelBadge::GetPendingMasterReward(int32 Column, FGeometry& OutGeometry) const
+{
+	if (!PendingRewards.Contains(Column) || !Icons.IsValidIndex(Column) || bCovered) return false;
+	// Arrange the actual Slate canvas, including its hidden children. This uses exactly the same
+	// anchors, DPI, parent transform and pixel snapping as the gem's eventual paint, without
+	// relying on a hidden image's old geometry or reconstructing its placement from UMG slots.
+	const TSharedPtr<SWidget> Canvas = GetRootWidget() ? GetRootWidget()->GetCachedWidget() : nullptr;
+	const TSharedPtr<SWidget> Icon = Icons[Column]->GetCachedWidget();
+	if (!Canvas || !Icon) return false;
+	const FGeometry& CanvasGeometry = Canvas->GetPaintSpaceGeometry();
+	if (CanvasGeometry.GetLocalSize().IsNearlyZero()) return false;
+	FArrangedChildren Children(EVisibility::All);
+	Canvas->ArrangeChildren(CanvasGeometry, Children);
+	for (int32 Index = 0; Index < Children.Num(); ++Index)
+	{
+		if (Children[Index].Widget == Icon.ToSharedRef())
+		{
+			OutGeometry = Children[Index].Geometry;
+			return true;
+		}
+	}
+	return false;
+}
+
+void UPlayerLevelBadge::RevealMasterReward(int32 Column)
+{
+#if !UE_BUILD_SHIPPING
+	FGeometry TargetGeometry;
+	const bool bCheckAnchor = GetPendingMasterReward(Column, TargetGeometry);
+	const FVector2D Expected = TargetGeometry.LocalToAbsolute(TargetGeometry.GetLocalSize() * .5f);
+#endif
+	PendingRewards.Remove(Column);
+	Refresh();
+#if !UE_BUILD_SHIPPING
+	if (bCheckAnchor && GetWorld())
+	{
+		FTimerHandle Timer;
+		TWeakObjectPtr<UPlayerLevelBadge> WeakThis(this);
+		GetWorld()->GetTimerManager().SetTimer(Timer, FTimerDelegate::CreateLambda([WeakThis, Column, Expected]
+		{
+			if (!WeakThis.IsValid() || !WeakThis->Icons.IsValidIndex(Column)) return;
+			const FGeometry& Painted = WeakThis->Icons[Column]->GetPaintSpaceGeometry();
+			const FVector2D Actual = Painted.LocalToAbsolute(Painted.GetLocalSize() * .5f);
+			UE_LOG(LogTemp, Display, TEXT("Master reward %d anchor: target=%s painted=%s error=%.2f"),
+				Column + 1, *Expected.ToString(), *Actual.ToString(), FVector2D::Distance(Expected, Actual));
+		}), .15f, false);
+	}
+#endif
 }
