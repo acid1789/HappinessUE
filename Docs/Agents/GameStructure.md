@@ -81,7 +81,8 @@ default collection (`KatrinaCollection`, 8 sets). At BeginPlay `PC_Happiness` sw
 `DA_IconSetUnlocks` (`UIconSetUnlocks`: set + `EIconSetUnlock` condition, `bHiddenUntilUnlocked`, optional
 `LockedReason`). It updates in place when campaign progress changes. `IS_GardenVisitors` unlocks once every lesson is
 completed; `IS_MythicalCreatures` once every lesson's Campaign final is (`UCampaignSubsystem::IsCampaignCompleted`,
-Master Mode not needed). To add an unlockable set, add it to `DA_IconSetUnlocks` (new conditions go in `EIconSetUnlock` /
+Master Mode not needed). `IS_MasterRewardGems` is hidden until every lesson's Master Mode is completed
+(`IsAllMasterCompleted`; test with `Happiness.Campaign.MasterAll`). To add an unlockable set, add it to `DA_IconSetUnlocks` (new conditions go in `EIconSetUnlock` /
 `UIconSetSubsystem::IsUnlocked` / the default reason in `GetEntries`). `DA_IconSetUnlocks` is always cooked (Asset
 Manager rule in `DefaultGame.ini`), so the sets it lists ship. Its `SetNames` (by set Id) are the names the icon sets
 screen shows; a set without one shows its Id spaced out.

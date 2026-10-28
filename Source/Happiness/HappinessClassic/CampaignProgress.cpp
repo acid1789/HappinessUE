@@ -197,6 +197,18 @@ bool UCampaignSubsystem::IsMasterColumnCompleted(int32 Column) const
 	return true;
 }
 
+bool UCampaignSubsystem::IsAllMasterCompleted() const
+{
+	for (int32 Column = 0; Column < UCampaignTree::GetNumColumns(); Column++)
+	{
+		if (!IsMasterColumnCompleted(Column))
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
 ECampaignMode UCampaignSubsystem::GetMode()
 {
 	const UCampaignSubsystem* Campaign = Instance.Get();

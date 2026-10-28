@@ -259,6 +259,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Campaign")
 	bool IsMasterColumnCompleted(int32 Column) const;
 
+	/** Every clue has completed Campaign Master Mode (every tree column, IsMasterColumnCompleted) */
+	UFUNCTION(BlueprintPure, Category = "Campaign")
+	bool IsAllMasterCompleted() const;
+
 	/** Stage size, difficulty and the progress needed to unlock it, for a given mode */
 	static int32 GetStageSizeFor(ECampaignMode Mode, int32 Stage);
 	static int32 GetStageDifficultyFor(ECampaignMode Mode, int32 Stage);

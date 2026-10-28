@@ -15,6 +15,8 @@ enum class EIconSetUnlock : uint8
 	LessonsCompleted,
 	/** Every lesson's Campaign mode final is completed (Master Mode not needed) */
 	CampaignCompleted,
+	/** Every lesson's Master Mode stages are completed */
+	MasterCompleted,
 };
 
 USTRUCT()
