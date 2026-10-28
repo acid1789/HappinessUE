@@ -7,10 +7,12 @@
 #include "HappinessModeWidget.generated.h"
 
 class UButton;
+class UCanvasPanel;
 class UConfirmDialogWidget;
 class UFireworksWidget;
 class ULessonsCompletePopup;
 class USoundBase;
+class UPlayerInfoPanel;
 class UPlayerLevelBadge;
 class UStreakSaverPanel;
 class UTextBlock;
@@ -118,6 +120,14 @@ protected:
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UPlayerLevelBadge> PlayerLevelBadge;
 
+	/** Over the sun: opens the player info (the badge itself takes no taps). Made with the badge's move to the menu. */
+	UPROPERTY(Transient)
+	TObjectPtr<UButton> SunButton;
+
+	/** The player info, over the menu with the badge above it (made the first time it's needed) */
+	UPROPERTY(Transient)
+	TObjectPtr<UPlayerInfoPanel> PlayerInfoPanel;
+
 	/** The streak saver shop, over the whole screen (made the first time it's needed) */
 	UPROPERTY(Transient)
 	TObjectPtr<UStreakSaverPanel> StreakSaverPanel;
@@ -164,6 +174,21 @@ private:
 
 	/** Moves the badge from this screen into the main menu around it, behind its screens (once it has been built) */
 	void MoveBadgeToMenu();
+
+	/** The sun's tap target, in the menu just above the badge, so the menu's screens still cover it */
+	void MakeSunButton(UCanvasPanel* Menu, const FVector2D& BadgePosition);
+
+	/** Opens the player info, or closes it if it's open */
+	UFUNCTION()
+	void HandleSunClicked();
+
+	void HandlePlayerInfoClosed();
+
+	/** The badge and its tap target above everything in the menu (while the player info is open), or back behind */
+	void SetBadgeRaised(bool bRaised);
+
+	/** A new player's first start (no save at all): straight to the Lessons tree with Game Basics open */
+	void StartNewPlayer();
 
 	/** Make the Streak Saver button if the layout has none */
 	void MakeStreakSaverButton();

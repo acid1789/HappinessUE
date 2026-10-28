@@ -34,6 +34,26 @@ public:
 	static UHappinessSaveGame* LoadFromSlot();
 
 	/**
+	 * A save from the game before lessons and the campaign (the one on Play before this version) starts the game
+	 * over, as for a new player: the first time the game save is read (LoadFromSlot, or the campaign's start), it is
+	 * replaced by a fresh one that keeps just the player's level and experience, and the puzzle slots are deleted.
+	 * Such a save has no DataVersion and no campaign progress; saves since have one or both, and are kept.
+	 */
+	static void ResetOldSave();
+
+	/** ResetOldSave replaced an old save this run (the game starts as for a new player) */
+	static bool WasOldSaveReset() { return bOldSaveReset; }
+
+	/** The run is over (the game instance is going): the next one checks again (in the editor, the next PIE) */
+	static void ForgetOldSaveCheck() { bOldSaveChecked = bOldSaveReset = false; }
+
+	/** Written into every save from this version on; older saves read as 0 */
+	static constexpr int32 CurrentDataVersion = 1;
+
+	UPROPERTY(SaveGame)
+	int32 DataVersion = 0;
+
+	/**
 	 * Rewrite the game save with the current campaign progress and free play settings, keeping the rest of it (the
 	 * classic puzzle, experience, icons) as it is on disk. With no game save yet they go to disk with the game's first save.
 	 */
@@ -67,4 +87,7 @@ public:
 private:
 	/** Read from disk, so not a new save of the current game: writing it again doesn't touch the puzzle slots */
 	bool bLoadedFromDisk = false;
+
+	static bool bOldSaveChecked;
+	static bool bOldSaveReset;
 };

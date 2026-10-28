@@ -107,17 +107,7 @@ void UPlayerLevelBadge::BuildLayout()
 		}
 		else if (RewardAtlasTexture && Index < 12)
 		{
-			const int32 Column = Index % 4;
-			const int32 Row = Index / 4;
-			constexpr float Inset = 0.02f;
-			FSlateBrush Brush;
-			Brush.SetResourceObject(RewardAtlasTexture);
-			Brush.DrawAs = ESlateBrushDrawType::Image;
-			Brush.ImageSize = FVector2D(IconSize);
-			Brush.SetUVRegion(FBox2f(
-				FVector2f((Column + Inset) / 4.f, (Row + Inset) / 3.f),
-				FVector2f((Column + 1.f - Inset) / 4.f, (Row + 1.f - Inset) / 3.f)));
-			Icon->SetBrush(Brush);
+			Icon->SetBrush(MakeRewardBrush(RewardAtlasTexture, Index, IconSize));
 		}
 		else
 		{
@@ -133,6 +123,25 @@ void UPlayerLevelBadge::BuildLayout()
 		Icons.Add(Icon);
 	}
 	Refresh();
+}
+
+FSlateBrush UPlayerLevelBadge::MakeRewardBrush(UTexture2D* Atlas, int32 Index, float Size)
+{
+	if (!Atlas || Index < 0 || Index >= 12)
+	{
+		return MakeDisc(FLinearColor(1.f, 0.93f, 0.7f, 1.f), SunRim, Size);
+	}
+	const int32 Column = Index % 4;
+	const int32 Row = Index / 4;
+	constexpr float Inset = 0.02f;
+	FSlateBrush Brush;
+	Brush.SetResourceObject(Atlas);
+	Brush.DrawAs = ESlateBrushDrawType::Image;
+	Brush.ImageSize = FVector2D(Size);
+	Brush.SetUVRegion(FBox2f(
+		FVector2f((Column + Inset) / 4.f, (Row + Inset) / 3.f),
+		FVector2f((Column + 1.f - Inset) / 4.f, (Row + 1.f - Inset) / 3.f)));
+	return Brush;
 }
 
 void UPlayerLevelBadge::NativeConstruct()
@@ -164,6 +173,10 @@ void UPlayerLevelBadge::NativeTick(const FGeometry& MyGeometry, float InDeltaTim
 	{
 		bCovered = bNowCovered;
 		SetRenderOpacity(bCovered ? 0.f : 1.f);
+		if (TapTarget.IsValid())
+		{
+			TapTarget->SetVisibility(bCovered ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
+		}
 		if (!bCovered)
 		{
 			Refresh();

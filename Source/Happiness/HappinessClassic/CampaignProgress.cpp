@@ -38,6 +38,12 @@ void UCampaignSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 	Instance = this;
 
+	// Checked before anything saves: nothing has been written yet for a new player. The old game's save makes a new
+	// player too: it is replaced, keeping just the level.
+	UHappinessSaveGame::ResetOldSave();
+	bNewPlayerStart = !UGameplayStatics::DoesSaveGameExist(UHappinessSaveGame::SaveSlotName, UHappinessSaveGame::SaveUserIndex) ||
+		UHappinessSaveGame::WasOldSaveReset();
+
 	if (const UHappinessSaveGame* SaveGame = UHappinessSaveGame::LoadFromSlot())
 	{
 		Data = SaveGame->Campaign;
@@ -52,6 +58,7 @@ void UCampaignSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 void UCampaignSubsystem::Deinitialize()
 {
 	FTSTicker::GetCoreTicker().RemoveTicker(PlayTimeTicker);
+	UHappinessSaveGame::ForgetOldSaveCheck();
 	if (Instance == this)
 	{
 		Instance = nullptr;
@@ -575,6 +582,13 @@ bool UCampaignSubsystem::ConsumeLessonsCompletion()
 	const bool bPending = bLessonsCompletionPending;
 	bLessonsCompletionPending = false;
 	return bPending;
+}
+
+bool UCampaignSubsystem::ConsumeNewPlayerStart()
+{
+	const bool bNew = bNewPlayerStart;
+	bNewPlayerStart = false;
+	return bNew;
 }
 
 bool UCampaignSubsystem::ConsumeLessonCompletion(ECampaignLesson& Lesson)

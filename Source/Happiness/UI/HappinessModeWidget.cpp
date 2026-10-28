@@ -13,9 +13,11 @@
 #include "Components/Image.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
+#include "UI/CampaignTreeWidget.h"
 #include "UI/ConfirmDialogWidget.h"
 #include "UI/FireworksWidget.h"
 #include "UI/LessonsCompletePopup.h"
+#include "UI/PlayerInfoPanel.h"
 #include "UI/PlayerLevelBadge.h"
 #include "UI/StreakSaverPanel.h"
 #include "UObject/ConstructorHelpers.h"
@@ -180,6 +182,26 @@ void UHappinessModeWidget::MakePlayerLevelBadge()
 	}
 }
 
+void UHappinessModeWidget::StartNewPlayer()
+{
+	// On the first tick, once the menu is built (the game always starts on this screen)
+	UCampaignSubsystem* Campaign = UCampaignSubsystem::Get(this);
+	UCanvasPanel* Menu = Cast<UCanvasPanel>(GetParent());
+	if (!Campaign || !Menu || !Campaign->ConsumeNewPlayerStart())
+	{
+		return;
+	}
+	ShowTree(ECampaignMode::Lessons);
+	for (UWidget* Child : Menu->GetAllChildren())
+	{
+		if (UCampaignTreeWidget* Tree = Cast<UCampaignTreeWidget>(Child))
+		{
+			// As if the player had picked it: its popup opens, and Back still leads here
+			Tree->NotifyNodeClicked(ECampaignLesson::VerticalTwo);	// Game Basics
+		}
+	}
+}
+
 void UHappinessModeWidget::MoveBadgeToMenu()
 {
 	// The menu (WBP_GameSelect's MainCanvas) holds this screen, the campaign tree, the Free Play settings and the
@@ -201,6 +223,7 @@ void UHappinessModeWidget::MoveBadgeToMenu()
 		BadgeSlot->SetSize(FVector2D(UPlayerLevelBadge::BadgeSize));
 		BadgeSlot->SetZOrder(0);
 	}
+	MakeSunButton(Menu, Position);
 	// The puzzle screen is in the menu too: no badge over a puzzle
 	for (UWidget* Child : Menu->GetAllChildren())
 	{
@@ -208,6 +231,77 @@ void UHappinessModeWidget::MoveBadgeToMenu()
 		{
 			PlayerLevelBadge->SetCoveredBy(Child);
 		}
+	}
+}
+
+void UHappinessModeWidget::MakeSunButton(UCanvasPanel* Menu, const FVector2D& BadgePosition)
+{
+	if (SunButton)
+	{
+		return;
+	}
+	SunButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("SunButton"));
+	FButtonStyle Clear;
+	Clear.Normal = Clear.Hovered = Clear.Pressed = Clear.Disabled = FSlateNoResource();
+	Clear.NormalPadding = Clear.PressedPadding = FMargin(0.f);
+	SunButton->SetStyle(Clear);
+	SunButton->SetCursor(EMouseCursor::Hand);
+	SunButton->OnClicked.AddUniqueDynamic(this, &UHappinessModeWidget::HandleSunClicked);
+	// Added after the badge at the same Z, so just above it
+	if (UCanvasPanelSlot* SunSlot = Menu->AddChildToCanvas(SunButton))
+	{
+		SunSlot->SetAnchors(FAnchors(1.f, 0.f));
+		SunSlot->SetAlignment(FVector2D(0.5f));
+		SunSlot->SetPosition(BadgePosition + FVector2D(UPlayerLevelBadge::GetSunCenter().X - UPlayerLevelBadge::BadgeSize, UPlayerLevelBadge::GetSunCenter().Y));
+		SunSlot->SetSize(FVector2D(150.f));
+		SunSlot->SetZOrder(0);
+	}
+	PlayerLevelBadge->SetTapTarget(SunButton);
+}
+
+void UHappinessModeWidget::HandleSunClicked()
+{
+	UCanvasPanel* Menu = Cast<UCanvasPanel>(GetParent());
+	if (PlayerInfoPanel && PlayerInfoPanel->IsOpen())
+	{
+		PlayerInfoPanel->Hide();
+		return;
+	}
+	if (!PlayerInfoPanel && Menu)
+	{
+		PlayerInfoPanel = CreateWidget<UPlayerInfoPanel>(this, UPlayerInfoPanel::StaticClass());
+		if (UCanvasPanelSlot* InfoSlot = PlayerInfoPanel ? Menu->AddChildToCanvas(PlayerInfoPanel) : nullptr)
+		{
+			// Over every menu screen (the tree is at Z 10, its popups inside it)
+			InfoSlot->SetAnchors(FAnchors(0.f, 0.f, 1.f, 1.f));
+			InfoSlot->SetOffsets(FMargin(0.f));
+			InfoSlot->SetZOrder(50);
+			PlayerInfoPanel->OnClosed.AddUObject(this, &UHappinessModeWidget::HandlePlayerInfoClosed);
+		}
+	}
+	if (PlayerInfoPanel)
+	{
+		UGameplayStatics::PlaySound2D(this, LoadObject<USoundBase>(nullptr, TEXT("/Game/General/Audio/Cues/MenuAccept.MenuAccept")), 1.f, 1.f, 0.f, nullptr, nullptr, true);
+		PlayerInfoPanel->Show();
+		SetBadgeRaised(true);
+	}
+}
+
+void UHappinessModeWidget::HandlePlayerInfoClosed()
+{
+	SetBadgeRaised(false);
+}
+
+void UHappinessModeWidget::SetBadgeRaised(bool bRaised)
+{
+	// The sun stays up, in full, above the dimmed menu
+	if (UCanvasPanelSlot* BadgeSlot = PlayerLevelBadge ? Cast<UCanvasPanelSlot>(PlayerLevelBadge->Slot) : nullptr)
+	{
+		BadgeSlot->SetZOrder(bRaised ? 55 : 0);
+	}
+	if (UCanvasPanelSlot* SunSlot = SunButton ? Cast<UCanvasPanelSlot>(SunButton->Slot) : nullptr)
+	{
+		SunSlot->SetZOrder(bRaised ? 56 : 0);
 	}
 }
 
@@ -299,6 +393,7 @@ void UHappinessModeWidget::NativeTick(const FGeometry& MyGeometry, float InDelta
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
 	MoveBadgeToMenu();
+	StartNewPlayer();
 	UpdateUnlockCelebration(InDeltaTime);
 }
 

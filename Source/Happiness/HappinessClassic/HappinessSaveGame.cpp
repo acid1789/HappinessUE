@@ -3,6 +3,9 @@
 #include "Ads/AdsSubsystem.h"
 #include "Kismet/GameplayStatics.h"
 
+bool UHappinessSaveGame::bOldSaveChecked = false;
+bool UHappinessSaveGame::bOldSaveReset = false;
+
 void UHappinessSaveGame::Serialize(FArchive& Ar)
 {
 	// Writing a save game: take the current campaign progress, free play and daily settings, and the ads switch. Not for the class default object (saved with the
@@ -27,6 +30,7 @@ void UHappinessSaveGame::Serialize(FArchive& Ar)
 		{
 			bAdsDisabled = AdsSubsystem->GetAdsDisabledSaveData();
 		}
+		DataVersion = CurrentDataVersion;
 	}
 
 	Super::Serialize(Ar);
@@ -51,8 +55,58 @@ void UHappinessSaveGame::Serialize(FArchive& Ar)
 	}
 }
 
+void UHappinessSaveGame::ResetOldSave()
+{
+	if (bOldSaveChecked)
+	{
+		return;
+	}
+	bOldSaveChecked = true;
+
+	TArray<uint8> Bytes;
+	if (!UGameplayStatics::DoesSaveGameExist(SaveSlotName, SaveUserIndex) || !UGameplayStatics::LoadDataFromSlot(Bytes, SaveSlotName, SaveUserIndex))
+	{
+		return;
+	}
+	// Saved properties are tagged with their names, as strings (length with the terminator, then the characters), and
+	// a property at its default isn't written. So a save with campaign progress has this tag, and one written by this
+	// version or later has a DataVersion; the old game's save has neither.
+	static const uint8 CampaignTag[] = {9, 0, 0, 0, 'C', 'a', 'm', 'p', 'a', 'i', 'g', 'n', 0};
+	USaveGame* Old = UGameplayStatics::LoadGameFromMemory(Bytes);
+	const UHappinessSaveGame* OldSave = Cast<UHappinessSaveGame>(Old);
+	bool bHasCampaign = false;
+	for (int32 At = 0; At + int32(sizeof(CampaignTag)) <= Bytes.Num() && !bHasCampaign; At++)
+	{
+		bHasCampaign = FMemory::Memcmp(&Bytes[At], CampaignTag, sizeof(CampaignTag)) == 0;
+	}
+	if (!Old || (OldSave && OldSave->DataVersion > 0) || bHasCampaign)
+	{
+		return;
+	}
+
+	// A fresh save with the level and experience (SG_Happiness's Level and Experience, read by PC_Happiness)
+	USaveGame* Fresh = UGameplayStatics::CreateSaveGameObject(Old->GetClass());
+	for (const TCHAR* Name : {TEXT("Level"), TEXT("Experience"), TEXT("SaveVersion")})
+	{
+		const FIntProperty* Property = FindFProperty<FIntProperty>(Old->GetClass(), Name);
+		if (Property && Fresh)
+		{
+			Property->SetPropertyValue_InContainer(Fresh, Property->GetPropertyValue_InContainer(Old));
+		}
+	}
+	UPuzzleSlotSubsystem::DeleteAllSlots();
+	UGameplayStatics::DeleteGameInSlot(SaveSlotName, SaveUserIndex);
+	if (Fresh)
+	{
+		UGameplayStatics::SaveGameToSlot(Fresh, SaveSlotName, SaveUserIndex);
+	}
+	bOldSaveReset = true;
+	UE_LOG(LogTemp, Log, TEXT("Old game save replaced: the game starts over, keeping the player's level"));
+}
+
 UHappinessSaveGame* UHappinessSaveGame::LoadFromSlot()
 {
+	ResetOldSave();
 	if (!UGameplayStatics::DoesSaveGameExist(SaveSlotName, SaveUserIndex))
 	{
 		return nullptr;
