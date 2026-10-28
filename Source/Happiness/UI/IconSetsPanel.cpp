@@ -38,15 +38,15 @@ namespace
 	const FLinearColor SetsWarning(.55f, .12f, .04f);
 	const FLinearColor SetsGold(.78f, .6f, .25f);
 	// The player info's window, half as big again (same shape, so the frame art keeps its proportions)
-	const FVector2D WindowSize(1560.f, 780.f);
-	const FVector2D CardSize(290.f, 430.f);
-	constexpr float CardGap = 24.f;
-	constexpr float IconSize = 56.f;
-	constexpr float IconGap = 10.f;
-	constexpr int32 IconColumns = 4;
-	constexpr float MessageDuration = 3.5f;
-	constexpr float DisabledIconOpacity = .4f;
-	constexpr float LockedIconOpacity = .25f;
+	const FVector2D SetsWindowSize(1560.f, 780.f);
+	const FVector2D SetsCardSize(290.f, 430.f);
+	constexpr float SetsCardGap = 24.f;
+	constexpr float SetsIconSize = 56.f;
+	constexpr float SetsIconGap = 10.f;
+	constexpr int32 SetsIconColumns = 4;
+	constexpr float SetsMessageDuration = 3.5f;
+	constexpr float SetsDisabledIconOpacity = .4f;
+	constexpr float SetsLockedIconOpacity = .25f;
 }
 
 void UIconSetCardClick::HandleClicked()
@@ -105,8 +105,8 @@ void UIconSetsPanel::BuildLayout()
 	FitSlot->SetAnchors(FAnchors(0.f, 0.f, 1.f, 1.f));
 	FitSlot->SetOffsets(FMargin(40.f));
 	USizeBox* Size = WidgetTree->ConstructWidget<USizeBox>();
-	Size->SetWidthOverride(WindowSize.X);
-	Size->SetHeightOverride(WindowSize.Y);
+	Size->SetWidthOverride(SetsWindowSize.X);
+	Size->SetHeightOverride(SetsWindowSize.Y);
 	Fit->AddChild(Size);
 	UCanvasPanel* Window = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("Window"));
 	Size->AddChild(Window);
@@ -126,7 +126,7 @@ void UIconSetsPanel::BuildLayout()
 	SurfaceBrush.DrawAs = ESlateBrushDrawType::Image;
 	SurfaceBrush.SetUVRegion(FBox2f(FVector2f(.008f, .05f), FVector2f(.992f, .93f)));
 	Surface->SetBrush(SurfaceBrush);
-	Place(Surface, FVector2D::ZeroVector, WindowSize);
+	Place(Surface, FVector2D::ZeroVector, SetsWindowSize);
 
 	// The title on the notebook buttons' ivory face, as the player info's
 	FSlateBrush Face;
@@ -136,14 +136,14 @@ void UIconSetsPanel::BuildLayout()
 	UImage* TitlePlate = WidgetTree->ConstructWidget<UImage>();
 	TitlePlate->SetBrush(Face);
 	TitlePlate->SetVisibility(ESlateVisibility::HitTestInvisible);
-	Place(TitlePlate, FVector2D((WindowSize.X - 440.f) * .5f, 64.f), FVector2D(440.f, 100.f));
+	Place(TitlePlate, FVector2D((SetsWindowSize.X - 440.f) * .5f, 64.f), FVector2D(440.f, 100.f));
 	UTextBlock* Title = WidgetTree->ConstructWidget<UTextBlock>();
 	Title->SetText(LOCTEXT("Title", "Icon Sets"));
 	Title->SetFont(FSlateFontInfo(PanelFont, 50));
 	Title->SetColorAndOpacity(SetsInk);
 	Title->SetJustification(ETextJustify::Center);
 	Title->SetVisibility(ESlateVisibility::HitTestInvisible);
-	Place(Title, FVector2D((WindowSize.X - 440.f) * .5f, 80.f), FVector2D(440.f, 72.f));
+	Place(Title, FVector2D((SetsWindowSize.X - 440.f) * .5f, 80.f), FVector2D(440.f, 72.f));
 
 	UButton* Close = UPlayerInfoPanel::MakeCloseButton(*WidgetTree);
 	Close->OnClicked.AddUniqueDynamic(this, &UIconSetsPanel::HandleCloseClicked);
@@ -154,7 +154,7 @@ void UIconSetsPanel::BuildLayout()
 	StatusText->SetFont(FSlateFontInfo(PanelFont, 30));
 	StatusText->SetJustification(ETextJustify::Center);
 	StatusText->SetVisibility(ESlateVisibility::HitTestInvisible);
-	Place(StatusText, FVector2D(150.f, 184.f), FVector2D(WindowSize.X - 300.f, 46.f));
+	Place(StatusText, FVector2D(150.f, 184.f), FVector2D(SetsWindowSize.X - 300.f, 46.f));
 
 	// The cards, scrolled left and right (dragged, or with the arrows either side)
 	Scroll = WidgetTree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(), TEXT("SetsScroll"));
@@ -165,7 +165,7 @@ void UIconSetsPanel::BuildLayout()
 	CardRow = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("CardRow"));
 	Scroll->AddChild(CardRow);
 	const float ScrollLeft = 160.f;
-	Place(Scroll, FVector2D(ScrollLeft, 250.f), FVector2D(WindowSize.X - 2.f * ScrollLeft, CardSize.Y));
+	Place(Scroll, FVector2D(ScrollLeft, 250.f), FVector2D(SetsWindowSize.X - 2.f * ScrollLeft, SetsCardSize.Y));
 
 	auto MakeArrow = [&](const TCHAR* Name, bool bLeft)
 	{
@@ -183,8 +183,8 @@ void UIconSetsPanel::BuildLayout()
 		GlyphSize->SetContent(Glyph);
 		GlyphSize->SetWidthOverride(36.f);
 		GlyphSize->SetHeightOverride(36.f);
-		const float X = bLeft ? ScrollLeft - 110.f : WindowSize.X - ScrollLeft + 26.f;
-		Place(Arrow, FVector2D(X, 250.f + (CardSize.Y - 84.f) * .5f), FVector2D(84.f, 84.f));
+		const float X = bLeft ? ScrollLeft - 110.f : SetsWindowSize.X - ScrollLeft + 26.f;
+		Place(Arrow, FVector2D(X, 250.f + (SetsCardSize.Y - 84.f) * .5f), FVector2D(84.f, 84.f));
 		return Arrow;
 	};
 	LeftButton = MakeArrow(TEXT("LeftButton"), true);
@@ -232,7 +232,7 @@ UWidget* UIconSetsPanel::MakeCard(int32 Index, const FIconSetEntry& Entry)
 	NameSlot->SetHorizontalAlignment(HAlign_Fill);
 
 	UUniformGridPanel* Icons = WidgetTree->ConstructWidget<UUniformGridPanel>();
-	Icons->SetSlotPadding(FMargin(IconGap * .5f));
+	Icons->SetSlotPadding(FMargin(SetsIconGap * .5f));
 	const TArray<UTexture2D*> Textures = UIconSetSubsystem::GetIconTextures(Entry.IconSet);
 	for (int32 Icon = 0; Icon < Textures.Num(); Icon++)
 	{
@@ -241,12 +241,12 @@ UWidget* UIconSetsPanel::MakeCard(int32 Index, const FIconSetEntry& Entry)
 		{
 			Image->SetBrushFromTexture(Textures[Icon]);
 		}
-		Image->SetRenderOpacity(Entry.bEnabled ? 1.f : Entry.bUnlocked ? DisabledIconOpacity : LockedIconOpacity);
+		Image->SetRenderOpacity(Entry.bEnabled ? 1.f : Entry.bUnlocked ? SetsDisabledIconOpacity : SetsLockedIconOpacity);
 		USizeBox* ImageSize = WidgetTree->ConstructWidget<USizeBox>();
-		ImageSize->SetWidthOverride(IconSize);
-		ImageSize->SetHeightOverride(IconSize);
+		ImageSize->SetWidthOverride(SetsIconSize);
+		ImageSize->SetHeightOverride(SetsIconSize);
 		ImageSize->AddChild(Image);
-		Icons->AddChildToUniformGrid(ImageSize, Icon / IconColumns, Icon % IconColumns);
+		Icons->AddChildToUniformGrid(ImageSize, Icon / SetsIconColumns, Icon % SetsIconColumns);
 	}
 	UVerticalBoxSlot* IconsSlot = Column->AddChildToVerticalBox(Icons);
 	IconsSlot->SetHorizontalAlignment(HAlign_Center);
@@ -280,8 +280,8 @@ UWidget* UIconSetsPanel::MakeCard(int32 Index, const FIconSetEntry& Entry)
 	ContentSlot->SetVerticalAlignment(VAlign_Fill);
 
 	USizeBox* Sized = WidgetTree->ConstructWidget<USizeBox>();
-	Sized->SetWidthOverride(CardSize.X);
-	Sized->SetHeightOverride(CardSize.Y);
+	Sized->SetWidthOverride(SetsCardSize.X);
+	Sized->SetHeightOverride(SetsCardSize.Y);
 	Sized->AddChild(Card);
 	return Sized;
 }
@@ -303,7 +303,7 @@ void UIconSetsPanel::Refresh()
 		if (UWidget* Card = MakeCard(Index, Entries[Index]))
 		{
 			UHorizontalBoxSlot* CardSlot = CardRow->AddChildToHorizontalBox(Card);
-			CardSlot->SetPadding(FMargin(Index == 0 ? 0.f : CardGap, 0.f, 0.f, 0.f));
+			CardSlot->SetPadding(FMargin(Index == 0 ? 0.f : SetsCardGap, 0.f, 0.f, 0.f));
 			Cards.Add(Card);
 			CardSets.Add(Entries[Index].IconSet);
 		}
@@ -349,7 +349,7 @@ void UIconSetsPanel::ToggleSet(int32 Index)
 	if (!Message.IsEmpty())
 	{
 		PlaySound(CancelSound);
-		MessageSeconds = MessageDuration;
+		MessageSeconds = SetsMessageDuration;
 		StatusText->SetText(Message);
 		StatusText->SetColorAndOpacity(SetsWarning);
 		return;
@@ -389,7 +389,7 @@ void UIconSetsPanel::ScrollBy(int32 CardCount)
 	{
 		return;
 	}
-	const float Step = CardSize.X + CardGap;
+	const float Step = SetsCardSize.X + SetsCardGap;
 	const int32 First = FMath::RoundToInt(Scroll->GetScrollOffset() / Step);
 	const int32 Target = FMath::Clamp(First + CardCount, 0, Cards.Num() - 1);
 	Scroll->ScrollWidgetIntoView(Cards[Target], true, EDescendantScrollDestination::TopOrLeft);

@@ -513,7 +513,8 @@ void UCampaignEndScreenWidget::ShowUnlock()
 	{
 		UnlockText->SetVisibility(ESlateVisibility::HitTestInvisible);
 	}
-	if (UnlockFrame) UnlockFrame->SetVisibility(ESlateVisibility::HitTestInvisible);
+	// Never an empty frame
+	if (UnlockFrame) UnlockFrame->SetVisibility(UnlockText && !UnlockText->GetText().IsEmpty() ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Hidden);
 	PlaySound(UnlockSound);
 }
 
@@ -565,7 +566,11 @@ FText UCampaignEndScreenWidget::GetUnlockText() const
 	{
 		return LOCTEXT("ClueMastered", "Mastered!");
 	}
-	// Clearing the final shows no unlock text: Master Mode is found by reopening the clue from the tree
+	// Clearing the final. Master Mode isn't mentioned: the player finds it by reopening the clue from the tree
+	if (Result.bLessonCompleted)
+	{
+		return LOCTEXT("ClueCompleted", "Completed!");
+	}
 	if (Result.bStageUnlocked)
 	{
 		return FText::Format(LOCTEXT("StageUnlocked", "{0} unlocked!"), UCampaignSubsystem::GetStageDisplayName(NextStage));

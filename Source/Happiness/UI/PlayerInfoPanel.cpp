@@ -32,9 +32,9 @@ namespace
 	// The pause menu's garden colors
 	const FLinearColor InfoInk(.17f, .085f, .035f);
 	const FLinearColor InfoSage(.16f, .29f, .075f);
-	const FVector2D WindowSize(1200.f, 600.f);
-	constexpr float RewardSize = 68.f;
-	constexpr float RewardGap = 10.f;
+	const FVector2D InfoWindowSize(1200.f, 600.f);
+	constexpr float InfoRewardSize = 68.f;
+	constexpr float InfoRewardGap = 10.f;
 }
 
 UPlayerInfoPanel::UPlayerInfoPanel(const FObjectInitializer& ObjectInitializer)
@@ -93,8 +93,8 @@ void UPlayerInfoPanel::BuildLayout()
 	const float SunClearance = UPlayerLevelBadge::BadgeSize + 40.f;
 	FitSlot->SetOffsets(FMargin(SunClearance, 60.f, SunClearance, 60.f));
 	USizeBox* Size = WidgetTree->ConstructWidget<USizeBox>();
-	Size->SetWidthOverride(WindowSize.X);
-	Size->SetHeightOverride(WindowSize.Y);
+	Size->SetWidthOverride(InfoWindowSize.X);
+	Size->SetHeightOverride(InfoWindowSize.Y);
 	Fit->AddChild(Size);
 	UCanvasPanel* Window = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("Window"));
 	Size->AddChild(Window);
@@ -129,7 +129,7 @@ void UPlayerInfoPanel::BuildLayout()
 	SurfaceBrush.DrawAs = ESlateBrushDrawType::Image;
 	SurfaceBrush.SetUVRegion(FBox2f(FVector2f(.008f, .05f), FVector2f(.992f, .93f)));
 	Surface->SetBrush(SurfaceBrush);
-	Place(Surface, FVector2D::ZeroVector, WindowSize);
+	Place(Surface, FVector2D::ZeroVector, InfoWindowSize);
 
 	UImage* TitlePlate = WidgetTree->ConstructWidget<UImage>();
 	TitlePlate->SetBrush(Face);
@@ -150,16 +150,16 @@ void UPlayerInfoPanel::BuildLayout()
 	for (int32 Index = 0; Index < NumRewards; Index++)
 	{
 		UImage* Reward = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(), *FString::Printf(TEXT("Reward%d"), Index));
-		Reward->SetBrush(UPlayerLevelBadge::MakeRewardBrush(RewardAtlasTexture, Index, RewardSize));
+		Reward->SetBrush(UPlayerLevelBadge::MakeRewardBrush(RewardAtlasTexture, Index, InfoRewardSize));
 		UHorizontalBoxSlot* RewardSlot = RewardRow->AddChildToHorizontalBox(Reward);
 		RewardSlot->SetVerticalAlignment(VAlign_Center);
-		RewardSlot->SetPadding(FMargin(Index == 0 ? 0.f : RewardGap, 0.f, 0.f, 0.f));
+		RewardSlot->SetPadding(FMargin(Index == 0 ? 0.f : InfoRewardGap, 0.f, 0.f, 0.f));
 		Rewards.Add(Reward);
 	}
-	const float RowWidth = NumRewards * RewardSize + FMath::Max(NumRewards - 1, 0) * RewardGap;
+	const float RowWidth = NumRewards * InfoRewardSize + FMath::Max(NumRewards - 1, 0) * InfoRewardGap;
 	// Explicitly over the tray: the canvas doesn't keep the order of children at the same Z, and the tray's cream
 	// over the rewards washed them out
-	Place(RewardRow, FVector2D((WindowSize.X - RowWidth) * .5f, 258.f), FVector2D(RowWidth, RewardSize))->SetZOrder(2);
+	Place(RewardRow, FVector2D((InfoWindowSize.X - RowWidth) * .5f, 258.f), FVector2D(RowWidth, InfoRewardSize))->SetZOrder(2);
 
 	UImage* Divider = WidgetTree->ConstructWidget<UImage>();
 	Divider->SetBrush(FSlateRoundedBoxBrush(FLinearColor(.44f, .28f, .1f, .35f), 0.f));
