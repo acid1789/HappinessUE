@@ -288,6 +288,11 @@ void UAdsSubsystem::ShowInterstitialThen(FSimpleDelegate Action)
 	Action.ExecuteIfBound();
 }
 
+bool UAdsSubsystem::IsInterstitialRecent(double Seconds) const
+{
+	return bShowing || FPlatformTime::Seconds() - InterstitialEndTime < Seconds;
+}
+
 void UAdsSubsystem::FinishShow()
 {
 	if (!bShowing)
@@ -295,6 +300,7 @@ void UAdsSubsystem::FinishShow()
 		return;
 	}
 	bShowing = false;
+	InterstitialEndTime = FPlatformTime::Seconds();
 	if (const UWorld* World = GetGameInstance() ? GetGameInstance()->GetWorld() : nullptr)
 	{
 		World->GetTimerManager().ClearTimer(TimeoutTimer);

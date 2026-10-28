@@ -10,6 +10,7 @@ goes on as if there were none: Daily starts over, Free Play opens its settings, 
 
 | Mode | What it is | Key code |
 |---|---|---|
+| **Daily** | One puzzle per date, its size, difficulty, seed and clue types chosen from the date. Only clue types whose lessons the player has unlocked (`GetLockedClueMask`); the rest are left out without changing the size, difficulty or seed, and the mask is kept for that date once its puzzle starts (`FDailySaveData::ActiveLockedClues`). Test with `Tools/puzzle.sh -daily=YYYYMMDD -dailycolumns=N`. | `UDailySubsystem` (`HappinessClassic/DailyPuzzle.*`) |
 | **Free Play** | Any size 3–8 and difficulty, with a choice of clue types. Scored with EXP against a par time; EXP fills the player's level. | `UFreePlaySubsystem` (`HappinessClassic/FreePlaySettings.*`) |
 | **Lessons** | A tree of clue-type lessons (`WBP_CampaignTree`). Each lesson: 3x3 Easy, 3x3 Normal, 4x4 Easy, 4x4 Normal, then a 4x4 Hard final. Points per puzzle (3, minus hints) unlock stages. | `UCampaignSubsystem` (`HappinessClassic/CampaignProgress.*`), tree in `CampaignTree.cpp` |
 | **Campaign** | Unlocked by completing every lesson. The same tree on bigger boards: per clue 4×5x5 Normal, 5x5 Hard, 4×6x6 Normal, 6x6 Hard, 4×7x7 Normal, 7x7 Hard, then an 8x8 Easy final. One step per solved puzzle; scored with EXP like Free Play. | Same subsystem, `ECampaignMode::Campaign` |
@@ -124,13 +125,16 @@ itself (alerts and sound, no push); Android 13+ asks for `POST_NOTIFICATIONS` th
 `ic_notification` drawable if there is one, else the app icon. Test on a phone with `Happiness.Reminder.Test [seconds]`.
 Android and iOS only; it does nothing in the editor.
 
+## Leaving the app mid-puzzle
+
+When the app stops being active (the phone locked, Home, another app or a call on top: `FCoreDelegates::ApplicationWillDeactivateDelegate`, Android and iOS), `UAppPauseSubsystem` (`Source/Happiness/AppPause.*`) pauses a puzzle in progress, so the player comes back to the pause menu with the clock stopped (`PausePuzzle`: WBP_Happiness's `Pause`, unless the pause menu or an end screen is already showing). An interstitial covers the game too, and Android may hand the game that deactivation only after the ad has closed, so deactivations while one plays or within 2 s of its end are ignored (`UAdsSubsystem::IsInterstitialRecent`). `Happiness.SimulateAppDeactivate` does the same in PIE (dev builds).
+
 ## Android back button
 
 `UBackButtonSubsystem` (`Source/Happiness/BackButton.*`, Android only) catches the back button before the UI does (a
 Slate input preprocessor) and sends the app to the background with `moveTaskToBack` (Java side
 `AndroidThunkJava_Happiness_MoveToBack` in `Happiness_UPL.xml`), like Home: the game keeps its state. Mid-puzzle it
-first calls WBP_Happiness's `Pause` (saves the time, shows the pause menu), unless the pause menu or an end screen is
-already showing. No screen handles back itself.
+first pauses the puzzle (`UAppPauseSubsystem::PausePuzzle`, above). No screen handles back itself.
 
 ## Save data
 

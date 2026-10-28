@@ -31,6 +31,11 @@ struct FDailySaveData
 	UPROPERTY(SaveGame)
 	int32 ActiveDate = 0;
 
+	/** The clue types still locked when ActiveDate's puzzle was first started (UDailySubsystem::GetLockedClueMask):
+	 *  that date's puzzle keeps them, so unlocking a lesson doesn't change a puzzle already under way */
+	UPROPERTY(SaveGame)
+	int32 ActiveLockedClues = 0;
+
 	/** Streak saver days bought and not used yet: each one covers a day the streak missed */
 	UPROPERTY(SaveGame)
 	int32 SaverDays = 0;
@@ -46,7 +51,8 @@ struct FDailySaveData
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnDailyChanged);
 
-/** One day's daily puzzle, worked out from the date alone: the same for everyone on that date */
+/** One day's daily puzzle, worked out from the date: the same size, difficulty and seed for everyone on that date. Its
+ *  clue types are the same too for players who have unlocked every lesson. */
 USTRUCT(BlueprintType)
 struct FDailyPuzzleSpec
 {
@@ -76,7 +82,8 @@ struct FDailyPuzzleSpec
 
 /**
  * The daily puzzle: one puzzle per calendar date (local time), chosen at random from the date: its clue types,
- * size, difficulty and seed. It plays like a Free Play puzzle; the first solve of each date's puzzle is worth
+ * size, difficulty and seed. Its clue types are only those whose lessons the player has unlocked, so a daily never
+ * shows a clue the player hasn't been taught. It plays like a Free Play puzzle; the first solve of each date's puzzle is worth
  * double experience and counts toward the streak of consecutive days.
  *
  * Game flow: the Daily button on the mode screen ends any lesson session and fires OnDailyChosen; WBP_GameSelect
@@ -104,12 +111,19 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Daily")
 	static int32 GetToday();
 
-	/** The daily puzzle for a date (YYYYMMDD) */
+	/**
+	 * The daily puzzle for a date (YYYYMMDD), leaving out the clue types in LockedClueMask (a bit per ECampaignLesson).
+	 * Locked clue types don't change its size, difficulty or seed; while unlocked ones remain it still has at least 5.
+	 */
 	UFUNCTION(BlueprintPure, Category = "Daily")
-	static FDailyPuzzleSpec GetSpec(int32 Date);
+	static FDailyPuzzleSpec GetSpec(int32 Date, int32 LockedClueMask = 0);
 
+	/** Today's daily puzzle for this player (only the clue types of unlocked lessons) */
 	UFUNCTION(BlueprintPure, Category = "Daily")
-	static FDailyPuzzleSpec GetTodaySpec() { return GetSpec(GetToday()); }
+	static FDailyPuzzleSpec GetTodaySpec();
+
+	/** The clue types whose lessons the player hasn't unlocked yet, a bit per ECampaignLesson; none outside a game */
+	static int32 GetLockedClueMask();
 
 	/** The current streak: 0 once a day has been missed that streak savers can't cover */
 	UFUNCTION(BlueprintPure, Category = "Daily")
@@ -200,6 +214,9 @@ private:
 		int32 MissedDays = 0;
 	};
 	FStreakState GetStreakState(int32 Date) const;
+
+	/** The clue types locked for Date's puzzle: as when it was started, if it was */
+	int32 GetLockedCluesFor(int32 Date) const;
 	/** Keep what savers covered by a date (GetStreakState), before anything else changes the streak */
 	void ApplySavers(int32 Date);
 
