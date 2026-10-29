@@ -5,6 +5,7 @@
 #include "FireworksWidget.generated.h"
 
 class UTexture2D;
+class USoundBase;
 
 /**
  * Sprite fireworks: rockets rise and burst into sparks that slow, fall and fade. Place it over the area they may
@@ -25,12 +26,19 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Fireworks|Art")
 	TObjectPtr<UTexture2D> ParticleAtlas;
 
+	UPROPERTY(EditAnywhere, Category = "Fireworks|Audio")
+	TObjectPtr<USoundBase> LaunchSound;
+
+	UPROPERTY(EditAnywhere, Category = "Fireworks|Audio")
+	TArray<TObjectPtr<USoundBase>> BurstSounds;
+
 	/** One burst: where (in this widget's space), when after Play, and where its rocket starts (its height: below it) */
 	struct FBurst
 	{
 		FVector2D Position = FVector2D::ZeroVector;
 		float Delay = 0.f;
 		float RocketRise = 0.f;
+		bool bLaunchSoundPlayed = false;
 	};
 
 	/** Start the bursts. Scale sizes the sparks and their spread (1: about a 500-unit-wide button's worth). */
@@ -89,6 +97,7 @@ private:
 	TArray<FSpark> Sparks;
 	TArray<TPair<FVector2D, float>> Flashes;
 	int32 NextBurst = 0;
+	int32 NextBurstSound = 0;
 	float Time = 0.f;
 	float Scale = 1.f;
 	FRandomStream Random;

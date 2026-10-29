@@ -86,6 +86,7 @@ Tools/*
 !Tools/umg.py
 !Tools/mcp_call.py
 !Tools/render_ui.sh
+!Tools/generate_firework_audio.py
 !Tools/bp_dump.py
 !Tools/bp_swap_node.py
 !Tools/checkout_env.sh

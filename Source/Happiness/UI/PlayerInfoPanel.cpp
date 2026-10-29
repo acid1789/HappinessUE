@@ -43,7 +43,7 @@ UPlayerInfoPanel::UPlayerInfoPanel(const FObjectInitializer& ObjectInitializer)
 	static ConstructorHelpers::FObjectFinder<UTexture2D> Panel(TEXT("/Game/General/Textures/T_PauseGardenPanel.T_PauseGardenPanel"));
 	static ConstructorHelpers::FObjectFinder<UTexture2D> Buttons(TEXT("/Game/General/Textures/T_LessonNotebookButtons.T_LessonNotebookButtons"));
 	static ConstructorHelpers::FObjectFinder<UTexture2D> RewardArt(TEXT("/Game/General/Textures/T_MasterRewardGems.T_MasterRewardGems"));
-	static ConstructorHelpers::FObjectFinder<UTexture2D> Daisy(TEXT("/Game/Happiness/IconSets/Icons/Flowers/Daisy.Daisy"));
+	static ConstructorHelpers::FObjectFinder<UTexture2D> Daisy(TEXT("/Game/Happiness/IconSets/Icons/Basic/Flowers/Daisy.Daisy"));
 	static ConstructorHelpers::FObjectFinder<UFont> Font(TEXT("/Game/Happiness/UI/Fonts/LessonsSerif_Font.LessonsSerif_Font"));
 	static ConstructorHelpers::FObjectFinder<USoundBase> Accept(TEXT("/Game/General/Audio/Cues/MenuAccept.MenuAccept"));
 	static ConstructorHelpers::FObjectFinder<USoundBase> Cancel(TEXT("/Game/General/Audio/Cues/MenuCancel.MenuCancel"));

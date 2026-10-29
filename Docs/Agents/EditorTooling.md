@@ -352,3 +352,25 @@ icon pulse each grid cell plays when its icon is set (`UGameCellWidget`).
   the fall speed; each piece's width swings with a cosine so it seems to flip).
 - **Unity builds put several `.cpp` files in one translation unit,** so names in their anonymous namespaces can
   clash (C2374 "redefinition"): two end screens both defined `Ink`. Give file-level constants distinctive names.
+
+### Bulk icon-set imports
+
+A one-off Python commandlet can enable Python without editing the project: pass
+`-EnablePlugins=PythonScriptPlugin -run=pythonscript -script=<project script.py>`.
+Close this checkout's editor, hold editor ownership, and lock all destination assets first.
+For Blueprint-defined data assets, `unreal.ToolsetLibrary.get_object_properties` and
+`set_object_properties` accept the same JSON as ObjectTools, including texture `refPath` values.
+Duplicate an existing icon-set asset, clear `Icons` with `[]`, then assign the new entries and `Id`.
+Import production icons at 512x512, use UI/TC_EditorIcon/NoMipmaps settings, save every asset,
+and verify eight distinct IDs and valid texture references per set. Keep the full-resolution originals
+and preview sheets under `output/imagegen`. These imports do not require collection or unlock-table edits.
+
+### Moving textures referenced by native defaults
+
+AssetTools cancels unattended moves when a native CDO holds the texture (RenameCDOReferences).
+Update the constructor paths and rebuild first, then complete the move in a Python commandlet
+before reopening the editor. The fresh editor reconstructs the defaults from the new paths.
+Private native UPROPERTY defaults cannot be cleared through ObjectTools or Python editor properties.
+If Unreal reports deleting an old unreferenced texture but its file remains, resave that old asset
+with `save_loaded_asset(asset, only_if_is_dirty=False)` before `delete_loaded_asset(asset)`.
+This resolved the legacy 8ball package without raw filesystem edits to a uasset.
