@@ -15,19 +15,21 @@ Usage Analytics
 --- Design Tasks ---
 Campaign
 Streak Saver Backing
+Icon Set Backing
 Game Rules
+Pencil Draw Sound
 
 --- Dev tasks ---
 Back/Home/Hamburger still there on daily notification trigger
 Hide Clue Undo
-Cell Dialog Selection
+Hint broken on mobile
+
 
 --- Art Tasks ---
 Streak Saver Art
 Options Menu Visuals
 Player Info Menu
 Remove Adds Artwork
-Pencil Draw Sound
 
 
 --- Store Product IDs (create in Play Console and App Store Connect) ---
