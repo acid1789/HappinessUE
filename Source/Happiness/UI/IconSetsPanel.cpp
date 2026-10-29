@@ -20,6 +20,7 @@
 #include "Components/VerticalBoxSlot.h"
 #include "Engine/Font.h"
 #include "Engine/Texture2D.h"
+#include "Ads/IconSetStore.h"
 #include "HappinessClassic/IconSets.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
@@ -260,18 +261,27 @@ UWidget* UIconSetsPanel::MakeCard(int32 Index, const FIconSetEntry& Entry)
 	IconsSlot->SetPadding(FMargin(0.f, 0.f, 0.f, 12.f));
 	IconsSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
 
-	// At the bottom: On / Off, or what unlocks it
+	// At the bottom: On / Off, what unlocks it, or (for sale) its price
 	UBorder* Pill = WidgetTree->ConstructWidget<UBorder>();
-	const FLinearColor PillFill = Entry.bEnabled ? SetsSage : Entry.bUnlocked ? FLinearColor(.7f, .67f, .6f) : FLinearColor(.44f, .28f, .1f, .18f);
+	const FLinearColor PillFill = Entry.bEnabled ? SetsSage : Entry.bUnlocked ? FLinearColor(.7f, .67f, .6f)
+		: Entry.bForSale ? SetsGold : FLinearColor(.44f, .28f, .1f, .18f);
 	Pill->SetBrush(FSlateRoundedBoxBrush(PillFill, 24.f));
 	Pill->SetPadding(FMargin(12.f, 6.f));
 	Pill->SetHorizontalAlignment(HAlign_Center);
 	Pill->SetVerticalAlignment(VAlign_Center);
 	UTextBlock* State = WidgetTree->ConstructWidget<UTextBlock>();
-	State->SetText(Entry.bEnabled ? LOCTEXT("On", "Enabled") : Entry.bUnlocked ? LOCTEXT("Off", "Disabled")
-		: FText::Format(LOCTEXT("Locked", "Locked: {0}"), Entry.LockedReason));
-	State->SetFont(FSlateFontInfo(PanelFont, Entry.bUnlocked ? 28 : 22));
-	State->SetColorAndOpacity(Entry.bEnabled ? SetsIvory : SetsInk);
+	FText StateText = Entry.bEnabled ? LOCTEXT("On", "Enabled") : Entry.bUnlocked ? LOCTEXT("Off", "Disabled")
+		: FText::Format(LOCTEXT("Locked", "Locked: {0}"), Entry.LockedReason);
+	if (const UIconSetStoreSubsystem* Store = Entry.bForSale ? UIconSetStoreSubsystem::Get(this) : nullptr)
+	{
+		const FText Price = Store->GetPriceText(Entry.Id);
+		StateText = Store->IsPurchasing(Entry.Id) ? LOCTEXT("Purchasing", "Purchasing...")
+			: Store->IsPending(Entry.Id) ? LOCTEXT("PaymentPending", "Payment pending")
+			: Price.IsEmpty() ? LOCTEXT("Buy", "Buy") : FText::Format(LOCTEXT("BuyPrice", "Buy {0}"), Price);
+	}
+	State->SetText(StateText);
+	State->SetFont(FSlateFontInfo(PanelFont, Entry.bUnlocked || Entry.bForSale ? 28 : 22));
+	State->SetColorAndOpacity(Entry.bEnabled || Entry.bForSale ? SetsIvory : SetsInk);
 	State->SetJustification(ETextJustify::Center);
 	State->SetAutoWrapText(true);
 	Pill->SetContent(State);
@@ -344,7 +354,20 @@ void UIconSetsPanel::ToggleSet(int32 Index)
 	}
 	const FIconSetEntry& Entry = Entries[Index];
 	FText Message;
-	if (!Entry.bUnlocked)
+	if (Entry.bForSale)
+	{
+		// Open the store's purchase flow; the store's answer remakes the cards (HandleStoreChanged)
+		UIconSetStoreSubsystem* Store = UIconSetStoreSubsystem::Get(this);
+		if (Store && Store->Buy(Entry.Id))
+		{
+			PlaySound(AcceptSound);
+			return;
+		}
+		Message = Store && Store->IsPending(Entry.Id)
+			? FText::Format(LOCTEXT("PendingMessage", "{0} is waiting for your payment to clear."), Entry.Name)
+			: LOCTEXT("NoStore", "The store can't be reached right now. Check your connection and try again.");
+	}
+	else if (!Entry.bUnlocked)
 	{
 		Message = FText::Format(LOCTEXT("LockedMessage", "{0} is locked. {1} to unlock it."), Entry.Name, Entry.LockedReason);
 	}
@@ -355,9 +378,7 @@ void UIconSetsPanel::ToggleSet(int32 Index)
 	if (!Message.IsEmpty())
 	{
 		PlaySound(CancelSound);
-		MessageSeconds = SetsMessageDuration;
-		StatusText->SetText(Message);
-		StatusText->SetColorAndOpacity(SetsWarning);
+		ShowMessage(Message);
 		return;
 	}
 	PlaySound(AcceptSound);
@@ -409,6 +430,46 @@ void UIconSetsPanel::HandleLeftClicked()
 void UIconSetsPanel::HandleRightClicked()
 {
 	ScrollBy(3);
+}
+
+void UIconSetsPanel::NativeConstruct()
+{
+	Super::NativeConstruct();
+	if (UIconSetStoreSubsystem* Store = UIconSetStoreSubsystem::Get(this))
+	{
+		StoreChangedHandle = Store->OnChanged.AddUObject(this, &UIconSetsPanel::HandleStoreChanged);
+	}
+}
+
+void UIconSetsPanel::NativeDestruct()
+{
+	if (UIconSetStoreSubsystem* Store = UIconSetStoreSubsystem::Get(this))
+	{
+		Store->OnChanged.Remove(StoreChangedHandle);
+	}
+	Super::NativeDestruct();
+}
+
+void UIconSetsPanel::HandleStoreChanged()
+{
+	if (!IsVisible())
+	{
+		return;
+	}
+	// Remake the cards, keeping the scroll where it is
+	const float Offset = Scroll ? Scroll->GetScrollOffset() : 0.f;
+	Refresh();
+	if (Scroll)
+	{
+		Scroll->SetScrollOffset(Offset);
+	}
+}
+
+void UIconSetsPanel::ShowMessage(const FText& Message)
+{
+	MessageSeconds = SetsMessageDuration;
+	StatusText->SetText(Message);
+	StatusText->SetColorAndOpacity(SetsWarning);
 }
 
 void UIconSetsPanel::Show()

@@ -53,6 +53,8 @@ public:
 
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
+	virtual void NativeConstruct() override;
+	virtual void NativeDestruct() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 private:
@@ -63,6 +65,10 @@ private:
 	UWidget* MakeCard(int32 Index, const FIconSetEntry& Entry);
 	void ScrollBy(int32 Cards);
 	void PlaySound(USoundBase* Sound) const;
+	/** A purchase started or ended, or prices came in: the cards again, while showing */
+	void HandleStoreChanged();
+	/** Show a message on the count line for a while, in the warning color */
+	void ShowMessage(const FText& Message);
 
 	UFUNCTION()
 	void HandleCloseClicked();
@@ -92,4 +98,6 @@ private:
 
 	/** While above zero, the count line shows why a set couldn't be turned off (or what unlocks one) */
 	float MessageSeconds = 0.f;
+
+	FDelegateHandle StoreChangedHandle;
 };

@@ -82,7 +82,16 @@ default collection (`KatrinaCollection`, 8 sets). At BeginPlay `PC_Happiness` sw
 `LockedReason`). It updates in place when campaign progress changes. `IS_GardenVisitors` unlocks once every lesson is
 completed; `IS_MythicalCreatures` once every lesson's Campaign final is (`UCampaignSubsystem::IsCampaignCompleted`,
 Master Mode not needed). `IS_MasterRewardGems` is hidden until every lesson's Master Mode is completed
-(`IsAllMasterCompleted`; test with `Happiness.Campaign.MasterAll`). To add an unlockable set, add it to `DA_IconSetUnlocks` (new conditions go in `EIconSetUnlock` /
+(`IsAllMasterCompleted`; test with `Happiness.Campaign.MasterAll`). The 31 sets in `Icons/Extra` are listed
+with `Purchase`: on PC unlocked from the start but off (`FIconSetSaveData::EnabledSets` holds the ones turned on); on
+phones each is a one-time store product, `iconset_<set id in lower case>` (`iconset_arcticanimals`), bought from its
+card on the icon sets screen ("Buy <price>") and on once bought. `Ads/IconSetStore` (`UIconSetStoreSubsystem`) keeps
+the purchases in `iconsets.owned` in the app's private storage, so they hold offline, and checks them against the
+store at startup and on each return to the foreground: a paid purchase missing from the file is added (reinstall,
+new phone); one the store no longer lists is removed only once the store's servers are confirmed reachable (as Remove
+Ads, `Ads/AdRemoval.h`). The Remove Ads Restore Purchases also restores the sets. Test on PC:
+`Happiness.IconSets.SimulateStore 1` (act as a phone; buying grants at once), `Happiness.IconSets.Owned <SetId|all> <1|0>`.
+`ComingSoon` (shown locked, never unlocked) is unused. To add an unlockable set, add it to `DA_IconSetUnlocks` (new conditions go in `EIconSetUnlock` /
 `UIconSetSubsystem::IsUnlocked` / the default reason in `GetEntries`). `DA_IconSetUnlocks` is always cooked (Asset
 Manager rule in `DefaultGame.ini`), so the sets it lists ship. Its `SetNames` (by set Id) are the names the icon sets
 screen shows; a set without one shows its Id spaced out.

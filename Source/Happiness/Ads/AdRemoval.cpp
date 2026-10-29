@@ -1,6 +1,7 @@
 #include "Ads/AdRemoval.h"
 
 #include "Ads/AdsSubsystem.h"
+#include "Ads/IconSetStore.h"
 #include "Containers/Ticker.h"
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
@@ -85,6 +86,11 @@ ERemoveAdsState UAdRemovalSubsystem::GetState() const
 
 FString UAdRemovalSubsystem::GetTokenPath() const
 {
+	return GetPrivateFilePath(TokenFileName);
+}
+
+FString UAdRemovalSubsystem::GetPrivateFilePath(const FString& FileName)
+{
 #if PLATFORM_ANDROID
 	// The app's internal files folder (Context.getFilesDir()): private to the app, removed with it
 	static FString FilesDir;
@@ -115,11 +121,11 @@ FString UAdRemovalSubsystem::GetTokenPath() const
 	}
 	if (!FilesDir.IsEmpty())
 	{
-		return FilesDir / TokenFileName;
+		return FilesDir / FileName;
 	}
 #endif
 	// iOS: the app's own sandbox; elsewhere (editor, PC): the project's Saved folder
-	return FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TokenFileName);
+	return FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / FileName);
 }
 
 void UAdRemovalSubsystem::SetOwned(bool bOwned, const FString& TransactionId)
@@ -415,6 +421,11 @@ void UAdRemovalSubsystem::BuyRemoveAds()
 
 void UAdRemovalSubsystem::RestorePurchases()
 {
+	// The one Restore Purchases button restores the icon sets too
+	if (UIconSetStoreSubsystem* IconSetStore = GetGameInstance() ? GetGameInstance()->GetSubsystem<UIconSetStoreSubsystem>() : nullptr)
+	{
+		IconSetStore->RestorePurchases();
+	}
 	if (bRestoring || bHasToken)
 	{
 		return;
