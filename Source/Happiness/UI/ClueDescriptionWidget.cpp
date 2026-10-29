@@ -39,7 +39,7 @@ void UClueDescriptionWidget::NativePreConstruct()
 			if (Line->GetChildrenCount() == 0)
 			{
 			FSlateBrush IconBrush;
-			IconBrush.SetResourceObject(LoadObject<UTexture2D>(nullptr, TEXT("/Game/Happiness/IconSets/Icons/Toys/Bear.Bear")));
+			IconBrush.SetResourceObject(LoadObject<UTexture2D>(nullptr, TEXT("/Game/Happiness/IconSets/Icons/Basic/Toys/Bear.Bear")));
 			IconBrush.ImageSize = FVector2D(30.f);
 			UImage* FirstIcon = WidgetTree->ConstructWidget<UImage>();
 			FirstIcon->SetBrush(IconBrush);

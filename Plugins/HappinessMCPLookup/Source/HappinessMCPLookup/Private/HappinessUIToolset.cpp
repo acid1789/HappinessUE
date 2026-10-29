@@ -67,7 +67,7 @@ namespace
 					if (UImage* Image = Cast<UImage>(Icon->GetWidgetFromName(TEXT("TheIcon"))))
 					{
 						const TCHAR* Name = Icons[(Index + Row) % UE_ARRAY_COUNT(Icons)];
-						const FString Path = FString::Printf(TEXT("/Game/Happiness/IconSets/Icons/Toys/%s.%s"), Name, Name);
+						const FString Path = FString::Printf(TEXT("/Game/Happiness/IconSets/Icons/Basic/Toys/%s.%s"), Name, Name);
 						Image->SetBrushFromTexture(LoadObject<UTexture2D>(nullptr, *Path), false);
 					}
 					(Index < FMath::DivideAndRoundUp(Size, 2) ? Top : Bottom)->AddChildToHorizontalBox(Icon);

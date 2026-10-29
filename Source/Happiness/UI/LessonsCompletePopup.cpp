@@ -41,10 +41,10 @@ ULessonsCompletePopup::ULessonsCompletePopup(const FObjectInitializer& ObjectIni
 	static ConstructorHelpers::FObjectFinder<UTexture2D> Plaque(TEXT("/Game/General/Textures/T_ConfirmGardenPlaque.T_ConfirmGardenPlaque"));
 	static ConstructorHelpers::FObjectFinder<UTexture2D> Button(TEXT("/Game/General/Textures/T_PauseQuitButton.T_PauseQuitButton"));
 	static ConstructorHelpers::FObjectFinder<UFont> Font(TEXT("/Game/Happiness/UI/Fonts/LessonsSerif_Font.LessonsSerif_Font"));
-	static ConstructorHelpers::FObjectFinder<UTexture2D> Bee(TEXT("/Game/Happiness/IconSets/Icons/GardenVisitors/T_Bee.T_Bee"));
-	static ConstructorHelpers::FObjectFinder<UTexture2D> Ladybug(TEXT("/Game/Happiness/IconSets/Icons/GardenVisitors/T_Ladybug.T_Ladybug"));
-	static ConstructorHelpers::FObjectFinder<UTexture2D> Butterfly(TEXT("/Game/Happiness/IconSets/Icons/GardenVisitors/T_Butterfly.T_Butterfly"));
-	static ConstructorHelpers::FObjectFinder<UTexture2D> Snail(TEXT("/Game/Happiness/IconSets/Icons/GardenVisitors/T_Snail.T_Snail"));
+	static ConstructorHelpers::FObjectFinder<UTexture2D> Bee(TEXT("/Game/Happiness/IconSets/Icons/Basic/GardenVisitors/T_Bee.T_Bee"));
+	static ConstructorHelpers::FObjectFinder<UTexture2D> Ladybug(TEXT("/Game/Happiness/IconSets/Icons/Basic/GardenVisitors/T_Ladybug.T_Ladybug"));
+	static ConstructorHelpers::FObjectFinder<UTexture2D> Butterfly(TEXT("/Game/Happiness/IconSets/Icons/Basic/GardenVisitors/T_Butterfly.T_Butterfly"));
+	static ConstructorHelpers::FObjectFinder<UTexture2D> Snail(TEXT("/Game/Happiness/IconSets/Icons/Basic/GardenVisitors/T_Snail.T_Snail"));
 	PlaqueTexture = Plaque.Object;
 	ButtonTexture = Button.Object;
 	PlaqueFont = Font.Object;
