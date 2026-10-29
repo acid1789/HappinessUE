@@ -30,6 +30,10 @@ struct FRulesSubject
 	FText Description;
 	/** Additional guidance below the diagrams, scrollable independently of the examples */
 	FText Details;
+	/** Controls: Description and Details for touch input (the cell dialog); the plain ones are for the mouse */
+	FText TouchDescription;
+	FText TouchDetails;
+	bool bControls = false;
 	/** Basics: what the picture should show, until there is artwork (Pictures) */
 	FText PictureNote;
 	/** Which Basics illustration to draw when there is no supplied picture */
@@ -59,7 +63,7 @@ class HAPPINESS_API UGameRulesWidget : public UUserWidget
 public:
 	UGameRulesWidget(const FObjectInitializer& ObjectInitializer);
 
-	/** Show the rules (PlayerController: for the game's icon sets) */
+	/** Show the rules, open at the first subject, Objective (PlayerController: for the game's icon sets) */
 	UFUNCTION(BlueprintCallable, Category = "Game Rules")
 	void Show(APlayerController* PlayerController);
 
@@ -100,6 +104,22 @@ public:
 
 	UPROPERTY(EditAnywhere, Category = "Game Rules")
 	TSoftClassPtr<UUserWidget> HorizontalClueClass;
+
+	/** The puzzle screen's cell dialog: the touch Controls page shows one, filled with a sample cell */
+	UPROPERTY(EditAnywhere, Category = "Game Rules")
+	TSoftClassPtr<UUserWidget> CellDialogClass;
+
+	/** The board's cell (WBP_Cell): the mouse Controls page shows one */
+	UPROPERTY(EditAnywhere, Category = "Game Rules")
+	TSoftClassPtr<UUserWidget> GridCellClass;
+
+	/** The cell dialog's panel size in WBP_CellDialog (SizeBox_15, centered in its canvas) */
+	UPROPERTY(EditAnywhere, Category = "Game Rules")
+	FVector2D CellDialogSize = FVector2D(1180.f, 620.f);
+
+	/** The mouse Controls page's grid cell (WBP_Cell), at its own size before it is scaled to the picture */
+	UPROPERTY(EditAnywhere, Category = "Game Rules")
+	FVector2D GridCellSize = FVector2D(240.f, 160.f);
 
 	/** Basics pictures by subject title (Objective, Game Layout, ...); a placeholder box until set */
 	UPROPERTY(EditAnywhere, Category = "Game Rules")
@@ -165,10 +185,18 @@ private:
 
 	void BuildIndex();
 	void Select(int32 Index);
+	/** Move the example and picture areas into the details' scroll box, under the fixed title and summary */
+	void ScrollBelowSummary();
+	/** The player's input is touch (PC_Happiness.InputMode), so the grid's cells open the cell dialog */
+	bool IsTouchInput() const;
 	/** The clue subject of this type, or INDEX_NONE */
 	int32 FindLessonSubject(ECampaignLesson Lesson) const;
 	/** A clue widget showing a clue of this type, or null */
 	UWidget* MakeExample(ECampaignLesson Lesson);
+	/** A cell dialog showing a sample cell (two icons eliminated, one selected), for looking at only; null if none */
+	UWidget* MakeCellDialogMock();
+	/** A grid cell showing the same sample cell, for looking at only; null if none */
+	UWidget* MakeGridCellMock();
 	/** A generated puzzle with a clue of this type in it */
 	bool FindExampleClue(ECampaignLesson Lesson, UPuzzle*& OutPuzzle, UClue*& OutClue);
 	/** The game's icon sets (PC_Happiness's HappinessIconSets), or empty */
@@ -187,6 +215,17 @@ private:
 
 	UFUNCTION()
 	void HandleClose();
+
+	/** Show the rules open at Subject, its index entry in view */
+	void Open(APlayerController* PlayerController, int32 Subject);
+
+	/** Next, bottom right: on to the following subject (hidden on the last) */
+	void BuildNextButton(const FButtonStyle& Style);
+	UFUNCTION()
+	void HandleNext();
+
+	UPROPERTY(Transient)
+	TObjectPtr<UButton> NextButton;
 
 	static TArray<FRulesSubject> MakeSubjects();
 

@@ -13,6 +13,7 @@
 #include "Components/PanelWidget.h"
 #include "Components/ScaleBox.h"
 #include "Components/ScrollBox.h"
+#include "Components/ScrollBoxSlot.h"
 #include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
 #include "Components/UniformGridPanel.h"
@@ -22,9 +23,12 @@
 #include "Engine/Font.h"
 #include "Engine/Texture2D.h"
 #include "GameFramework/PlayerController.h"
+#include "UObject/EnumProperty.h"
+#include "UObject/UnrealType.h"
 #include "HappinessClassic/Clue.h"
 #include "HappinessClassic/ClueExample.h"
 #include "HappinessClassic/Puzzle.h"
+#include "HappinessClassic/PuzzleCell.h"
 #include "Blueprint/WidgetTree.h"
 #include "Styling/SlateBrush.h"
 #include "UObject/ConstructorHelpers.h"
@@ -144,6 +148,8 @@ UGameRulesWidget::UGameRulesWidget(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
 	VerticalClueClass = TSoftClassPtr<UUserWidget>(FSoftObjectPath(TEXT("/Game/Happiness/UI/WBP_VerticalClue.WBP_VerticalClue_C")));
+	CellDialogClass = TSoftClassPtr<UUserWidget>(FSoftObjectPath(TEXT("/Game/Happiness/UI/WBP_CellDialog.WBP_CellDialog_C")));
+	GridCellClass = TSoftClassPtr<UUserWidget>(FSoftObjectPath(TEXT("/Game/Happiness/UI/WBP_Cell.WBP_Cell_C")));
 	HorizontalClueClass = TSoftClassPtr<UUserWidget>(FSoftObjectPath(TEXT("/Game/Happiness/UI/WBP_HorizontalClue.WBP_HorizontalClue_C")));
 	ButtonPanelClass = TSoftClassPtr<UUserWidget>(FSoftObjectPath(TEXT("/Game/Happiness/UI/WBP_ButtonPanel.WBP_ButtonPanel_C")));
 
@@ -182,18 +188,26 @@ TArray<FRulesSubject> UGameRulesWidget::MakeSubjects()
 
 	const FText Basics = LOCTEXT("Basics", "Basics");
 	Basic(Basics, LOCTEXT("Objective", "Objective"),
-		LOCTEXT("ObjectiveDesc", "Work out which icon goes in each column. Every row holds each of its icons exactly once. Use the clues to work out where each icon belongs."),
+		LOCTEXT("ObjectiveDesc", "Use the clues to determine where each icon belongs in the grid.\nEach icon belongs in exactly one spot in the grid."),		
 		LOCTEXT("ObjectivePic", "A solved puzzle grid, with one row and one column highlighted"));
-	Result.Last().Details = LOCTEXT("ObjectiveDetails", "Every row contains each of that row's icons once. Each column holds one icon from every row. Read the clues, rule out impossible positions, and place an icon when you know its column.");
+	Result.Last().Details = LOCTEXT("ObjectiveDetails", "");
 	Basic(FText(), LOCTEXT("Layout", "Game Layout"),
 		LOCTEXT("LayoutDesc", "The puzzle grid, clues, and controls each have their own area."),
 		FText());
-	Result.Last().Details = LOCTEXT("LayoutDetails", "Puzzle Area: tap a cell to work on it. Vertical Clues: find relationships within a column. Horizontal Clues: compare positions across columns. Clue Info: read what the selected clue means.");
+	// Below the diagram and button legend (scrolling with them): what each area is for
+	Result.Last().Details = LOCTEXT("LayoutDetails",
+		"Puzzle Area: The grid you solve. Each row is one set of icons, and each cell starts with every icon that might belong there.\n\n"
+		"Clue Info: Explains the selected clue in words. When you ask for a hint, its explanation appears here.\n\n"
+		"Vertical Clues: Clues about which icons share a column, or never do.\n\n"
+		"Horizontal Clues: Clues about the left-to-right order of the columns: which icons are next to, left of, or between others.");
 	Result.Last().bLayoutDiagram = true;
-	Basic(FText(), LOCTEXT("Grid", "Puzzle Grid"),
-		LOCTEXT("GridDesc", "Tap a cell to rule icons out, bring them back, or place its answer."),
-		LOCTEXT("GridPic", "A cell with all its icons, a cell with one ruled out, a cell with its answer placed, and the cell window with its buttons"));
-	Result.Last().Details = LOCTEXT("GridDetails", "Each cell begins with the icons that might belong there. Eliminate icons that clues rule out. If you change your mind, restore an icon. When you are sure of a cell's answer, place that icon.");
+	Basic(FText(), LOCTEXT("Controls", "Controls"),
+		LOCTEXT("ControlsMouseDesc", "Left-click an icon to place it. Right-click an icon to eliminate it. Middle-click to restore it."),
+		LOCTEXT("ControlsPic", "A cell with all its icons, a cell with one ruled out, a cell with its answer placed"));
+	Result.Last().Details = LOCTEXT("ControlsMouseDetails", "Each cell begins with the icons that might belong there. Right-click an icon the clues rule out to eliminate it, and middle-click its spot to bring it back. When you are sure of a cell's answer, left-click that icon to place it. On a placed icon, right-click rules it out and middle-click returns the cell to its icons.");
+	Result.Last().TouchDescription = LOCTEXT("ControlsTouchDesc", "Tap a cell to open the cell window.\n Here you can eliminate, restore, or place icons.");
+	Result.Last().TouchDetails = LOCTEXT("ControlsTouchDetails", "Tap the icon you want to interact with to select it.\nEliminate/Restore:  Determines if this icon should still be a candidate in this cell.\nConfirm:  Indicates this icon should be placed in this cell.\nReset All:  Restores all icons in the cell.\nCancel:  Returns to the puzzle without making changes\nCommit:  Applies the changes to the puzzle.");
+	Result.Last().bControls = true;
 	Basic(FText(), LOCTEXT("Clues", "Clues"),
 		LOCTEXT("CluesDesc", "Tap a clue to see what it means. Hide clues you're done with (HC); Unhide Clues in the pause menu brings them back."),
 		LOCTEXT("CluesPic", "A selected clue, with its explanation above the grid"));
@@ -231,6 +245,7 @@ TArray<FRulesSubject> UGameRulesWidget::MakeSubjects()
 void UGameRulesWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
+	ScrollBelowSummary();
 	FieldGuideTexture = LoadObject<UTexture2D>(nullptr, TEXT("/Game/General/Textures/T_GameRulesFieldGuide.T_GameRulesFieldGuide"));
 	if (FieldGuideTexture)
 	{
@@ -269,6 +284,7 @@ void UGameRulesWidget::NativeConstruct()
 	BackStyle.SetNormalPadding(FMargin(0.f)).SetPressedPadding(FMargin(0.f));
 	CloseButton->SetStyle(BackStyle);
 	CloseButton->OnClicked.AddUniqueDynamic(this, &UGameRulesWidget::HandleClose);
+	BuildNextButton(BackStyle);
 	if (Subjects.Num() == 0)
 	{
 		Subjects = MakeSubjects();
@@ -278,17 +294,79 @@ void UGameRulesWidget::NativeConstruct()
 	{
 		Select(PC ? 0 : FMath::Clamp(PreviewSubject, 0, Subjects.Num() - 1));
 	}
+	else
+	{
+		// Opened (Show) before it was constructed: again, now its textures and the Next button are in place
+		Select(Selected);
+	}
+}
+
+void UGameRulesWidget::ScrollBelowSummary()
+{
+	// The title and summary stay put; the example, the picture and the details below them scroll together, in the
+	// details' scroll box (DescriptionScroll). Moved once: a second construct finds them already in it
+	UScrollBox* Scroll = Cast<UScrollBox>(DescriptionText->GetParent());
+	UWidget* ExampleArea = ExampleBox->GetParent();
+	if (!Scroll || !ExampleArea || ExampleArea->GetParent() == Scroll)
+	{
+		return;
+	}
+	// The scroll box takes all the room below the summary
+	if (UVerticalBoxSlot* ScrollSlot = Cast<UVerticalBoxSlot>(Scroll->Slot))
+	{
+		ScrollSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+	}
+	// Pictures only: a drag or the wheel over them (the button legend's buttons too) scrolls the page
+	IllustrationBox->SetVisibility(ESlateVisibility::HitTestInvisible);
+	for (UWidget* Widget : { ExampleArea, static_cast<UWidget*>(IllustrationBox), static_cast<UWidget*>(DescriptionText) })
+	{
+		FMargin SlotPadding;
+		EHorizontalAlignment Horizontal = HAlign_Fill;
+		if (const UVerticalBoxSlot* OldSlot = Cast<UVerticalBoxSlot>(Widget->Slot))
+		{
+			SlotPadding = OldSlot->GetPadding();
+			Horizontal = OldSlot->GetHorizontalAlignment();
+		}
+		else if (const UScrollBoxSlot* OldScrollSlot = Cast<UScrollBoxSlot>(Widget->Slot))
+		{
+			SlotPadding = OldScrollSlot->GetPadding();
+			Horizontal = OldScrollSlot->GetHorizontalAlignment();
+		}
+		Widget->RemoveFromParent();
+		if (UScrollBoxSlot* NewSlot = Cast<UScrollBoxSlot>(Scroll->AddChild(Widget)))
+		{
+			NewSlot->SetPadding(SlotPadding);
+			NewSlot->SetHorizontalAlignment(Horizontal);
+		}
+	}
+}
+
+bool UGameRulesWidget::IsTouchInput() const
+{
+	// PC_Happiness.InputMode, a Blueprint enum: NewEnumerator0 touch, NewEnumerator1 mouse
+	if (PC)
+	{
+		if (const FProperty* Property = PC->GetClass()->FindPropertyByName(TEXT("InputMode")))
+		{
+			const void* Value = Property->ContainerPtrToValuePtr<void>(PC);
+			if (const FByteProperty* ByteProperty = CastField<FByteProperty>(Property))
+			{
+				return ByteProperty->GetPropertyValue(Value) == 0;
+			}
+			if (const FEnumProperty* EnumProperty = CastField<FEnumProperty>(Property))
+			{
+				return EnumProperty->GetUnderlyingProperty()->GetSignedIntPropertyValue(Value) == 0;
+			}
+		}
+	}
+	// No player controller (the editor preview): as BeginPlay sets it
+	return PLATFORM_ANDROID || PLATFORM_IOS;
 }
 
 void UGameRulesWidget::Show(APlayerController* PlayerController)
 {
-	PC = PlayerController;
-	SetVisibility(ESlateVisibility::Visible);
-	if (Subjects.Num() > 0)
-	{
-		// The examples need the player controller's icon sets
-		Select(Selected == INDEX_NONE ? 0 : Selected);
-	}
+	// Always from the start, whatever was read last time
+	Open(PlayerController, 0);
 }
 
 void UGameRulesWidget::ShowLesson(APlayerController* PlayerController, ECampaignLesson Lesson)
@@ -300,12 +378,31 @@ void UGameRulesWidget::ShowLesson(APlayerController* PlayerController, ECampaign
 	}
 	// The first lesson (Game Basics) teaches the game itself, so it opens at the Basics' Objective, not its clue
 	const int32 Subject = Lesson == ECampaignLesson::VerticalTwo ? INDEX_NONE : FindLessonSubject(Lesson);
-	Selected = Subject == INDEX_NONE ? 0 : Subject;
-	Show(PlayerController);
-	if (UScrollBox* Index = Cast<UScrollBox>(SubjectList->GetParent()); Index && EntryButtons.IsValidIndex(Selected))
+	Open(PlayerController, Subject == INDEX_NONE ? 0 : Subject);
+}
+
+void UGameRulesWidget::Open(APlayerController* PlayerController, int32 Subject)
+{
+	PC = PlayerController;
+	if (Subjects.Num() == 0)
 	{
-		// The section header above the first clue of a section scrolls in with it
-		Index->ScrollWidgetIntoView(EntryButtons[Selected], false, EDescendantScrollDestination::Center);
+		Subjects = MakeSubjects();
+		BuildIndex();
+	}
+	SetVisibility(ESlateVisibility::Visible);
+	// Selected now, with the player controller: the examples need its icon sets
+	Select(FMath::Clamp(Subject, 0, Subjects.Num() - 1));
+	if (UScrollBox* Index = Cast<UScrollBox>(SubjectList->GetParent()))
+	{
+		if (Selected == 0)
+		{
+			Index->ScrollToStart();
+		}
+		else if (EntryButtons.IsValidIndex(Selected))
+		{
+			// The section header above the first clue of a section scrolls in with it
+			Index->ScrollWidgetIntoView(EntryButtons[Selected], false, EDescendantScrollDestination::Center);
+		}
 	}
 }
 
@@ -317,6 +414,66 @@ int32 UGameRulesWidget::FindLessonSubject(ECampaignLesson Lesson) const
 void UGameRulesWidget::HandleClose()
 {
 	SetVisibility(ESlateVisibility::Collapsed);
+}
+
+void UGameRulesWidget::BuildNextButton(const FButtonStyle& Style)
+{
+	UCanvasPanel* Canvas = Cast<UCanvasPanel>(GetRootWidget());
+	if (NextButton || !Canvas)
+	{
+		return;
+	}
+	// Close's twin in the bottom right corner: same face and size, same label font
+	NextButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("NextButton"));
+	NextButton->SetStyle(Style);
+	UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("NextText"));
+	Label->SetText(LOCTEXT("Next", "Next  >"));
+	if (const UTextBlock* CloseText = Cast<UTextBlock>(WidgetTree->FindWidget(TEXT("CloseText"))))
+	{
+		Label->SetFont(CloseText->GetFont());
+		Label->SetColorAndOpacity(CloseText->GetColorAndOpacity());
+	}
+	if (UButtonSlot* LabelSlot = Cast<UButtonSlot>(NextButton->AddChild(Label)))
+	{
+		LabelSlot->SetHorizontalAlignment(HAlign_Center);
+		LabelSlot->SetVerticalAlignment(VAlign_Center);
+	}
+	const UCanvasPanelSlot* CloseSlot = CloseButton->GetParent() ? Cast<UCanvasPanelSlot>(CloseButton->GetParent()->Slot) : nullptr;
+	const FVector2D Size = CloseSlot ? FVector2D(CloseSlot->GetSize()) : FVector2D(205.f, 62.f);
+	const float Inset = CloseSlot ? -CloseSlot->GetPosition().X : 29.f;
+	if (UCanvasPanelSlot* NextSlot = Canvas->AddChildToCanvas(NextButton))
+	{
+		NextSlot->SetAnchors(FAnchors(1.f, 1.f));
+		NextSlot->SetAlignment(FVector2D(1.f, 1.f));
+		NextSlot->SetPosition(FVector2D(-Inset, -Inset));
+		NextSlot->SetSize(Size);
+		NextSlot->SetZOrder(10);
+	}
+	// The detail column ends above it, so its text scrolls clear of the button
+	if (UWidget* Detail = WidgetTree->FindWidget(TEXT("Detail")))
+	{
+		if (UCanvasPanelSlot* DetailSlot = Cast<UCanvasPanelSlot>(Detail->Slot))
+		{
+			FMargin Offsets = DetailSlot->GetOffsets();
+			Offsets.Bottom = FMath::Max(Offsets.Bottom, Inset + Size.Y + 12.f);
+			DetailSlot->SetOffsets(Offsets);
+		}
+	}
+	NextButton->OnClicked.AddUniqueDynamic(this, &UGameRulesWidget::HandleNext);
+}
+
+void UGameRulesWidget::HandleNext()
+{
+	if (!Subjects.IsValidIndex(Selected + 1))
+	{
+		return;
+	}
+	Select(Selected + 1);
+	// Keep the index in step: the new subject's entry comes into view
+	if (UScrollBox* Index = Cast<UScrollBox>(SubjectList->GetParent()); Index && EntryButtons.IsValidIndex(Selected))
+	{
+		Index->ScrollWidgetIntoView(EntryButtons[Selected], true, EDescendantScrollDestination::IntoView);
+	}
 }
 
 void UGameRulesWidget::BuildIndex()
@@ -401,13 +558,26 @@ void UGameRulesWidget::Select(int32 Index)
 		return;
 	}
 	Selected = Index;
+	if (NextButton)
+	{
+		NextButton->SetVisibility(Subjects.IsValidIndex(Index + 1) ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	}
 	const FRulesSubject& Subject = Subjects[Index];
+	const bool bTouchText = Subject.bControls && IsTouchInput();
+	const FText& Details = bTouchText ? Subject.TouchDetails : Subject.Details;
 	TitleText->SetText(Subject.Title);
 	if (SummaryText)
 	{
-		SummaryText->SetText(Subject.Description);
+		SummaryText->SetText(bTouchText ? Subject.TouchDescription : Subject.Description);
 	}
-	DescriptionText->SetText(Subject.Details);
+	DescriptionText->SetText(Details);
+	// No details (Game Layout): no gap for them below the pictures
+	DescriptionText->SetVisibility(Details.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
+	// A new subject reads from its top
+	if (UScrollBox* Scroll = Cast<UScrollBox>(DescriptionText->GetParent()))
+	{
+		Scroll->ScrollToStart();
+	}
 
 	for (int32 Entry = 0; Entry < EntryTexts.Num(); Entry++)
 	{
@@ -677,7 +847,27 @@ void UGameRulesWidget::AddPicture(const FRulesSubject& Subject)
 	USizeBox* PictureSize = NewObject<USizeBox>(this);
 	PictureSize->SetWidthOverride(760.f);
 	PictureSize->SetHeightOverride(300.f);
-	if (UTexture2D* Picture = Pictures.FindRef(Subject.Title.ToString()))
+	// Controls: the cell dialog itself (touch), scaled to the picture's width, or a grid cell (mouse), enlarged to
+	// the picture's height
+	const bool bTouchMock = Subject.bControls && IsTouchInput();
+	UWidget* ControlsMock = !Subject.bControls ? nullptr : bTouchMock ? MakeCellDialogMock() : MakeGridCellMock();
+	if (ControlsMock)
+	{
+		const FVector2D MockSize = bTouchMock ? CellDialogSize : GridCellSize;
+		if (bTouchMock)
+		{
+			PictureSize->SetHeightOverride(760.f * MockSize.Y / MockSize.X);
+		}
+		USizeBox* MockBox = NewObject<USizeBox>(this);
+		MockBox->SetWidthOverride(MockSize.X);
+		MockBox->SetHeightOverride(MockSize.Y);
+		MockBox->SetContent(ControlsMock);
+		UScaleBox* MockFit = NewObject<UScaleBox>(this);
+		MockFit->SetStretch(EStretch::ScaleToFit);
+		MockFit->AddChild(MockBox);
+		PictureSize->SetContent(MockFit);
+	}
+	else if (UTexture2D* Picture = Pictures.FindRef(Subject.Title.ToString()))
 	{
 		UImage* Image = NewObject<UImage>(this);
 		Image->SetBrushFromTexture(Picture, false);
@@ -754,10 +944,15 @@ void UGameRulesWidget::AddPicture(const FRulesSubject& Subject)
 		}
 		else
 		{
+			// Controls: what does each, for the player's input
+			const bool bTouch = IsTouchInput();
 			const FText Captions[3] = {
-				Subject.BasicIndex == 2 ? LOCTEXT("GridPossible", "Consider") : Subject.BasicIndex == 3 ? LOCTEXT("ClueSelect", "Select a clue") : LOCTEXT("HintAsk", "Ask for a hint"),
-				Subject.BasicIndex == 2 ? LOCTEXT("GridEliminate", "Eliminate") : Subject.BasicIndex == 3 ? LOCTEXT("ClueRead", "Read its meaning") : LOCTEXT("HintLook", "See the highlight"),
-				Subject.BasicIndex == 2 ? LOCTEXT("GridPlace", "Place") : Subject.BasicIndex == 3 ? LOCTEXT("ClueHide", "Hide when done") : LOCTEXT("HintDeduce", "Make the deduction")
+				Subject.bControls ? (bTouch ? LOCTEXT("ControlsTouchOpen", "Tap a cell") : LOCTEXT("ControlsMouseRestore", "Middle-click: restore"))
+					: Subject.BasicIndex == 3 ? LOCTEXT("ClueSelect", "Select a clue") : LOCTEXT("HintAsk", "Ask for a hint"),
+				Subject.bControls ? (bTouch ? LOCTEXT("ControlsTouchEliminate", "Select an icon, Eliminate") : LOCTEXT("ControlsMouseEliminate", "Right-click: eliminate"))
+					: Subject.BasicIndex == 3 ? LOCTEXT("ClueRead", "Read its meaning") : LOCTEXT("HintLook", "See the highlight"),
+				Subject.bControls ? (bTouch ? LOCTEXT("ControlsTouchPlace", "Select an icon, Confirm") : LOCTEXT("ControlsMousePlace", "Left-click: place"))
+					: Subject.BasicIndex == 3 ? LOCTEXT("ClueHide", "Hide when done") : LOCTEXT("HintDeduce", "Make the deduction")
 			};
 			for (int32 Step = 0; Step < 3; ++Step)
 			{
@@ -822,7 +1017,10 @@ void UGameRulesWidget::AddLayoutDiagram()
 
 	USizeBox* DiagramSize = NewObject<USizeBox>(this);
 	DiagramSize->SetWidthOverride(LayoutDiagramSize.X);
-	DiagramSize->SetHeightOverride(FMath::Min(LayoutDiagramSize.Y, 225.f));
+	const float DiagramHeight = FMath::Min(LayoutDiagramSize.Y, 225.f);
+	DiagramSize->SetHeightOverride(DiagramHeight);
+	// The canvas inside the frame's padding: what the areas' fractions are of
+	const double CanvasHeight = DiagramHeight - 10.0;
 	UBorder* Frame = NewObject<UBorder>(this);
 	Frame->SetBrush(MakeRulesSurface(FLinearColor(1.f, 0.98f, 0.90f, 1.f), RulesGold));
 	Frame->SetPadding(FMargin(5.f));
@@ -847,7 +1045,7 @@ void UGameRulesWidget::AddLayoutDiagram()
 			}
 		}
 		// Thin areas (the clue info bar) still need room for their label
-		const double MinHeight = 22.0 / LayoutDiagramSize.Y;
+		const double MinHeight = 24.0 / CanvasHeight;
 		if (Rect.Max.Y - Rect.Min.Y < MinHeight)
 		{
 			Rect.Max.Y = Rect.Min.Y + MinHeight;
@@ -855,7 +1053,10 @@ void UGameRulesWidget::AddLayoutDiagram()
 		Rects.Add(Rect);
 	}
 	// The puzzle area (first) starts below the clue info bar (last), which may have grown into it
-	Rects[0].Min.Y = FMath::Max(Rects[0].Min.Y, Rects.Last().Max.Y + 2.0 / LayoutDiagramSize.Y);
+	Rects[0].Min.Y = FMath::Max(Rects[0].Min.Y, Rects.Last().Max.Y + 2.0 / CanvasHeight);
+	// The vertical clues span from the buttons' left edge to the puzzle area's right edge
+	Rects[2].Min.X = Rects[1].Min.X;
+	Rects[2].Max.X = Rects[0].Max.X;
 
 	for (int32 Index = 0; Index < UE_ARRAY_COUNT(Areas); Index++)
 	{
@@ -876,8 +1077,40 @@ void UGameRulesWidget::AddLayoutDiagram()
 		Label->SetFont(LabelFont);
 		Label->SetColorAndOpacity(FSlateColor(RulesInk));
 		Label->SetJustification(ETextJustify::Center);
-		Label->SetAutoWrapText(true);
-		Box->SetContent(Label);
+		const bool bButtons = FCString::Strcmp(Area.Widget, TEXT("ButtonPanel")) == 0;
+		const bool bInfo = FCString::Strcmp(Area.Widget, TEXT("HelpPanel")) == 0;
+		if (bButtons)
+		{
+			// Turned to read upward along the narrow strip: on a canvas, so it keeps its full length while turned
+			UCanvasPanel* Turn = NewObject<UCanvasPanel>(this);
+			if (UCanvasPanelSlot* LabelSlot = Turn->AddChildToCanvas(Label))
+			{
+				LabelSlot->SetAnchors(FAnchors(0.5f, 0.5f));
+				LabelSlot->SetAlignment(FVector2D(0.5f, 0.5f));
+				LabelSlot->SetAutoSize(true);
+			}
+			Label->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
+			Label->SetRenderTransformAngle(-90.f);
+			Box->SetPadding(FMargin(0.f));
+			Box->SetHorizontalAlignment(HAlign_Fill);
+			Box->SetVerticalAlignment(VAlign_Fill);
+			Box->SetContent(Turn);
+		}
+		else if (bInfo)
+		{
+			// The thin clue info bar: one line, shrunk to fit inside it
+			UScaleBox* Fit = NewObject<UScaleBox>(this);
+			Fit->SetStretch(EStretch::ScaleToFit);
+			Fit->SetStretchDirection(EStretchDirection::DownOnly);
+			Fit->SetContent(Label);
+			Box->SetPadding(FMargin(4.f, 1.f));
+			Box->SetContent(Fit);
+		}
+		else
+		{
+			Label->SetAutoWrapText(true);
+			Box->SetContent(Label);
+		}
 
 		if (UCanvasPanelSlot* BoxSlot = Canvas->AddChildToCanvas(Box))
 		{
@@ -891,14 +1124,29 @@ void UGameRulesWidget::AddLayoutDiagram()
 void UGameRulesWidget::AddButtonLegend()
 {
 	const UFont* Serif = LoadObject<UFont>(nullptr, TEXT("/Game/Happiness/UI/Fonts/LessonsSerif_Font.LessonsSerif_Font"));
-	const TCHAR* ButtonNames[] = { TEXT("Pause"), TEXT("Hint"), TEXT("Undo"), TEXT("Hide") };
-	const FText Meanings[] =
+	struct FLegendButton
 	{
-		LOCTEXT("ButtonPause", "Pause the puzzle"),
-		LOCTEXT("ButtonHint", "Find a useful clue and learn why it helps"),
-		LOCTEXT("ButtonUndo", "Undo your last move"),
-		LOCTEXT("ButtonHide", "Hide the selected clue"),
+		const TCHAR* Widget;	// in WBP_ButtonPanel
+		const TCHAR* Name;		// if the panel can't be read
+		FText Meaning;
 	};
+	// Two columns: Pause and Hint on the left, Undo and Hide on the right
+	const FLegendButton Buttons[] =
+	{
+		{ TEXT("Button_P"), TEXT("Pause"), LOCTEXT("ButtonPause", "Pause the puzzle") },
+		{ TEXT("Button_H"), TEXT("Hint"), LOCTEXT("ButtonHint", "Find a useful clue and learn why it helps") },
+		{ TEXT("Button_U"), TEXT("Undo"), LOCTEXT("ButtonUndo", "Undo your last move") },
+		{ TEXT("Button_HC"), TEXT("Hide Clue"), LOCTEXT("ButtonHide", "Hide the selected clue") },
+	};
+	// Each button as it looks on the puzzle screen: its face and label, copied from a button panel made just for that
+	const UUserWidget* Panel = nullptr;
+	if (UClass* PanelClass = ButtonPanelClass.LoadSynchronous())
+	{
+		Panel = CreateWidget<UUserWidget>(this, PanelClass);
+	}
+	constexpr float PanelButtonSize = 94.f;	// WBP_ButtonPanel's buttons
+	constexpr float TileSize = 80.f;
+
 	UVerticalBox* Legend = NewObject<UVerticalBox>(this);
 	UTextBlock* Heading = NewObject<UTextBlock>(this);
 	Heading->SetText(LOCTEXT("ButtonsHeading", "Buttons"));
@@ -908,40 +1156,95 @@ void UGameRulesWidget::AddButtonLegend()
 	{
 		HeadingSlot->SetPadding(FMargin(0.f, 6.f, 0.f, 3.f));
 	}
+	UHorizontalBox* Columns = NewObject<UHorizontalBox>(this);
+	UVerticalBox* Column = nullptr;
 
-	for (int32 Index = 0; Index < 4; ++Index)
+	for (int32 Index = 0; Index < UE_ARRAY_COUNT(Buttons); ++Index)
 	{
+		if (Index % 2 == 0)
+		{
+			Column = NewObject<UVerticalBox>(this);
+			if (UHorizontalBoxSlot* ColumnSlot = Columns->AddChildToHorizontalBox(Column))
+			{
+				ColumnSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+				ColumnSlot->SetPadding(FMargin(Index == 0 ? 0.f : 24.f, 0.f, 0.f, 0.f));
+			}
+		}
+		const UButton* Real = Panel ? Cast<UButton>(Panel->GetWidgetFromName(Buttons[Index].Widget)) : nullptr;
+		const UTextBlock* RealLabel = Real ? Cast<UTextBlock>(Real->GetChildAt(0)) : nullptr;
+
 		UBorder* ButtonTile = NewObject<UBorder>(this);
-		ButtonTile->SetBrush(MakeRulesSurface(RulesSage, RulesGold, 8.f, 2.f));
+		if (Real)
+		{
+			ButtonTile->SetBrush(Real->GetStyle().Normal);
+		}
+		else
+		{
+			ButtonTile->SetBrush(MakeRulesSurface(RulesSage, RulesGold, 8.f, 2.f));
+		}
+		// The label where the real one sits on the tile (bottom centre, just above the edge), scaled with it
+		const UButtonSlot* RealSlot = RealLabel ? Cast<UButtonSlot>(RealLabel->Slot) : nullptr;
+		const float Scale = TileSize / PanelButtonSize;
+		if (RealSlot)
+		{
+			const FMargin LabelPadding = RealSlot->GetPadding();
+			const FMargin ButtonPadding = Real->GetStyle().NormalPadding;
+			ButtonTile->SetPadding(FMargin((LabelPadding.Left + ButtonPadding.Left) * Scale, (LabelPadding.Top + ButtonPadding.Top) * Scale,
+				(LabelPadding.Right + ButtonPadding.Right) * Scale, (LabelPadding.Bottom + ButtonPadding.Bottom) * Scale));
+			ButtonTile->SetHorizontalAlignment(RealSlot->GetHorizontalAlignment());
+			ButtonTile->SetVerticalAlignment(RealSlot->GetVerticalAlignment());
+		}
+		else
+		{
+			ButtonTile->SetPadding(FMargin(4.f));
+			ButtonTile->SetHorizontalAlignment(HAlign_Center);
+			ButtonTile->SetVerticalAlignment(VAlign_Center);
+		}
 		UTextBlock* ButtonName = NewObject<UTextBlock>(this);
-		ButtonName->SetText(FText::FromString(ButtonNames[Index]));
-		ButtonName->SetFont(FSlateFontInfo(Serif, 14));
-		ButtonName->SetColorAndOpacity(FSlateColor(RulesCream));
+		if (RealLabel)
+		{
+			// Its own text and font, scaled with the tile
+			ButtonName->SetText(RealLabel->GetText());
+			FSlateFontInfo Font = RealLabel->GetFont();
+			Font.Size = FMath::Max(1.f, FMath::RoundToFloat(Font.Size * Scale));
+			ButtonName->SetFont(Font);
+			ButtonName->SetColorAndOpacity(RealLabel->GetColorAndOpacity());
+		}
+		else
+		{
+			ButtonName->SetText(FText::FromString(Buttons[Index].Name));
+			ButtonName->SetFont(FSlateFontInfo(Serif, 14));
+			ButtonName->SetColorAndOpacity(FSlateColor(RulesCream));
+		}
 		ButtonName->SetJustification(ETextJustify::Center);
-		ButtonTile->SetHorizontalAlignment(HAlign_Center);
-		ButtonTile->SetVerticalAlignment(VAlign_Center);
 		ButtonTile->SetContent(ButtonName);
 		USizeBox* ButtonSize = NewObject<USizeBox>(this);
-		ButtonSize->SetWidthOverride(52.f);
-		ButtonSize->SetHeightOverride(45.f);
+		ButtonSize->SetWidthOverride(TileSize);
+		ButtonSize->SetHeightOverride(TileSize);
 		ButtonSize->SetContent(ButtonTile);
 		UTextBlock* Description = NewObject<UTextBlock>(this);
-		Description->SetText(Meanings[Index]);
+		Description->SetText(Buttons[Index].Meaning);
 		Description->SetFont(FSlateFontInfo(Serif, 19));
 		Description->SetColorAndOpacity(FSlateColor(RulesInk));
+		Description->SetAutoWrapText(true);
 
 		UHorizontalBox* Line = NewObject<UHorizontalBox>(this);
-		Line->AddChildToHorizontalBox(ButtonSize);
+		if (UHorizontalBoxSlot* TileSlot = Line->AddChildToHorizontalBox(ButtonSize))
+		{
+			TileSlot->SetVerticalAlignment(VAlign_Center);
+		}
 		if (UHorizontalBoxSlot* TextSlot = Line->AddChildToHorizontalBox(Description))
 		{
+			TextSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
 			TextSlot->SetPadding(FMargin(14.f, 0.f, 0.f, 0.f));
 			TextSlot->SetVerticalAlignment(VAlign_Center);
 		}
-		if (UVerticalBoxSlot* LineSlot = Legend->AddChildToVerticalBox(Line))
+		if (UVerticalBoxSlot* LineSlot = Column->AddChildToVerticalBox(Line))
 		{
-			LineSlot->SetPadding(FMargin(0.f, 1.f));
+			LineSlot->SetPadding(FMargin(0.f, 4.f));
 		}
 	}
+	Legend->AddChildToVerticalBox(Columns);
 	IllustrationBox->AddChild(Legend);
 }
 
@@ -1098,6 +1401,144 @@ UWidget* UGameRulesWidget::MakeExample(ECampaignLesson Lesson)
 		It->DestroyValue_InContainer(Params);
 	}
 	return Widget;
+}
+
+namespace
+{
+	/** Calls a Blueprint function on Target, Fill giving each parameter its value (left at its default otherwise) */
+	bool CallBlueprintFunction(UObject* Target, const TCHAR* Name, TFunctionRef<void(FProperty*, uint8*)> Fill)
+	{
+		UFunction* Function = Target ? Target->FindFunction(Name) : nullptr;
+		if (!Function)
+		{
+			return false;
+		}
+		uint8* Params = static_cast<uint8*>(FMemory_Alloca(Function->ParmsSize));
+		FMemory::Memzero(Params, Function->ParmsSize);
+		for (TFieldIterator<FProperty> It(Function); It && It->HasAnyPropertyFlags(CPF_Parm); ++It)
+		{
+			It->InitializeValue_InContainer(Params);
+			Fill(*It, Params);
+		}
+		Target->ProcessEvent(Function, Params);
+		for (TFieldIterator<FProperty> It(Function); It && It->HasAnyPropertyFlags(CPF_Parm); ++It)
+		{
+			It->DestroyValue_InContainer(Params);
+		}
+		return true;
+	}
+
+	void SetCellParam(FProperty* Property, uint8* Params, const FPuzzleCell& Cell)
+	{
+		if (const FStructProperty* Struct = CastField<FStructProperty>(Property); Struct && Struct->Struct == FPuzzleCell::StaticStruct())
+		{
+			*Struct->ContainerPtrToValuePtr<FPuzzleCell>(Params) = Cell;
+		}
+	}
+}
+
+UWidget* UGameRulesWidget::MakeCellDialogMock()
+{
+	// Always the Balls, whatever the player's sets
+	UObject* IconSet = LoadObject<UObject>(nullptr, TEXT("/Game/Happiness/IconSets/IS_Balls.IS_Balls"));
+	UClass* DialogClass = CellDialogClass.LoadSynchronous();
+	UUserWidget* Dialog = DialogClass && IconSet ? CreateWidget<UUserWidget>(this, DialogClass) : nullptr;
+	if (!Dialog)
+	{
+		return nullptr;
+	}
+	// A six-icon cell: two ruled out, the rest still possible
+	constexpr int32 IconCount = 6;
+	constexpr int32 SelectedIcon = 3;
+	FPuzzleCell Cell;
+	Cell.m_bValues = { true, false, true, true, false, true };
+	// Its widget tree must exist before Populate fills its cell
+	Dialog->TakeWidget();
+	// Populate(PuzzleSize, IconSet, Row, Col, Puzzle, Cell), as the puzzle screen opens it; no puzzle, so no
+	// wrong-icon marks
+	const bool bPopulated = CallBlueprintFunction(Dialog, TEXT("Populate"), [&](FProperty* Property, uint8* Params)
+	{
+		if (const FIntProperty* Int = CastField<FIntProperty>(Property); Int && Property->GetFName() == TEXT("PuzzleSize"))
+		{
+			Int->SetPropertyValue_InContainer(Params, IconCount);
+		}
+		else if (const FObjectPropertyBase* Object = CastField<FObjectPropertyBase>(Property);
+			Object && Object->PropertyClass && IconSet->IsA(Object->PropertyClass) && !Object->PropertyClass->IsChildOf(UPuzzle::StaticClass()))
+		{
+			Object->SetObjectPropertyValue_InContainer(Params, IconSet);
+		}
+		SetCellParam(Property, Params, Cell);
+	});
+	if (!bPopulated)
+	{
+		return nullptr;
+	}
+	// Select one of the possible icons, as a tap on it does: its highlight, Eliminate and Confirm ready
+	const FObjectPropertyBase* CellProperty = FindFProperty<FObjectPropertyBase>(Dialog->GetClass(), TEXT("Cell"));
+	UObject* CellWidget = CellProperty ? CellProperty->GetObjectPropertyValue_InContainer(Dialog) : nullptr;
+	const FArrayProperty* IconsProperty = CellWidget ? FindFProperty<FArrayProperty>(CellWidget->GetClass(), TEXT("AllIcons")) : nullptr;
+	const FObjectPropertyBase* IconElement = IconsProperty ? CastField<FObjectPropertyBase>(IconsProperty->Inner) : nullptr;
+	if (IconElement)
+	{
+		FScriptArrayHelper Icons(IconsProperty, IconsProperty->ContainerPtrToValuePtr<void>(CellWidget));
+		if (UObject* Icon = Icons.IsValidIndex(SelectedIcon) ? IconElement->GetObjectPropertyValue(Icons.GetRawPtr(SelectedIcon)) : nullptr)
+		{
+			CallBlueprintFunction(Dialog, TEXT("IconPress"), [&](FProperty* Property, uint8* Params)
+			{
+				if (const FObjectPropertyBase* Object = CastField<FObjectPropertyBase>(Property); Object && Object->PropertyClass && Icon->IsA(Object->PropertyClass))
+				{
+					Object->SetObjectPropertyValue_InContainer(Params, Icon);
+				}
+				SetCellParam(Property, Params, Cell);
+			});
+		}
+	}
+	// A picture: it takes no taps, and a drag over it scrolls the page
+	Dialog->SetVisibility(ESlateVisibility::HitTestInvisible);
+	return Dialog;
+}
+
+UWidget* UGameRulesWidget::MakeGridCellMock()
+{
+	UObject* IconSet = LoadObject<UObject>(nullptr, TEXT("/Game/Happiness/IconSets/IS_Balls.IS_Balls"));
+	UClass* CellClass = GridCellClass.LoadSynchronous();
+	UUserWidget* CellWidget = CellClass && IconSet ? CreateWidget<UUserWidget>(this, CellClass) : nullptr;
+	if (!CellWidget)
+	{
+		return nullptr;
+	}
+	// The touch page's sample: six Balls, two ruled out
+	constexpr int32 IconCount = 6;
+	FPuzzleCell Cell;
+	Cell.m_bValues = { true, false, true, true, false, true };
+	CellWidget->TakeWidget();
+	// SetupCell(PuzzleSize, IconSet, CellSize, Row, Col), then ApplyPuzzleCell(PuzzleCell, Puzzle) as the board does;
+	// no puzzle, so no wrong-icon marks
+	const bool bSetUp = CallBlueprintFunction(CellWidget, TEXT("SetupCell"), [&](FProperty* Property, uint8* Params)
+	{
+		if (const FIntProperty* Int = CastField<FIntProperty>(Property); Int && Property->GetFName() == TEXT("PuzzleSize"))
+		{
+			Int->SetPropertyValue_InContainer(Params, IconCount);
+		}
+		else if (const FObjectPropertyBase* Object = CastField<FObjectPropertyBase>(Property);
+			Object && Object->PropertyClass && IconSet->IsA(Object->PropertyClass))
+		{
+			Object->SetObjectPropertyValue_InContainer(Params, IconSet);
+		}
+		else if (const FStructProperty* Struct = CastField<FStructProperty>(Property); Struct && Struct->Struct == TBaseStructure<FVector2D>::Get())
+		{
+			*Struct->ContainerPtrToValuePtr<FVector2D>(Params) = GridCellSize;
+		}
+	});
+	if (!bSetUp || !CallBlueprintFunction(CellWidget, TEXT("ApplyPuzzleCell"), [&](FProperty* Property, uint8* Params)
+	{
+		SetCellParam(Property, Params, Cell);
+	}))
+	{
+		return nullptr;
+	}
+	CellWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
+	return CellWidget;
 }
 
 #undef LOCTEXT_NAMESPACE

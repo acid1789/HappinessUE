@@ -295,7 +295,8 @@ python Tools/mcp_call.py $A StopPIE '{}'
   land every time. Prefer it for pressing buttons.
 - **Testing the phone's touch input.** PIE runs in mouse mode (`PC_Happiness.InputMode`, set to touch at BeginPlay
   only on Android and iOS; the grid, icons and clues pick their behaviour from it, and the game panel wires each
-  cell for it when the grid is built). Set it with `SetPIEProperty` (above; the console's `set` is refused in the
+  cell for it when the grid is built). Set it with `Happiness.InputMode [touch|mouse]` in the PIE console (left out,
+  it toggles) or `SetPIEProperty` (above; the console's `set` is refused in the
   editor) **before** the grid is built: start a new puzzle from the main menu, since Reset Puzzle keeps the cells.
   Then `TapViewport`. `SetPIEProperty` changes the objects in the PIE world only, never class defaults or assets.
 - **Which widget took an input:** `SlateDebugger.Event.EnableAllInputFilters`, `SlateDebugger.Event.LogInputEvent 1`,

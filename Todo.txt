@@ -18,8 +18,9 @@ Streak Saver Backing
 Game Rules
 
 --- Dev tasks ---
-Master Column Unlocks wrong?
-MasterAll Command
+Back/Home/Hamburger still there on daily notification trigger
+Hide Clue Undo
+Cell Dialog Selection
 
 --- Art Tasks ---
 Streak Saver Art
@@ -62,3 +63,9 @@ Desert:				Cactus, camel, scorpion, tumbleweed, sun, lizard, oasis palm, pyramid
 Candy:				Lollipop, gummy bear, candy cane, chocolate bar, jellybean, cotton candy, wrapped candy, licorice
 Bakery:				Baguette, pretzel, cinnamon roll, bagel, muffin, loaf, croissant, cookie
 Cheeses:			Swiss, cheddar, brie, blue cheese, mozzarella, gouda wheel, parmesan wedge, cheese string
+
+
+7x7 puzzle
+8 ball and soccer ball both only on the outside columnns
+soccer ball eliminated from leftmost column sets soccer ball in the rightmost column.
+8 ball is not set in the leftmost column

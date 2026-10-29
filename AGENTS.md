@@ -76,6 +76,10 @@ Keep it true: when you learn something that would have saved you time, add it he
   can reach, through its references, a widget of the class being constructed: the circular load hangs the editor
   (and the puzzle commandlet) at startup, right after loading the Happiness module. Use a `TSoftClassPtr` and
   load it when first needed (see `UPauseMenuWidget::OptionsClass`). Sounds and textures are safe to find there.
+- **Anything code loads by path at runtime isn't cooked on its own** (a `TSoftClassPtr`/`TSoftObjectPtr` default set in
+  C++, `LoadObject`/`LoadSynchronous` of a path): the cooker can't see it, so it works in the editor and silently
+  loads nothing on the phone. Add such assets to `/Game/Happiness/UI/PAL_LoadedByCode` (a PrimaryAssetLabel that
+  `DefaultGame.ini` always cooks). Check a cook with `grep -a -c <package path> Saved/Cooked/Android_ASTC/Happiness/AssetRegistry.bin`.
 - Test puzzle logic changes with the headless harness (`Tools/puzzle.sh`) before handing them over.
 - **After a pull that changes `Source/`, rebuild C++ before touching assets** (`Tools/puzzle.sh --build`, editor
   closed). Pulled assets may use C++ classes your editor's DLL doesn't have yet: their Blueprints then fail to load

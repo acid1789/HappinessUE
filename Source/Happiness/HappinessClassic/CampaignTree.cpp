@@ -86,7 +86,7 @@ FText UCampaignTree::GetLessonDescription(ECampaignLesson Lesson)
 	switch (Lesson)
 	{
 		case ECampaignLesson::VerticalTwo:
-			return LOCTEXT("VerticalTwoDesc", "Every row holds each of its icons exactly once. Some icons start already placed. Pick an icon for a cell, or rule icons out, until every cell is filled.\n\nThe \"same column\" clue shows two icons stacked: wherever one of them is, the other is in the same column.");
+			return LOCTEXT("VerticalTwoDesc", "Use the clues to determine where each icon belongs in the grid.\nThe \"Same Column\" clue describes two icons that belong in the same column.");			
 		case ECampaignLesson::VerticalThree:
 			return LOCTEXT("VerticalThreeDesc", "Three icons stacked means all three are in the same column. Find where any one of them goes and you know where the other two go.");
 		case ECampaignLesson::NextTo:
