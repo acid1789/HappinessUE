@@ -197,6 +197,18 @@ bool UCampaignSubsystem::IsMasterColumnCompleted(int32 Column) const
 	return true;
 }
 
+bool UCampaignSubsystem::IsAllMasterCompleted() const
+{
+	for (int32 Column = 0; Column < UCampaignTree::GetNumColumns(); Column++)
+	{
+		if (!IsMasterColumnCompleted(Column))
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
 ECampaignMode UCampaignSubsystem::GetMode()
 {
 	const UCampaignSubsystem* Campaign = Instance.Get();
@@ -226,6 +238,22 @@ bool UCampaignSubsystem::IsCampaignModeUnlocked() const
 		for (ECampaignLesson Lesson : Column)
 		{
 			const FLessonProgress* Progress = Data.Lessons.Find(Lesson);
+			if (!Progress || !Progress->bFinalCompleted)
+			{
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
+bool UCampaignSubsystem::IsCampaignCompleted() const
+{
+	for (const TArray<ECampaignLesson>& Column : UCampaignTree::GetColumns())
+	{
+		for (ECampaignLesson Lesson : Column)
+		{
+			const FLessonProgress* Progress = Data.CampaignLessons.Find(Lesson);
 			if (!Progress || !Progress->bFinalCompleted)
 			{
 				return false;
@@ -528,6 +556,8 @@ FLessonPuzzleResult UCampaignSubsystem::FinishLessonPuzzle(UPuzzle* Puzzle)
 				UncelebratedLesson = Result.Lesson;
 				// The last lesson: Campaign mode and the Garden Visitors open
 				bLessonsCompletionPending |= Data.Mode == ECampaignMode::Lessons && IsCampaignModeUnlocked();
+				// The campaign's last: the Mythical Creatures open
+				bCampaignCompletionPending |= Data.Mode == ECampaignMode::Campaign && IsCampaignCompleted();
 			}
 		}
 		else if (Result.Stage == GetCurrentStage(Result.Lesson) && Progress.Points < MaxPoints)
@@ -581,6 +611,13 @@ bool UCampaignSubsystem::ConsumeLessonsCompletion()
 {
 	const bool bPending = bLessonsCompletionPending;
 	bLessonsCompletionPending = false;
+	return bPending;
+}
+
+bool UCampaignSubsystem::ConsumeCampaignCompletion()
+{
+	const bool bPending = bCampaignCompletionPending;
+	bCampaignCompletionPending = false;
 	return bPending;
 }
 
@@ -665,6 +702,7 @@ void UCampaignSubsystem::CompleteAllLessons()
 void UCampaignSubsystem::DebugSetLesson(ECampaignLesson Lesson, int32 Points, bool bFinalCompleted, bool bCelebrate)
 {
 	const bool bWasUnlocked = IsCampaignModeUnlocked();
+	const bool bWasCompleted = IsCampaignCompleted();
 	if (Data.bInSession && Data.SessionLesson == Lesson)
 	{
 		Data.bInSession = false;
@@ -680,6 +718,7 @@ void UCampaignSubsystem::DebugSetLesson(ECampaignLesson Lesson, int32 Points, bo
 	{
 		UncelebratedLesson = Lesson;
 		bLessonsCompletionPending |= !bWasUnlocked && IsCampaignModeUnlocked();
+		bCampaignCompletionPending |= Data.Mode == ECampaignMode::Campaign && !bWasCompleted && IsCampaignCompleted();
 	}
 	else if (UncelebratedLesson.IsSet() && UncelebratedLesson.GetValue() == Lesson)
 	{
@@ -712,6 +751,13 @@ void UCampaignSubsystem::DebugSetMaster(ECampaignLesson Lesson, int32 MasterPoin
 	}
 	Save();
 	OnProgressChanged.Broadcast();
+}
+
+void UCampaignSubsystem::DebugSkipCelebrations()
+{
+	UncelebratedLesson.Reset();
+	bLessonsCompletionPending = false;
+	bCampaignCompletionPending = false;
 }
 
 void UCampaignSubsystem::DebugResetMode()

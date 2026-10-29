@@ -211,6 +211,15 @@ void UPlayerLevelBadge::Refresh()
 	}
 }
 
+void UPlayerLevelBadge::SkipPendingRewards()
+{
+	// Forgetting what was known makes Refresh take the current gems as the starting state: shown, nothing pending
+	PendingRewards.Reset();
+	PreviewRewardIndex = INDEX_NONE;
+	KnownRewards.Reset();
+	Refresh();
+}
+
 void UPlayerLevelBadge::PreviewMasterReward(int32 Column)
 {
 	PendingRewards.Reset();

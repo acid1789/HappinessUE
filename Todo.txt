@@ -16,24 +16,49 @@ Usage Analytics
 Campaign
 Streak Saver Backing
 Game Rules
-Icon Set Selections
 
 --- Dev tasks ---
-Campaign Completion
-Power Button Pause
+Master Column Unlocks wrong?
+MasterAll Command
 
 --- Art Tasks ---
 Streak Saver Art
 Options Menu Visuals
 Player Info Menu
-Finish Lesson Fireworks
-Master Erase
-Master Completion Sounds
-
+Remove Adds Artwork
+Pencil Draw Sound
 
 
 --- Category Ides ---
-Sea Life:		Octopus, crab, seahorse, jellyfish, sea turtle, stingray, pufferfish, starfish
-Camping Gear:	Tent, lantern, backpack, binoculars, compass, canteen, campfire, hiking boot
-Kitchen Tools:	Kettle, whisk, rolling pin, colander, spatula, grater, measuring cup, mortar and pestle
-Birds:			Owl, flamingo, penguin, toucan, rooster, swan, pelican, hummingbird
+Sea Life:			Octopus, crab, seahorse, jellyfish, sea turtle, stingray, pufferfish, starfish
+Camping Gear:		Tent, lantern, backpack, binoculars, compass, canteen, campfire, hiking boot
+Kitchen Tools:		Kettle, whisk, rolling pin, colander, spatula, grater, measuring cup, mortar and pestle
+Birds:				Owl, flamingo, penguin, toucan, rooster, swan, pelican, hummingbird
+
+Vegetables:			Carrot, broccoli, eggplant, corn, tomato, mushroom, pea pod, pumpkin
+Farm Animals:		Cow, pig, sheep, horse, goat, chicken, duck, donkey
+Jungle Animals:		Lion, elephant, giraffe, zebra, monkey, parrot, tiger, hippo
+Arctic Animals:		Polar bear, walrus, penguin, seal, arctic fox, orca, snowy owl, reindeer
+Insects:			Ant, beetle, firefly, mosquito, praying mantis, scorpion, spider, moth
+Weather:			Sun, cloud, raindrop, snowflake, lightning bolt, rainbow, tornado, umbrella
+Space:				Rocket, planet, moon, star, comet, astronaut, satellite, UFO
+Vehicles:			Bicycle, bus, sailboat, helicopter, train, hot air balloon, tractor, submarine
+Tools:				Hammer, wrench, screwdriver, saw, pliers, drill, paintbrush, tape measure
+Breakfast:			Pancakes, waffle, egg, bacon, toast, croissant, coffee cup, cereal bowl
+Fast Food:			Burger, fries, pizza slice, hot dog, taco, soda cup, donut, popcorn
+Beach Day:			Beach ball, bucket, sunglasses, flip-flop, surfboard, sandcastle, shell, sun umbrella
+Garden Tools:		Watering can, shovel, rake, wheelbarrow, trowel, flower pot, hose, pruning shears
+School Supplies:	Pencil, crayon, scissors, ruler, eraser, glue bottle, notebook, backpack
+Sports Gear:		Tennis racket, baseball bat, hockey stick, golf club, boxing glove, skateboard, ice skate, trophy
+Gemstones:			Ruby, emerald, sapphire, amethyst, topaz, pearl, diamond, opal
+Clothing:			T-shirt, dress, sock, mitten, scarf, sneaker, bow tie, jacket
+Halloween:			Jack-o'-lantern, ghost, bat, witch hat, black cat, skull, candy corn, cauldron
+Winter Holidays:	Snowman, ornament, candy cane, gift box, stocking, gingerbread man, sled, wreath
+Dinosaurs:			T. rex, triceratops, stegosaurus, brachiosaurus, pterodactyl, ankylosaurus, velociraptor, dino egg
+Board Games:		Chess knight, die, playing card, domino, checker, game pawn, spinner, hourglass
+Treasure:			Chest, gold coin, crown, key, map, compass, goblet, ruby ring
+Cozy Home:			Armchair, lamp, teapot, clock, candle, bookshelf, houseplant, rug
+Desert:				Cactus, camel, scorpion, tumbleweed, sun, lizard, oasis palm, pyramid
+Candy:				Lollipop, gummy bear, candy cane, chocolate bar, jellybean, cotton candy, wrapped candy, licorice
+Bakery:				Baguette, pretzel, cinnamon roll, bagel, muffin, loaf, croissant, cookie
+Cheeses:			Swiss, cheddar, brie, blue cheese, mozzarella, gouda wheel, parmesan wedge, cheese string

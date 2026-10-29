@@ -84,6 +84,16 @@ bool UIconSetSubsystem::IsUnlocked(const FIconSetUnlock& Unlock) const
 		const UCampaignSubsystem* Campaign = GetGameInstance()->GetSubsystem<UCampaignSubsystem>();
 		return Campaign && Campaign->IsCampaignModeUnlocked();
 	}
+	case EIconSetUnlock::CampaignCompleted:
+	{
+		const UCampaignSubsystem* Campaign = GetGameInstance()->GetSubsystem<UCampaignSubsystem>();
+		return Campaign && Campaign->IsCampaignCompleted();
+	}
+	case EIconSetUnlock::MasterCompleted:
+	{
+		const UCampaignSubsystem* Campaign = GetGameInstance()->GetSubsystem<UCampaignSubsystem>();
+		return Campaign && Campaign->IsAllMasterCompleted();
+	}
 	}
 	return false;
 }
@@ -125,6 +135,8 @@ TArray<FIconSetEntry> UIconSetSubsystem::GetEntries() const
 				switch (Unlock.Unlock)
 				{
 				case EIconSetUnlock::LessonsCompleted: Reason = LOCTEXT("CompleteLessons", "Complete Lessons"); break;
+				case EIconSetUnlock::CampaignCompleted: Reason = LOCTEXT("CompleteCampaign", "Complete Campaign"); break;
+				case EIconSetUnlock::MasterCompleted: Reason = LOCTEXT("CompleteMaster", "Complete Every Master Challenge"); break;
 				}
 			}
 			Add(Unlock.IconSet, bUnlocked, bUnlocked ? FText::GetEmpty() : Reason);

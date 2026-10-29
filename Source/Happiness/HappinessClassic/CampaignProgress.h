@@ -192,6 +192,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Campaign")
 	bool IsCampaignModeUnlocked() const;
 
+	/** Every lesson's Campaign mode final is completed, whatever the current mode (Master Mode doesn't count) */
+	UFUNCTION(BlueprintPure, Category = "Campaign")
+	bool IsCampaignCompleted() const;
+
 	// ---- Stage definitions (current mode) ----
 
 	UFUNCTION(BlueprintPure, Category = "Campaign")
@@ -254,6 +258,10 @@ public:
 	 *  unlocks one of the icons around the player's level on the mode screen (UPlayerLevelBadge). */
 	UFUNCTION(BlueprintPure, Category = "Campaign")
 	bool IsMasterColumnCompleted(int32 Column) const;
+
+	/** Every clue has completed Campaign Master Mode (every tree column, IsMasterColumnCompleted) */
+	UFUNCTION(BlueprintPure, Category = "Campaign")
+	bool IsAllMasterCompleted() const;
 
 	/** Stage size, difficulty and the progress needed to unlock it, for a given mode */
 	static int32 GetStageSizeFor(ECampaignMode Mode, int32 Stage);
@@ -375,6 +383,13 @@ public:
 	/** IsLessonsCompletionPending, once */
 	bool ConsumeLessonsCompletion();
 
+	/** Every lesson's Campaign final has just been completed (the Mythical Creatures unlocked), and the mode screen
+	 *  hasn't celebrated it yet (UHappinessModeWidget). Not saved, like the lessons' completion. */
+	bool IsCampaignCompletionPending() const { return bCampaignCompletionPending; }
+
+	/** IsCampaignCompletionPending, once */
+	bool ConsumeCampaignCompletion();
+
 	/** The game started with no game save at all (a new player): true once, for the menu to open on Game Basics */
 	bool ConsumeNewPlayerStart();
 
@@ -403,6 +418,9 @@ public:
 	 * 0..GetMasterMaxPoints()), already shown to the player. A session on the lesson ends. Saves. Console: Happiness.Campaign.Master
 	 */
 	void DebugSetMaster(ECampaignLesson Lesson, int32 MasterPoints);
+
+	/** Debug: drop the celebrations waiting to play (a lesson's, every lesson's, the campaign's), as if already seen */
+	void DebugSkipCelebrations();
 
 	/** Debug: clear the current mode's progress, leaving the other mode's alone. Saves. */
 	void DebugResetMode();
@@ -467,6 +485,7 @@ private:
 	FLessonPuzzleResult LastResult;
 	TOptional<ECampaignLesson> UncelebratedLesson;
 	bool bLessonsCompletionPending = false;
+	bool bCampaignCompletionPending = false;
 	bool bNewPlayerStart = false;
 	static TWeakObjectPtr<UCampaignSubsystem> Instance;
 };

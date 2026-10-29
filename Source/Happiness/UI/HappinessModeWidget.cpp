@@ -135,7 +135,11 @@ void UHappinessModeWidget::Show()
 	UCampaignSubsystem* Campaign = UCampaignSubsystem::Get(this);
 	if (Campaign && Campaign->ConsumeLessonsCompletion())
 	{
-		StartUnlockCelebration();
+		StartUnlockCelebration(false);
+	}
+	else if (Campaign && Campaign->ConsumeCampaignCompletion())
+	{
+		StartUnlockCelebration(true);
 	}
 	RefreshCampaignLock();
 	RefreshDaily();
@@ -377,9 +381,12 @@ void UHappinessModeWidget::HandleStreakSaverClicked()
 void UHappinessModeWidget::Hide()
 {
 	EndUnlockCelebration();
-	if (LessonsCompletePopup)
+	for (ULessonsCompletePopup* Popup : { LessonsCompletePopup.Get(), CampaignCompletePopup.Get() })
 	{
-		LessonsCompletePopup->Hide();
+		if (Popup)
+		{
+			Popup->Hide();
+		}
 	}
 	HandleClosePurchaseClicked();
 	if (StreakSaverPanel)
@@ -397,7 +404,7 @@ void UHappinessModeWidget::NativeTick(const FGeometry& MyGeometry, float InDelta
 	UpdateUnlockCelebration(InDeltaTime);
 }
 
-void UHappinessModeWidget::StartUnlockCelebration()
+void UHappinessModeWidget::StartUnlockCelebration(bool bCampaign)
 {
 	UCanvasPanel* Root = Cast<UCanvasPanel>(GetRootWidget());
 	if (!Root)
@@ -420,12 +427,14 @@ void UHappinessModeWidget::StartUnlockCelebration()
 	UnlockTime = 0.f;
 	bUnlockFireworksStarted = false;
 	FirstBurstAt = -1.f;
-	ShowLessonsCompletePopup();
+	bCampaignCelebration = bCampaign;
+	ShowCompletePopup();
 }
 
-bool UHappinessModeWidget::PlayUnlockFireworks()
+bool UHappinessModeWidget::PlayUnlockFireworks(bool bAppend)
 {
-	const UWidget* Window = LessonsCompletePopup ? LessonsCompletePopup->GetWindow() : nullptr;
+	const ULessonsCompletePopup* Popup = GetCelebrationPopup();
+	const UWidget* Window = Popup ? Popup->GetWindow() : nullptr;
 	if (!Window)
 	{
 		return false;
@@ -455,7 +464,14 @@ bool UHappinessModeWidget::PlayUnlockFireworks()
 		// Each rocket climbs from just below the window
 		Burst.RocketRise = Center.Y + Size.Y * .5f + 40.f * Unit - Burst.Position.Y;
 	}
-	Fireworks->Play(Bursts, Unit);
+	if (bAppend)
+	{
+		Fireworks->AddBursts(Bursts, Unit);
+	}
+	else
+	{
+		Fireworks->Play(Bursts, Unit);
+	}
 	return true;
 }
 
@@ -467,10 +483,17 @@ void UHappinessModeWidget::UpdateUnlockCelebration(float DeltaTime)
 	}
 	UnlockTime += DeltaTime;
 	// Once the congratulations have opened (and been laid out)
-	if (!bUnlockFireworksStarted && UnlockTime >= UnlockFireworksDelay && PlayUnlockFireworks())
+	if (!bUnlockFireworksStarted && UnlockTime >= UnlockFireworksDelay && PlayUnlockFireworks(false))
 	{
 		bUnlockFireworksStarted = true;
 		FirstBurstAt = UnlockTime + Fireworks->GetFirstBurstTime();
+	}
+	// The campaign's: another round as each one's last rocket goes up, until Continue closes the congratulations
+	const ULessonsCompletePopup* Popup = GetCelebrationPopup();
+	const bool bPopupOpen = Popup && Popup->IsVisible();
+	if (bCampaignCelebration && bUnlockFireworksStarted && bPopupOpen && !Fireworks->HasBurstsLeft())
+	{
+		PlayUnlockFireworks(true);
 	}
 	Fireworks->Advance(DeltaTime);
 	if (FirstBurstAt >= 0.f && UnlockTime >= FirstBurstAt)
@@ -481,7 +504,8 @@ void UHappinessModeWidget::UpdateUnlockCelebration(float DeltaTime)
 			UGameplayStatics::PlaySound2D(this, UnlockSound, 1.f, 1.f, 0.f, nullptr, nullptr, true);
 		}
 	}
-	if (bUnlockFireworksStarted ? !Fireworks->IsPlaying() : UnlockTime >= UnlockFireworksDelay + 2.f)
+	// Done once the last sparks fade (or, if the fireworks never started, a while after they should have)
+	if (bUnlockFireworksStarted ? !Fireworks->IsPlaying() : (UnlockTime >= UnlockFireworksDelay + 2.f || !bPopupOpen))
 	{
 		EndUnlockCelebration();
 	}
@@ -502,29 +526,34 @@ void UHappinessModeWidget::EndUnlockCelebration()
 	}
 }
 
-void UHappinessModeWidget::ShowLessonsCompletePopup()
+void UHappinessModeWidget::ShowCompletePopup()
 {
-	if (!LessonsCompletePopup)
+	TObjectPtr<ULessonsCompletePopup>& Popup = bCampaignCelebration ? CampaignCompletePopup : LessonsCompletePopup;
+	if (!Popup)
 	{
-		LessonsCompletePopup = CreateWidget<ULessonsCompletePopup>(this, ULessonsCompletePopup::StaticClass());
+		Popup = CreateWidget<ULessonsCompletePopup>(this, ULessonsCompletePopup::StaticClass());
+		if (Popup)
+		{
+			Popup->bCampaignComplete = bCampaignCelebration;
+		}
 		UCanvasPanel* Root = Cast<UCanvasPanel>(GetRootWidget());
-		if (UCanvasPanelSlot* PopupSlot = Root && LessonsCompletePopup ? Root->AddChildToCanvas(LessonsCompletePopup) : nullptr)
+		if (UCanvasPanelSlot* PopupSlot = Root && Popup ? Root->AddChildToCanvas(Popup) : nullptr)
 		{
 			// Over the whole screen, under the fireworks
 			PopupSlot->SetAnchors(FAnchors(0.f, 0.f, 1.f, 1.f));
 			PopupSlot->SetOffsets(FMargin(0.f));
 			PopupSlot->SetZOrder(40);
 		}
-		else if (LessonsCompletePopup)
+		else if (Popup)
 		{
-			LessonsCompletePopup->AddToViewport(40);
+			Popup->AddToViewport(40);
 		}
 	}
-	if (LessonsCompletePopup)
+	if (Popup)
 	{
-		// The Campaign tile's picture, on the popup's Campaign card
+		// The Campaign tile's picture, on the lessons' popup's Campaign card
 		const UImage* Art = Cast<UImage>(GetWidgetFromName(TEXT("CampaignButtonArt")));
-		LessonsCompletePopup->Show(Art ? &Art->GetBrush() : nullptr);
+		Popup->Show(Art ? &Art->GetBrush() : nullptr);
 	}
 }
 

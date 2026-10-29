@@ -77,8 +77,9 @@ public:
 	void Hide();
 
 	/**
-	 * Every lesson just completed (the first time the screen shows after it): the congratulations
-	 * (ULessonsCompletePopup) open, and this many seconds later fireworks burst over them
+	 * Every lesson, or the whole campaign, just completed (the first time the screen shows after it): the
+	 * congratulations (ULessonsCompletePopup) open, and this many seconds later fireworks burst over them. The
+	 * campaign's keep going, a round at a time, until the player presses Continue.
 	 */
 	UPROPERTY(EditAnywhere, Category = "Lessons Complete")
 	float UnlockFireworksDelay = 0.35f;
@@ -139,6 +140,10 @@ protected:
 	/** The congratulations for completing every lesson (made the first time it's needed) */
 	UPROPERTY(Transient)
 	TObjectPtr<ULessonsCompletePopup> LessonsCompletePopup;
+
+	/** The congratulations for completing the campaign (made the first time it's needed) */
+	UPROPERTY(Transient)
+	TObjectPtr<ULessonsCompletePopup> CampaignCompletePopup;
 
 	/** Asks whether to resume a puzzle in progress, over the whole screen (made the first time it's needed) */
 	UPROPERTY(Transient)
@@ -219,19 +224,24 @@ private:
 	void ShowTree(ECampaignMode Mode);
 	void RefreshCampaignLock();
 
-	/** Every lesson's completion: the congratulations, with fireworks over them */
-	void StartUnlockCelebration();
+	/** Every lesson's completion, or the campaign's (bCampaign): the congratulations, with fireworks over them */
+	void StartUnlockCelebration(bool bCampaign);
 	void UpdateUnlockCelebration(float DeltaTime);
 	/** Stop the fireworks (the congratulations stay open) */
 	void EndUnlockCelebration();
 	bool IsCelebratingUnlock() const { return UnlockTime >= 0.f; }
-	/** Where the fireworks burst, over the congratulations' window: false until it has been laid out */
-	bool PlayUnlockFireworks();
-	void ShowLessonsCompletePopup();
+	/** A round of fireworks over the congratulations' window, after any still to come (bAppend) or in place of
+	 *  them: false until it has been laid out */
+	bool PlayUnlockFireworks(bool bAppend);
+	/** The congratulations being celebrated: the campaign's or the lessons' */
+	ULessonsCompletePopup* GetCelebrationPopup() const { return bCampaignCelebration ? CampaignCompletePopup : LessonsCompletePopup; }
+	void ShowCompletePopup();
 
 	/** Seconds into the celebration (below 0: none) */
 	float UnlockTime = -1.f;
 	bool bUnlockFireworksStarted = false;
+	/** The celebration is the campaign's: its fireworks last until Continue */
+	bool bCampaignCelebration = false;
 	/** When the first burst comes, for its sound (below 0: not known yet, or played) */
 	float FirstBurstAt = -1.f;
 

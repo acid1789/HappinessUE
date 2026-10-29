@@ -16,6 +16,8 @@ class ULessonProgressTicks;
 class ULessonPopupWidget;
 class UCampaignSubsystem;
 class UCanvasPanel;
+class UAudioComponent;
+class USoundBase;
 class USizeBox;
 class UTexture2D;
 class UFont;
@@ -123,6 +125,14 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lesson Popup|Master Reveal")
 	float RevealEraseTime = 3.f;
+
+	/** Rubbing, played as the eraser clears the Campaign controls; sped up or slowed to last RevealEraseTime */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lesson Popup|Master Reveal")
+	TObjectPtr<USoundBase> EraseSound;
+
+	/** Pencil scratching, played as the Master controls are drawn in (that also takes RevealEraseTime) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lesson Popup|Master Reveal")
+	TObjectPtr<USoundBase> DrawSound;
 
 	/** Seconds the Master line shows before the Master buttons and bar come in */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lesson Popup|Master Reveal")
@@ -272,6 +282,9 @@ private:
 	TSharedPtr<SMasterRevealSheet> RevealSheet;
 
 	void TickReveal(float DeltaTime);
+	/** Play one of the reveal's sounds (EraseSound, DrawSound) over the next RevealEraseTime */
+	void PlayRevealSound(USoundBase* Sound);
+	UPROPERTY(Transient) TObjectPtr<UAudioComponent> RevealAudio;
 	/** 0: nothing erased, 1: the whole line covered */
 	void SetEraseProgress(float Alpha);
 	void HideEraser();

@@ -224,10 +224,16 @@ UWidget* UIconSetsPanel::MakeCard(int32 Index, const FIconSetEntry& Entry)
 	Name->SetFont(FSlateFontInfo(PanelFont, 34));
 	Name->SetColorAndOpacity(Entry.bUnlocked ? SetsInk : SetsInk.CopyWithNewOpacity(.6f));
 	Name->SetJustification(ETextJustify::Center);
-	Name->SetAutoWrapText(true);
+	// Wrapped to the card's width; a name that needs more than two lines shrinks to fit
+	Name->SetWrapTextAt(SetsCardSize.X - 36.f);
+	UScaleBox* NameFit = WidgetTree->ConstructWidget<UScaleBox>();
+	NameFit->SetStretch(EStretch::ScaleToFit);
+	NameFit->SetStretchDirection(EStretchDirection::DownOnly);
+	NameFit->AddChild(Name);
 	USizeBox* NameSize = WidgetTree->ConstructWidget<USizeBox>();
-	NameSize->SetHeightOverride(96.f);
-	NameSize->AddChild(Name);
+	// Two lines at full size; with three rows of icons (12) the card is still just tall enough
+	NameSize->SetHeightOverride(112.f);
+	NameSize->AddChild(NameFit);
 	UVerticalBoxSlot* NameSlot = Column->AddChildToVerticalBox(NameSize);
 	NameSlot->SetHorizontalAlignment(HAlign_Fill);
 

@@ -616,8 +616,9 @@ void UCampaignTreeWidget::ShowForLessonSession()
 			LessonPopup->SetVisibility(ESlateVisibility::Collapsed);
 		}
 		StartCelebration(Completed);
-		// The last lesson: once its check has settled, back to the mode screen, which celebrates every lesson
-		bCloseAfterCelebration = Campaign->IsLessonsCompletionPending();
+		// The last lesson (or the campaign's last): once its check has settled, back to the mode screen, which
+		// celebrates every lesson (or the whole campaign)
+		bCloseAfterCelebration = Campaign->IsLessonsCompletionPending() || Campaign->IsCampaignCompletionPending();
 		if (bCloseAfterCelebration && !IsCelebrating())
 		{
 			Close();
