@@ -15,7 +15,7 @@ class UWidgetTree;
 /**
  * The player info panel, opened by tapping the player level badge's sun in the main menu (UHappinessModeWidget makes
  * it the first time). A window in the middle of the screen, clear of the sun (which stays up, above the dimmed menu):
- * Mastered Clues, one row of the badge's twelve Master rewards (faint until earned), then Options (WBP_Options),
+ * Mastered Clues, two rows of the badge's twelve Master rewards (faint until earned), then Options (WBP_Options),
  * Game Rules (WBP_GameRules) and Icon Sets (UIconSetsPanel). The close button (top right), tapping outside the window, or the sun
  * again, closes it.
  * Built in code, in the pause menu's garden style.
@@ -75,9 +75,7 @@ private:
 	void HandleIconSetsClicked();
 
 	UPROPERTY() TObjectPtr<UTexture2D> PanelTexture;
-	UPROPERTY() TObjectPtr<UTexture2D> ButtonTexture;
 	UPROPERTY() TObjectPtr<UTexture2D> RewardAtlasTexture;
-	UPROPERTY() TObjectPtr<UTexture2D> IconSetsTexture;
 	UPROPERTY() TObjectPtr<UFont> PanelFont;
 	UPROPERTY() TObjectPtr<USoundBase> AcceptSound;
 	UPROPERTY() TObjectPtr<USoundBase> CancelSound;

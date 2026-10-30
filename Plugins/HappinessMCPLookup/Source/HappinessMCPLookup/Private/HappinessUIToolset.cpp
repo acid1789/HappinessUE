@@ -97,7 +97,8 @@ FString UHappinessUIToolset::RenderWidget(const FString& WidgetBlueprintPath, in
 		PackagePath.LeftInline(Dot);
 	}
 	const FString AssetName = FPaths::GetBaseFilename(PackagePath);
-	const FString ClassPath = FString::Printf(TEXT("%s.%s_C"), *PackagePath, *AssetName);
+	const FString ClassPath = WidgetBlueprintPath.StartsWith(TEXT("/Script/"))
+		? WidgetBlueprintPath : FString::Printf(TEXT("%s.%s_C"), *PackagePath, *AssetName);
 
 	UClass* WidgetClass = LoadClass<UUserWidget>(nullptr, *ClassPath);
 	if (!WidgetClass)
@@ -135,6 +136,12 @@ FString UHappinessUIToolset::RenderWidget(const FString& WidgetBlueprintPath, in
 	TSharedRef<SWidget> SlateWidget = Widget->TakeWidget();
 	if (bPreviewMasterRewards)
 	{
+		// Code-built Player Info has twelve live reward images directly in its widget tree.
+		for (int32 Index = 0; Index < 12; ++Index)
+		{
+			if (UWidget* Reward = Widget->GetWidgetFromName(*FString::Printf(TEXT("Reward%d"), Index)))
+				Reward->SetRenderOpacity(Index < 5 ? 1.f : .25f);
+		}
 		if (const FObjectProperty* BadgeProperty = FindFProperty<FObjectProperty>(Widget->GetClass(), TEXT("PlayerLevelBadge")))
 		{
 			if (UUserWidget* Badge = Cast<UUserWidget>(BadgeProperty->GetObjectPropertyValue_InContainer(Widget)))
