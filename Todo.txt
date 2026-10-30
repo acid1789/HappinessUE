@@ -20,8 +20,7 @@ Game Rules
 Pencil Draw Sound
 
 --- Dev tasks ---
-Back/Home/Hamburger still there on daily notification trigger
-Hint broken on mobile
+Hint Cell Dialog
 
 
 --- Art Tasks ---

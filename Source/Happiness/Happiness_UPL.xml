@@ -41,6 +41,64 @@
 
 	<gameActivityClassAdditions>
 		<insert>
+	/**
+	 * Hide Back/Home/Recents again each time the game's window gets focus back. The engine hides them in onResume, but
+	 * coming back from a notification the shade is still closing then, and on Android 11+ the bars it brings stay up
+	 * (the engine's other restores listen for changes those versions don't report). The window gets focus once the
+	 * shade has gone. Android 11+ hides them with its insets API, older versions with the engine's flags.
+	 */
+	@Override
+	public void onWindowFocusChanged(boolean hasFocus)
+	{
+		super.onWindowFocusChanged(hasFocus);
+		if (hasFocus &amp;&amp; !isStandalone &amp;&amp; Happiness_ShouldHideUI())
+		{
+			Happiness_HideSystemBars();
+			// Again a moment later, in case the shade's animation shows them once more
+			new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(new Runnable()
+			{
+				public void run()
+				{
+					Happiness_HideSystemBars();
+				}
+			}, 500);
+		}
+	}
+
+	/** The manifest's bShouldHideUI (Project Settings: full screen), whichever way the activity was started */
+	private boolean Happiness_ShouldHideUI()
+	{
+		try
+		{
+			Bundle HappinessMeta = getPackageManager().getApplicationInfo(getPackageName(), PackageManager.GET_META_DATA).metaData;
+			return HappinessMeta != null &amp;&amp; HappinessMeta.getBoolean("com.epicgames.unreal.GameActivity.bShouldHideUI", false);
+		}
+		catch (PackageManager.NameNotFoundException e)
+		{
+			return false;
+		}
+	}
+
+	private void Happiness_HideSystemBars()
+	{
+		try
+		{
+			if (android.os.Build.VERSION.SDK_INT &gt;= 30)
+			{
+				android.view.WindowInsetsController Controller = getWindow().getInsetsController();
+				if (Controller != null)
+				{
+					Controller.setSystemBarsBehavior(android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+					Controller.hide(android.view.WindowInsets.Type.systemBars());
+				}
+			}
+			restoreTransparentBars();
+		}
+		catch (Exception e)
+		{
+		}
+	}
+
 	/** UDailyReminderSubsystem: ask for permission to notify (Android 13+; earlier versions need none) */
 	public void AndroidThunkJava_Happiness_RequestNotifications()
 	{

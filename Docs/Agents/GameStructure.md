@@ -132,7 +132,10 @@ still going. With a streak of 8+ days (`EveningMinStreak`) it also schedules an 
 20:00 (`EveningHour`) on the next day not yet solved; solving that day reschedules and drops it. Permission is asked once, after the first daily solve (`bAskedPermission` in GameUserSettings): iOS asks
 itself (alerts and sound, no push); Android 13+ asks for `POST_NOTIFICATIONS` through
 `AndroidThunkJava_Happiness_RequestNotifications` in `Happiness_UPL.xml`, which also declares the permission.
-`bRestoreNotificationsOnReboot` brings Android's back after a restart. On Android the small icon is the
+`bRestoreNotificationsOnReboot` brings Android's back after a restart.
+Tapping one starts or resumes GameActivity without SplashActivity; `Happiness_UPL.xml` keeps Back/Home/Recents hidden
+then: it passes the full-screen settings on at a cold start, and hides the bars again whenever the game's window gets
+focus back (`onWindowFocusChanged`), as the notification shade closes after the engine's own `onResume` hide. On Android the small icon is the
 `ic_notification` drawable if there is one, else the app icon. Test on a phone with `Happiness.Reminder.Test [seconds]`.
 Android and iOS only; it does nothing in the editor.
 
