@@ -17,6 +17,7 @@
 #include "Components/VerticalBoxSlot.h"
 #include "Engine/Font.h"
 #include "Engine/Texture2D.h"
+#include "Ads/IconSetStore.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
 #include "UObject/ConstructorHelpers.h"
@@ -163,7 +164,7 @@ TArray<FIconSetEntry> UIconSetsPanel::GetEntries() const
 
 FSlateBrush UIconSetsPanel::StateBrush(const FIconSetEntry& Entry) const
 {
-	const int32 Row = Entry.bUnlocked ? (Entry.bEnabled ? 0 : 1) : (Entry.ProductId.IsEmpty() ? 2 : 3);
+	const int32 Row = Entry.bUnlocked ? (Entry.bEnabled ? 0 : 1) : (Entry.bForSale ? 3 : 2);
 	// Measured bounds of each painted face; exclude the atlas's transparent gutters.
 	constexpr float Tops[] = {.083f, .305f, .524f, .745f};
 	constexpr float Bottoms[] = {.284f, .510f, .731f, .954f};
@@ -177,7 +178,15 @@ FSlateBrush UIconSetsPanel::StateBrush(const FIconSetEntry& Entry) const
 FText UIconSetsPanel::StateLabel(const FIconSetEntry& Entry) const
 {
 	if (Entry.bUnlocked) return Entry.bEnabled ? LOCTEXT("Enabled", "Enabled") : LOCTEXT("Disabled", "Disabled");
-	return Entry.ProductId.IsEmpty() ? Entry.LockedReason : LOCTEXT("BuySet", "Buy Set");
+	if (!Entry.bForSale) return Entry.LockedReason;
+	if (const UIconSetStoreSubsystem* Store = UIconSetStoreSubsystem::Get(this))
+	{
+		if (Store->IsPurchasing(Entry.Id)) return LOCTEXT("Purchasing", "Purchasing...");
+		if (Store->IsPending(Entry.Id)) return LOCTEXT("PaymentPending", "Payment pending");
+		const FText Price = Store->GetPriceText(Entry.Id);
+		if (!Price.IsEmpty()) return FText::Format(LOCTEXT("BuyPrice", "Buy {0}"), Price);
+	}
+	return LOCTEXT("BuySet", "Buy Set");
 }
 
 UButton* UIconSetsPanel::MakeStateButton(UCanvasPanel* Canvas, const FIconSetEntry& Entry, int32 Index,
@@ -200,7 +209,7 @@ UButton* UIconSetsPanel::MakeStateButton(UCanvasPanel* Canvas, const FIconSetEnt
 	Click->bAction = true;
 	Button->OnClicked.AddUniqueDynamic(Click, &UIconSetCardClick::HandleClicked);
 	(Canvas == Detail ? DetailClicks : CardClicks).Add(Click);
-	const FText LabelText = Canvas == Detail && !Entry.bUnlocked && Entry.ProductId.IsEmpty()
+	const FText LabelText = Canvas == Detail && !Entry.bUnlocked && !Entry.bForSale
 		? LOCTEXT("Locked", "Locked") : StateLabel(Entry);
 	UTextBlock* Label = SetsText(WidgetTree, PanelFont, LabelText, FontSize,
 		Entry.bUnlocked && Entry.bEnabled ? SetsIvory : SetsInk);
@@ -315,7 +324,7 @@ void UIconSetsPanel::UpdateDetail()
 	}
 	MakeStateButton(Detail, Entry, Index, FVector2D(191.f, 460.f), FVector2D(400.f, 88.f), 34);
 	const FText Help = Entry.bUnlocked ? (Entry.bEnabled ? LOCTEXT("TapOff", "Tap to disable") : LOCTEXT("TapOn", "Tap to enable"))
-		: Entry.ProductId.IsEmpty() ? Entry.LockedReason : LOCTEXT("TapBuy", "Tap to purchase this set");
+		: Entry.bForSale ? LOCTEXT("TapBuy", "Tap to purchase this set") : Entry.LockedReason;
 	UTextBlock* Hint = SetsText(WidgetTree, PanelFont, Help, 21, SetsInk);
 	Hint->SetAutoWrapText(true);
 	SetsPlace(Detail, Hint, FVector2D(20.f, 557.f), FVector2D(742.f, 65.f), 5);
@@ -347,15 +356,17 @@ void UIconSetsPanel::ToggleSet(int32 Index)
 	const FIconSetEntry& Entry = Entries[Index];
 	SelectedId = Entry.Id;
 	FText Message;
-	if (!Entry.bUnlocked && !Entry.ProductId.IsEmpty())
+	if (Entry.bForSale)
 	{
-		if (OnPurchaseRequested.IsBound())
+		UIconSetStoreSubsystem* Store = UIconSetStoreSubsystem::Get(this);
+		if (Store && Store->Buy(Entry.Id))
 		{
 			PlaySound(AcceptSound);
-			OnPurchaseRequested.Broadcast(Entry.ProductId);
 			return;
 		}
-		Message = LOCTEXT("StoreUnavailable", "Purchases are not available right now.");
+		Message = Store && Store->IsPending(Entry.Id)
+			? FText::Format(LOCTEXT("PendingMessage", "{0} is waiting for your payment to clear."), Entry.Name)
+			: LOCTEXT("NoStore", "The store can't be reached right now. Check your connection and try again.");
 	}
 	else if (!Entry.bUnlocked) Message = Entry.LockedReason;
 	else if (UIconSetSubsystem* Sets = UIconSetSubsystem::Get(this))
@@ -366,10 +377,8 @@ void UIconSetsPanel::ToggleSet(int32 Index)
 	if (!Message.IsEmpty())
 	{
 		PlaySound(CancelSound);
-		MessageSeconds = SetsMessageDuration;
 		Refresh();
-		StatusText->SetText(Message);
-		StatusText->SetColorAndOpacity(SetsWarning);
+		ShowMessage(Message);
 		return;
 	}
 	PlaySound(AcceptSound);
@@ -385,6 +394,46 @@ void UIconSetsPanel::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 		MessageSeconds = 0.f;
 		UpdateStatus();
 	}
+}
+
+void UIconSetsPanel::NativeConstruct()
+{
+	Super::NativeConstruct();
+	if (UIconSetStoreSubsystem* Store = UIconSetStoreSubsystem::Get(this))
+	{
+		StoreChangedHandle = Store->OnChanged.AddUObject(this, &UIconSetsPanel::HandleStoreChanged);
+	}
+}
+
+void UIconSetsPanel::NativeDestruct()
+{
+	if (UIconSetStoreSubsystem* Store = UIconSetStoreSubsystem::Get(this))
+	{
+		Store->OnChanged.Remove(StoreChangedHandle);
+	}
+	Super::NativeDestruct();
+}
+
+void UIconSetsPanel::HandleStoreChanged()
+{
+	if (!IsVisible())
+	{
+		return;
+	}
+	// Remake the cards, keeping the scroll where it is
+	const float Offset = Scroll ? Scroll->GetScrollOffset() : 0.f;
+	Refresh();
+	if (Scroll)
+	{
+		Scroll->SetScrollOffset(Offset);
+	}
+}
+
+void UIconSetsPanel::ShowMessage(const FText& Message)
+{
+	MessageSeconds = SetsMessageDuration;
+	StatusText->SetText(Message);
+	StatusText->SetColorAndOpacity(SetsWarning);
 }
 
 void UIconSetsPanel::Show()
@@ -416,7 +465,7 @@ void UIconSetsPanel::PreviewCatalogue(int32 Index)
 		Entry.Name = FText::FromString(Names[I]);
 		Entry.bUnlocked = I != 2 && I != 3;
 		Entry.bEnabled = Entry.bUnlocked && I != 1;
-		if (I == 2) Entry.ProductId = TEXT("preview_only");
+		if (I == 2) Entry.bForSale = true;
 		if (I == 3) Entry.LockedReason = LOCTEXT("PreviewLock", "Complete Campaign");
 		PreviewEntries.Add(Entry);
 	}

@@ -1,6 +1,7 @@
 #include "IconSets.h"
 #include "CampaignProgress.h"
 #include "HappinessSaveGame.h"
+#include "Ads/IconSetStore.h"
 
 #include "Engine/GameInstance.h"
 #include "Engine/Texture2D.h"
@@ -27,6 +28,12 @@ void UIconSetSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	if (UCampaignSubsystem* Campaign = Collection.InitializeDependency<UCampaignSubsystem>())
 	{
 		Campaign->OnProgressChanged.AddUniqueDynamic(this, &UIconSetSubsystem::Refresh);
+	}
+	if (UIconSetStoreSubsystem* Store = Collection.InitializeDependency<UIconSetStoreSubsystem>())
+	{
+		// Bought, or found refunded: the collection follows
+		Store->OnChanged.AddUObject(this, &UIconSetSubsystem::Refresh);
+		Store->OnSetOwned.AddUObject(this, &UIconSetSubsystem::HandleSetOwned);
 	}
 }
 
@@ -72,7 +79,50 @@ bool UIconSetSubsystem::IsIconSetEnabled(const UObject* WorldContextObject, cons
 	{
 		return true;
 	}
-	return !IconSets->Data.DisabledSets.Contains(GetSetId(IconSet));
+	return IconSets->IsSetOn(GetSetId(IconSet));
+}
+
+bool UIconSetSubsystem::StartsOff(FName Id) const
+{
+	const UIconSetUnlocks* AllUnlocks = GetUnlocks();
+	return AllUnlocks && AllUnlocks->IconSets.ContainsByPredicate([Id](const FIconSetUnlock& Unlock)
+	{
+		return Unlock.Unlock == EIconSetUnlock::Purchase && GetSetId(Unlock.IconSet) == Id;
+	});
+}
+
+bool UIconSetSubsystem::IsSetOn(FName Id) const
+{
+	return StartsOff(Id) ? Data.EnabledSets.Contains(Id) : !Data.DisabledSets.Contains(Id);
+}
+
+TArray<FName> UIconSetSubsystem::GetPurchaseSetIds() const
+{
+	TArray<FName> Ids;
+	if (const UIconSetUnlocks* AllUnlocks = GetUnlocks())
+	{
+		for (const FIconSetUnlock& Unlock : AllUnlocks->IconSets)
+		{
+			const FName Id = GetSetId(Unlock.IconSet);
+			if (Unlock.Unlock == EIconSetUnlock::Purchase && !Id.IsNone())
+			{
+				Ids.AddUnique(Id);
+			}
+		}
+	}
+	return Ids;
+}
+
+void UIconSetSubsystem::HandleSetOwned(FName Id)
+{
+	if (Id.IsNone() || Data.EnabledSets.Contains(Id))
+	{
+		return;
+	}
+	Data.EnabledSets.Add(Id);
+	UHappinessSaveGame::SaveCurrentSettings();
+	Refresh();
+	OnEnabledChanged.Broadcast();
 }
 
 bool UIconSetSubsystem::IsUnlocked(const FIconSetUnlock& Unlock) const
@@ -94,6 +144,17 @@ bool UIconSetSubsystem::IsUnlocked(const FIconSetUnlock& Unlock) const
 		const UCampaignSubsystem* Campaign = GetGameInstance()->GetSubsystem<UCampaignSubsystem>();
 		return Campaign && Campaign->IsAllMasterCompleted();
 	}
+	case EIconSetUnlock::ComingSoon:
+		return false;
+	case EIconSetUnlock::Purchase:
+	{
+		if (!UIconSetStoreSubsystem::UsesStore())
+		{
+			return true;
+		}
+		const UIconSetStoreSubsystem* Store = GetGameInstance()->GetSubsystem<UIconSetStoreSubsystem>();
+		return Store && Store->IsOwned(GetSetId(Unlock.IconSet));
+	}
 	}
 	return false;
 }
@@ -101,20 +162,21 @@ bool UIconSetSubsystem::IsUnlocked(const FIconSetUnlock& Unlock) const
 TArray<FIconSetEntry> UIconSetSubsystem::GetEntries() const
 {
 	TArray<FIconSetEntry> Entries;
-	auto Add = [&](UObject* IconSet, bool bUnlocked, const FText& LockedReason)
+	auto Add = [&](UObject* IconSet, bool bUnlocked, const FText& LockedReason) -> FIconSetEntry*
 	{
 		UPrimaryDataAsset* Set = Cast<UPrimaryDataAsset>(IconSet);
 		if (!Set || Entries.ContainsByPredicate([Set](const FIconSetEntry& Entry) { return Entry.IconSet == Set; }))
 		{
-			return;
+			return nullptr;
 		}
 		FIconSetEntry& Entry = Entries.AddDefaulted_GetRef();
 		Entry.IconSet = Set;
 		Entry.Id = GetSetId(Set);
 		Entry.Name = GetSetName(Set);
 		Entry.bUnlocked = bUnlocked;
-		Entry.bEnabled = bUnlocked && !Data.DisabledSets.Contains(Entry.Id);
+		Entry.bEnabled = bUnlocked && IsSetOn(Entry.Id);
 		Entry.LockedReason = LockedReason;
+		return &Entry;
 	};
 	for (UObject* Set : GetSets(DefaultCollection))
 	{
@@ -137,9 +199,14 @@ TArray<FIconSetEntry> UIconSetSubsystem::GetEntries() const
 				case EIconSetUnlock::LessonsCompleted: Reason = LOCTEXT("CompleteLessons", "Complete Lessons"); break;
 				case EIconSetUnlock::CampaignCompleted: Reason = LOCTEXT("CompleteCampaign", "Complete Campaign"); break;
 				case EIconSetUnlock::MasterCompleted: Reason = LOCTEXT("CompleteMaster", "Complete Every Master Challenge"); break;
+				case EIconSetUnlock::ComingSoon: Reason = LOCTEXT("ComingSoon", "Coming Soon"); break;
+				case EIconSetUnlock::Purchase: Reason = LOCTEXT("Purchase", "Buy it in the store"); break;
 				}
 			}
-			Add(Unlock.IconSet, bUnlocked, bUnlocked ? FText::GetEmpty() : Reason);
+			if (FIconSetEntry* Entry = Add(Unlock.IconSet, bUnlocked, bUnlocked ? FText::GetEmpty() : Reason))
+			{
+				Entry->bForSale = !bUnlocked && Unlock.Unlock == EIconSetUnlock::Purchase;
+			}
 		}
 	}
 	return Entries;
@@ -150,7 +217,7 @@ int32 UIconSetSubsystem::GetNumEnabled() const
 	int32 Count = 0;
 	for (const UObject* Set : GetSets(PlayerCollection))
 	{
-		Count += Data.DisabledSets.Contains(GetSetId(Set)) ? 0 : 1;
+		Count += IsSetOn(GetSetId(Set)) ? 1 : 0;
 	}
 	return Count;
 }
@@ -158,8 +225,7 @@ int32 UIconSetSubsystem::GetNumEnabled() const
 bool UIconSetSubsystem::SetEnabled(const UObject* IconSet, bool bEnabled)
 {
 	const FName Id = GetSetId(IconSet);
-	const bool bDisabled = Data.DisabledSets.Contains(Id);
-	if (Id.IsNone() || bDisabled != bEnabled)
+	if (Id.IsNone() || IsSetOn(Id) == bEnabled)
 	{
 		// Already so
 		return !Id.IsNone();
@@ -168,13 +234,15 @@ bool UIconSetSubsystem::SetEnabled(const UObject* IconSet, bool bEnabled)
 	{
 		return false;
 	}
-	if (bEnabled)
+	// Sets that start off are kept in the turned-on list, the others in the turned-off one
+	TArray<FName>& Changed = StartsOff(Id) ? Data.EnabledSets : Data.DisabledSets;
+	if (bEnabled == StartsOff(Id))
 	{
-		Data.DisabledSets.Remove(Id);
+		Changed.AddUnique(Id);
 	}
 	else
 	{
-		Data.DisabledSets.AddUnique(Id);
+		Changed.Remove(Id);
 	}
 	// Written into the game save now; it would also go with the game's next save
 	UHappinessSaveGame::SaveCurrentSettings();

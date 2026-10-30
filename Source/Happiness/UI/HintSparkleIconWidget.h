@@ -17,7 +17,7 @@ class SCanvas;
 /**
  * Moves Niagara sparkle sprites around the highlighted icon or clue.
  *
- * A clue's sparkles orbit the whole clue and are run by its first icon (_0). Clues sit in their panel's scroll box,
+ * A clue's sparkles orbit the whole clue and are run by its first icon (the first in its box). Clues sit in their panel's scroll box,
  * which stops painting, and so ticking, the clues scrolled out of view: those icons are run by a core ticker instead,
  * which scrolls the clue into view when its hint starts, follows it as the panel scrolls, and hides the sparkles
  * that leave the panel.
@@ -57,7 +57,12 @@ private:
 	void UpdateSparklePosition(const FGeometry& Geometry, bool bWholeClue);
 	/** Geometry's rectangle in the sparkle canvas */
 	bool ToSparkleSpace(const FGeometry& Geometry, FVector2D& OutTopLeft, FVector2D& OutBottomRight) const;
-	void SpawnSparkle();
+	/** Starts a sparkle; its index, or INDEX_NONE if all are in use */
+	int32 SpawnSparkle();
+	/** An icon of the cell dialog: the dialog is the board's cell up close, so its ring is there from the start */
+	bool IsInCellDialog() const;
+	/** Fill the ring at once, as many sparkles as it settles at, each partway through its life */
+	void PrefillRing();
 	FVector2D GetSparklePosition(int32 Index) const;
 	/** Where Index's sparkle is in the orbit (its center) */
 	FVector2D GetOrbitPosition(int32 Index) const;

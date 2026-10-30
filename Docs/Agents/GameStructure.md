@@ -35,7 +35,7 @@ functions (`GetNumStages`, `GetStageSize`, `GetMaxPoints`, ...) follow it.
 | `Happiness/UI/WBP_HorizontalCluePanel` | — | The **right** clue column (horizontal clues) |
 | `Happiness/UI/WBP_ButtonPanel` | `UI/ButtonPanelWidget` | Side buttons; the hint button wiggles after 5 s idle |
 | `Happiness/UI/WBP_HintInfo` | `UI/HintInfoWidget` | Hint explanation panel over the bottom clue strip |
-| `Happiness/UI/WBP_Icon` | `UI/HintSparkleIconWidget` | One icon of a cell or clue. While its `ShowingHint` is set, sparkles orbit it (a clue's orbit its whole clue, run by its first icon `_0`). When a hint starts, its sparkles stream in to lead the player's eye: out of the hint button (`UButtonPanelWidget::Button_H`) to the clue, then, `CellStreamDelay` later, off the clue's ring to the board icon (`ShownClue`). Each sparkle flies into its place in the orbit (`StreamSeconds`, `StreamSpawns`, `TravelSeconds`). A clue's sparkles run from a core ticker, since the clue panels' scroll boxes stop ticking clues scrolled out of view: the hint scrolls its clue into view, the ring follows the clue as the panel scrolls (its place comes from arranging the scroll box), and sparkles outside the panel are hidden. A board icon's sparkles stop once the icon stops ticking (`TickBoardWatch`): placing a hinted icon ends the hint and collapses the cell's candidates in the same frame, before the icon could see it. |
+| `Happiness/UI/WBP_Icon` | `UI/HintSparkleIconWidget` | One icon of a cell or clue. While its `ShowingHint` is set, sparkles orbit it (a clue's orbit its whole clue, run by its first icon, the first child of the clue's box). When a hint starts, its sparkles stream in to lead the player's eye: out of the hint button (`UButtonPanelWidget::Button_H`) to the clue, then, `CellStreamDelay` later, off the clue's ring to the board icon (`ShownClue`). The cell dialog shows the hint too when it opens on the hinted cell (`WBP_CellDialog.ShowHint`): its icon gets the sparkles (drawn just above the overlay the icon is in, so over the dialog; no stream, the ring is there at once, `PrefillRing`, as the dialog is the board's cell up close) and, for an elimination (`UHint::IsElimination`), the board's red tint. Each sparkle flies into its place in the orbit (`StreamSeconds`, `StreamSpawns`, `TravelSeconds`). A clue's sparkles run from a core ticker, since the clue panels' scroll boxes stop ticking clues scrolled out of view: the hint scrolls its clue into view, the ring follows the clue as the panel scrolls (its place comes from arranging the scroll box), and sparkles outside the panel are hidden. A board icon's sparkles stop once the icon stops ticking (`TickBoardWatch`): placing a hinted icon ends the hint and collapses the cell's candidates in the same frame, before the icon could see it. |
 | `Happiness/UI/WBP_EndScreen` | — | Free Play end screen: times, EXP, level bar |
 | `Happiness/UI/WBP_LessonEndScreen` | `UI/LessonEndScreenWidget` | Lessons end screen: points breakdown, lesson progress |
 | `Happiness/UI/WBP_CampaignEndScreen` | `UI/CampaignEndScreenWidget` | Campaign end screen: Free Play scoring plus campaign progress |
@@ -82,7 +82,16 @@ default collection (`KatrinaCollection`, 8 sets). At BeginPlay `PC_Happiness` sw
 `LockedReason`). It updates in place when campaign progress changes. `IS_GardenVisitors` unlocks once every lesson is
 completed; `IS_MythicalCreatures` once every lesson's Campaign final is (`UCampaignSubsystem::IsCampaignCompleted`,
 Master Mode not needed). `IS_MasterRewardGems` is hidden until every lesson's Master Mode is completed
-(`IsAllMasterCompleted`; test with `Happiness.Campaign.MasterAll`). To add an unlockable set, add it to `DA_IconSetUnlocks` (new conditions go in `EIconSetUnlock` /
+(`IsAllMasterCompleted`; test with `Happiness.Campaign.MasterAll`). The 31 sets in `Icons/Extra` are listed
+with `Purchase`: on PC unlocked from the start but off (`FIconSetSaveData::EnabledSets` holds the ones turned on); on
+phones each is a one-time store product, `iconset_<set id in lower case>` (`iconset_arcticanimals`), bought from its
+card on the icon sets screen ("Buy <price>") and on once bought. `Ads/IconSetStore` (`UIconSetStoreSubsystem`) keeps
+the purchases in `iconsets.owned` in the app's private storage, so they hold offline, and checks them against the
+store at startup and on each return to the foreground: a paid purchase missing from the file is added (reinstall,
+new phone); one the store no longer lists is removed only once the store's servers are confirmed reachable (as Remove
+Ads, `Ads/AdRemoval.h`). The Remove Ads Restore Purchases also restores the sets. Test on PC:
+`Happiness.IconSets.SimulateStore 1` (act as a phone; buying grants at once), `Happiness.IconSets.Owned <SetId|all> <1|0>`.
+`ComingSoon` (shown locked, never unlocked) is unused. To add an unlockable set, add it to `DA_IconSetUnlocks` (new conditions go in `EIconSetUnlock` /
 `UIconSetSubsystem::IsUnlocked` / the default reason in `GetEntries`). `DA_IconSetUnlocks` is always cooked (Asset
 Manager rule in `DefaultGame.ini`), so the sets it lists ship. Its `SetNames` (by set Id) are the names the icon sets
 screen shows; a set without one shows its Id spaced out.
@@ -123,7 +132,10 @@ still going. With a streak of 8+ days (`EveningMinStreak`) it also schedules an 
 20:00 (`EveningHour`) on the next day not yet solved; solving that day reschedules and drops it. Permission is asked once, after the first daily solve (`bAskedPermission` in GameUserSettings): iOS asks
 itself (alerts and sound, no push); Android 13+ asks for `POST_NOTIFICATIONS` through
 `AndroidThunkJava_Happiness_RequestNotifications` in `Happiness_UPL.xml`, which also declares the permission.
-`bRestoreNotificationsOnReboot` brings Android's back after a restart. On Android the small icon is the
+`bRestoreNotificationsOnReboot` brings Android's back after a restart.
+Tapping one starts or resumes GameActivity without SplashActivity; `Happiness_UPL.xml` keeps Back/Home/Recents hidden
+then: it passes the full-screen settings on at a cold start, and hides the bars again whenever the game's window gets
+focus back (`onWindowFocusChanged`), as the notification shade closes after the engine's own `onResume` hide. On Android the small icon is the
 `ic_notification` drawable if there is one, else the app icon. Test on a phone with `Happiness.Reminder.Test [seconds]`.
 Android and iOS only; it does nothing in the editor.
 
@@ -213,4 +225,4 @@ no rules subject, and Game Basics (VerticalTwo, which teaches the game itself), 
 
 ### Icon Sets catalogue UI
 
-`UI/IconSetsPanel` is a code-built book: a vertical selectable list on the left, a large square icon grid and state button on the right. Row status buttons and the large button enable/disable the set; row backgrounds select the preview. `UIconSetSubsystem::GetEntries` filters hidden sets and supplies achievement locks; `SetEnabled` keeps at least eight enabled. Purchase presentation uses optional `FIconSetEntry::ProductId` and broadcasts `OnPurchaseRequested`; product discovery, checkout and ownership are not implemented by this art pass. No existing entries are converted into paid sets.
+`UI/IconSetsPanel` is a code-built book: a vertical selectable list on the left, a large square icon grid and state button on the right. Row status buttons and the large button enable/disable the set; row backgrounds select the preview. `UIconSetSubsystem::GetEntries` filters hidden sets and supplies achievement locks; `SetEnabled` keeps at least eight enabled. Purchase presentation follows `FIconSetEntry::bForSale` and `UIconSetStoreSubsystem`: localized prices, purchasing/pending states, and `Buy(Entry.Id)`. Store change notifications refresh both the list and the selected preview while preserving selection and scroll position.

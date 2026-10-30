@@ -48,6 +48,10 @@ public:
 
 	bool ShouldDraw(const UClue& C) const;
 
+	/** The hint rules its icon out of the cell (else it places it there): the board and the cell dialog tint it red */
+	UFUNCTION(BlueprintPure)
+	bool IsElimination() const { return !bSetFinalIcon; }
+
 	/** What the hint says to do, for the hint info panel: "So [icon] can't be in column 3" / "So [icon] goes in column 3" */
 	UFUNCTION(BlueprintPure)
 	FClueHelp GetActionHelp() const;

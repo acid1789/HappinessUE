@@ -81,6 +81,13 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Ads")
 	FOnRemoveAdsChanged OnChanged;
 
+	/**
+	 * Full path of a file in the app's private storage (on Android its internal files folder, Context.getFilesDir():
+	 * private to the app, removed with it; iOS: the app's sandbox; elsewhere the project's Saved folder). Purchases
+	 * are kept there (this token, UIconSetStoreSubsystem's file).
+	 */
+	static FString GetPrivateFilePath(const FString& FileName);
+
 	/** Testing: create or delete the token as if bought or refunded */
 	void DebugSetToken(bool bOwned);
 	/** Testing: check the store again now */

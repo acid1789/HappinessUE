@@ -15,19 +15,56 @@ Usage Analytics
 --- Design Tasks ---
 Campaign
 Streak Saver Backing
+Icon Set Backing
 Game Rules
+Pencil Draw Sound
 
 --- Dev tasks ---
-Back/Home/Hamburger still there on daily notification trigger
-Hide Clue Undo
-Cell Dialog Selection
+Hint Cell Dialog
+
 
 --- Art Tasks ---
 Streak Saver Art
 Options Menu Visuals
 Player Info Menu
 Remove Adds Artwork
-Pencil Draw Sound
+
+
+--- Store Product IDs (create in Play Console and App Store Connect) ---
+Remove Ads (non-consumable):	remove_ads
+Streak Savers (consumable):	streak_saver_1, streak_saver_7, streak_saver_30
+Icon Sets (non-consumable):
+	iconset_arcticanimals
+	iconset_bakery
+	iconset_beachday
+	iconset_birds
+	iconset_boardgames
+	iconset_breakfast
+	iconset_campinggear
+	iconset_candy
+	iconset_cheeses
+	iconset_clothing
+	iconset_cozyhome
+	iconset_desert
+	iconset_dinosaurs
+	iconset_farmanimals
+	iconset_fastfood
+	iconset_gardentools
+	iconset_gemstones
+	iconset_halloween
+	iconset_insects
+	iconset_jungleanimals
+	iconset_kitchentools
+	iconset_schoolsupplies
+	iconset_sealife
+	iconset_space
+	iconset_sportsgear
+	iconset_tools
+	iconset_treasure
+	iconset_vegetables
+	iconset_vehicles
+	iconset_weather
+	iconset_winterholidays
 
 
 --- Category Ides ---

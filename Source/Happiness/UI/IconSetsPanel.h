@@ -15,8 +15,6 @@ class UTexture2D;
 class USoundBase;
 class UIconSetsPanel;
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnIconSetPurchaseRequested, const FString&, ProductId);
-
 /** Routes a row's selection or status button to its set. */
 UCLASS()
 class UIconSetCardClick : public UObject
@@ -41,10 +39,6 @@ public:
 	void SelectSet(int32 Index);
 	void ToggleSet(int32 Index);
 
-	/** Store integration supplies products/ownership and handles checkout; the art never grants a purchase. */
-	UPROPERTY(BlueprintAssignable, Category = "Icon Sets")
-	FOnIconSetPurchaseRequested OnPurchaseRequested;
-
 #if WITH_EDITORONLY_DATA
 	UPROPERTY(Transient) int32 PreviewIconSetIndex = -1;
 #endif
@@ -54,6 +48,8 @@ public:
 #endif
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
+	virtual void NativeConstruct() override;
+	virtual void NativeDestruct() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 private:
 	void BuildLayout();
@@ -67,6 +63,8 @@ private:
 	FSlateBrush StateBrush(const FIconSetEntry& Entry) const;
 	FText StateLabel(const FIconSetEntry& Entry) const;
 	void PlaySound(USoundBase* Sound) const;
+	void HandleStoreChanged();
+	void ShowMessage(const FText& Message);
 	UFUNCTION() void HandleCloseClicked();
 
 	UPROPERTY() TObjectPtr<UTexture2D> PanelTexture;
@@ -84,4 +82,6 @@ private:
 	TArray<FIconSetEntry> PreviewEntries;
 	FName SelectedId;
 	float MessageSeconds = 0.f;
+
+	FDelegateHandle StoreChangedHandle;
 };

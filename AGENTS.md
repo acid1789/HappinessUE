@@ -80,6 +80,10 @@ Keep it true: when you learn something that would have saved you time, add it he
   C++, `LoadObject`/`LoadSynchronous` of a path): the cooker can't see it, so it works in the editor and silently
   loads nothing on the phone. Add such assets to `/Game/Happiness/UI/PAL_LoadedByCode` (a PrimaryAssetLabel that
   `DefaultGame.ini` always cooks). Check a cook with `grep -a -c <package path> Saved/Cooked/Android_ASTC/Happiness/AssetRegistry.bin`.
+- **Don't identify runtime-created objects by name** (`GetName().EndsWith(TEXT("_0"))`). The editor numbers them
+  `WBP_Icon_C_0`, `_1`, ... per outer, but cooked builds (phones) use fast unique-name generation with arbitrary
+  large numbers, so such a check works in PIE and never matches on device. Use the widget's place (child index),
+  a property, or its class. Names of designer-placed widgets are stable.
 - Test puzzle logic changes with the headless harness (`Tools/puzzle.sh`) before handing them over.
 - **After a pull that changes `Source/`, rebuild C++ before touching assets** (`Tools/puzzle.sh --build`, editor
   closed). Pulled assets may use C++ classes your editor's DLL doesn't have yet: their Blueprints then fail to load

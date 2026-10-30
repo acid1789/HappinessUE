@@ -9,6 +9,32 @@
 #include "Hint.h"
 #include "Puzzle.generated.h"
 
+class UPanelSlot;
+class UPanelWidget;
+class UWidget;
+
+/** A clue the player hid (UPuzzle::RecordClueHide), so Undo can bring it back where it was */
+USTRUCT()
+struct FClueHide
+{
+	GENERATED_BODY()
+
+	/** The clue's widget (WBP_ClueBase) and the clue panel's list it was in, at Index, in Slot */
+	UPROPERTY()
+	TObjectPtr<UWidget> Widget;
+
+	UPROPERTY()
+	TObjectPtr<UPanelWidget> Panel;
+
+	UPROPERTY()
+	TObjectPtr<UPanelSlot> Slot;
+
+	int32 Index = 0;
+
+	/** The undo list's length (WBP_Happiness.ActionList) when it was hidden: it's undone once the list is back to it */
+	int32 ActionCount = 0;
+};
+
 /** How hard a puzzle is to solve, from UPuzzle::ComputeRating */
 USTRUCT(BlueprintType)
 struct FPuzzleRating
@@ -256,6 +282,17 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void FixPuzzle();
 
+	// Hiding a clue goes in the undo order: WBP_Happiness.HideSelectedClue records the clue's widget before it is
+	// removed, with the undo list's length (ActionList, the board moves); WBP_Happiness.Undo first asks
+	// UndoClueHide, which puts the last hidden clue back where it was if it was hidden after the last board move.
+	UFUNCTION(BlueprintCallable)
+	void RecordClueHide(UWidget* ClueWidget, int32 ActionCount);
+
+	// True if a hidden clue was brought back (then the board move before it stays). Hides recorded after a longer
+	// undo list (since reset) are dropped, and so are clues already back on show (Unhide Clues, a hint).
+	UFUNCTION(BlueprintCallable)
+	bool UndoClueHide(int32 ActionCount);
+
 private:
 	UHint* FindBestHint(const TArray<UClue*>& VisibleClues, UClue*& OutClue);
 
@@ -319,6 +356,10 @@ private:
 	double m_NextStepTime = 0.0;
 	FTSTicker::FDelegateHandle m_CollateralTicker;
 	TWeakObjectPtr<UObject> m_CollateralView;
+
+	// The clues the player hid, the last one last (RecordClueHide)
+	UPROPERTY(Transient)
+	TArray<FClueHide> m_ClueHides;
 
 	void RecordPlayerMove(UObject* View, TFunctionRef<void()> Move);
 	// Still showing steps of the last move: there are steps left and nothing else has changed the board since

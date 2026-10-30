@@ -17,6 +17,13 @@ enum class EIconSetUnlock : uint8
 	CampaignCompleted,
 	/** Every lesson's Master Mode stages are completed */
 	MasterCompleted,
+	/** Not unlockable yet: shown locked ("Coming Soon") until it gets a way to unlock */
+	ComingSoon,
+	/**
+	 * Bought in the store on phones (UIconSetStoreSubsystem), on once bought; on PC unlocked from the start, but off
+	 * until the player turns it on
+	 */
+	Purchase,
 };
 
 USTRUCT()
@@ -67,6 +74,10 @@ struct FIconSetSaveData
 	/** Sets the player turned off (their Ids): new puzzles don't use them */
 	UPROPERTY(SaveGame)
 	TArray<FName> DisabledSets;
+
+	/** Sets that start off (Purchase sets) the player turned on, or bought */
+	UPROPERTY(SaveGame)
+	TArray<FName> EnabledSets;
 };
 
 /** One set on the icon sets screen */
@@ -80,8 +91,8 @@ struct FIconSetEntry
 	bool bEnabled = false;
 	/** Why it is locked (when it is) */
 	FText LockedReason;
-	/** Optional store product, supplied by the purchase integration. Empty for achievement unlocks. */
-	FString ProductId;
+	/** Locked, and can be bought (a Purchase set on a phone): tapping it opens the store */
+	bool bForSale = false;
 };
 
 /**
@@ -127,6 +138,9 @@ public:
 	/** How many unlocked sets are on */
 	int32 GetNumEnabled() const;
 
+	/** The Ids of the sets bought in the store (the Purchase condition) */
+	TArray<FName> GetPurchaseSetIds() const;
+
 	/** Turn an unlocked set on or off (saved). False, and nothing changes, when it would leave too few on. */
 	bool SetEnabled(const UObject* IconSet, bool bEnabled);
 
@@ -147,6 +161,11 @@ private:
 	void Refresh();
 
 	UIconSetUnlocks* GetUnlocks() const;
+	/** The set (by Id) is on: not turned off, or for sets that start off (Purchase), turned on */
+	bool IsSetOn(FName Id) const;
+	bool StartsOff(FName Id) const;
+	/** A set just bought: on */
+	void HandleSetOwned(FName Id);
 	TArray<UObject*> GetSets(const UObject* Collection) const;
 	FText GetSetName(const UObject* IconSet) const;
 

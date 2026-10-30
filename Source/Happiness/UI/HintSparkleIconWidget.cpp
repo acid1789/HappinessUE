@@ -8,6 +8,7 @@
 #include "Components/CanvasPanelSlot.h"
 #include "Components/Image.h"
 #include "Components/NativeWidgetHost.h"
+#include "Components/PanelWidget.h"
 #include "Components/ScrollBox.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/Texture2D.h"
@@ -65,8 +66,11 @@ void UHintSparkleIconWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 	if (IsDesignTime()) return;
+	// The clue's first icon runs its sparkles. Found by its place in the clue, not its name: the clues make their icons
+	// at runtime, and cooked builds (phones) don't number runtime objects' names from _0 as the editor does
 	UUserWidget* Clue = FindClue();
-	if (Clue && GetName().EndsWith(TEXT("_0")) && !ClueTicker.IsValid())
+	const UPanelWidget* Parent = GetParent();
+	if (Clue && Parent && Parent->GetChildIndex(this) == 0 && !ClueTicker.IsValid())
 	{
 		TickedClue = Clue;
 		ClueTicker = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateUObject(this, &UHintSparkleIconWidget::TickClue));
@@ -190,9 +194,16 @@ void UHintSparkleIconWidget::UpdateSparkles(float InDeltaTime, const FGeometry& 
 	StartSparkles();
 	if (SparkleCanvas.IsValid() && !bStreamed)
 	{
-		// The hint has just started: the clue streams in from the hint button now, the board icon from the clue later
+		// The hint has just started: the clue streams in from the hint button now, the board icon from the clue later.
+		// The cell dialog's icon is the board's, up close: its ring is already there
 		bStreamed = true;
 		StreamTime = bWholeClue ? 0.f : -CellStreamDelay;
+		if (!bWholeClue && IsInCellDialog())
+		{
+			StreamTime = StreamSeconds;
+			UpdateSparklePosition(Geometry, bWholeClue);
+			PrefillRing();
+		}
 	}
 	if (bWholeClue && SparkleCanvas.IsValid())
 		ShownClue = this;
@@ -329,7 +340,30 @@ FVector2D UHintSparkleIconWidget::GetOrbitPosition(int32 Index) const
 		+ Normal * (State.NormalOffset * SpriteSize);
 }
 
-void UHintSparkleIconWidget::SpawnSparkle()
+bool UHintSparkleIconWidget::IsInCellDialog() const
+{
+	for (UObject* Outer = GetOuter(); Outer; Outer = Outer->GetOuter())
+	{
+		if (const UUserWidget* ParentWidget = Cast<UUserWidget>(Outer); ParentWidget && ParentWidget->GetClass()->GetName().StartsWith(TEXT("WBP_CellDialog_C")))
+			return true;
+	}
+	return false;
+}
+
+void UHintSparkleIconWidget::PrefillRing()
+{
+	// One spawn each SpawnInterval, each living 2 seconds on average: the ring settles at about this many
+	const int32 Count = FMath::Min(SparkleCount, FMath::RoundToInt(2.f / SpawnInterval));
+	for (int32 Spawn = 0; Spawn < Count; ++Spawn)
+	{
+		const int32 Index = SpawnSparkle();
+		if (Index == INDEX_NONE) break;
+		FOrbitSparkle& State = SparkleStates[Index];
+		State.Age = FMath::FRandRange(0.f, State.Lifetime);
+	}
+}
+
+int32 UHintSparkleIconWidget::SpawnSparkle()
 {
 	for (int32 Index = 0; Index < SparkleStates.Num(); ++Index)
 	{
@@ -358,8 +392,9 @@ void UHintSparkleIconWidget::SpawnSparkle()
 			Component->SetVariableFloat(TEXT("PulseDuration"), State.Lifetime);
 			Component->Activate(true);
 		}
-		return;
+		return Index;
 	}
+	return INDEX_NONE;
 }
 
 void UHintSparkleIconWidget::StartSparkles()
@@ -424,10 +459,23 @@ void UHintSparkleIconWidget::StartSparkles()
 		SparkleHost = NewObject<UNativeWidgetHost>(this);
 		SparkleHost->SetContent(SparkleCanvas.ToSharedRef());
 		SparkleHost->SetVisibility(ESlateVisibility::HitTestInvisible);
+		// Over the board (12), and just over the screen's overlay this icon is in when that is higher: the cell
+		// dialog (20) shows the hinted icon too
+		int32 ZOrder = 12;
+		for (UObject* Outer = this; Outer; Outer = Outer->GetOuter())
+		{
+			const UWidget* Widget = Cast<UWidget>(Outer);
+			const UCanvasPanelSlot* ScreenSlot = Widget ? Cast<UCanvasPanelSlot>(Widget->Slot) : nullptr;
+			if (ScreenSlot && ScreenSlot->Parent == ScreenCanvas)
+			{
+				ZOrder = FMath::Max(ZOrder, ScreenSlot->GetZOrder() + 1);
+				break;
+			}
+		}
 		UCanvasPanelSlot* HostSlot = ScreenCanvas->AddChildToCanvas(SparkleHost);
 		HostSlot->SetAnchors(FAnchors(0.f, 0.f, 1.f, 1.f));
 		HostSlot->SetOffsets(FMargin(0.f));
-		HostSlot->SetZOrder(12);
+		HostSlot->SetZOrder(ZOrder);
 	}
 	else
 	{

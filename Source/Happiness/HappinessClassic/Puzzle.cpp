@@ -1,4 +1,6 @@
 #include "Puzzle.h"
+#include "Components/PanelSlot.h"
+#include "Components/PanelWidget.h"
 #include "Kismet/GameplayStatics.h"
 #include "CampaignTree.h"
 #include "Clue.h"
@@ -1347,6 +1349,85 @@ TArray<FPuzzleRow> UPuzzle::GetShownRows()
 bool UPuzzle::IsCompletedShown()
 {
 	return !IsShowingCollateral() && IsCompleted();
+}
+
+namespace
+{
+	/** The clue a clue widget (WBP_ClueBase) shows */
+	UObject* GetWidgetClue(const UWidget* ClueWidget)
+	{
+		const FObjectPropertyBase* Property = ClueWidget ? FindFProperty<FObjectPropertyBase>(ClueWidget->GetClass(), TEXT("Clue")) : nullptr;
+		return Property ? Property->GetObjectPropertyValue_InContainer(ClueWidget) : nullptr;
+	}
+}
+
+void UPuzzle::RecordClueHide(UWidget* ClueWidget, int32 ActionCount)
+{
+	UPanelWidget* Panel = ClueWidget ? ClueWidget->GetParent() : nullptr;
+	if (!Panel)
+	{
+		return;
+	}
+	FClueHide& Hide = m_ClueHides.AddDefaulted_GetRef();
+	Hide.Widget = ClueWidget;
+	Hide.Panel = Panel;
+	Hide.Slot = ClueWidget->Slot;
+	Hide.Index = Panel->GetChildIndex(ClueWidget);
+	Hide.ActionCount = ActionCount;
+}
+
+bool UPuzzle::UndoClueHide(int32 ActionCount)
+{
+	while (m_ClueHides.Num() > 0)
+	{
+		const FClueHide Hide = m_ClueHides.Last();
+		if (Hide.ActionCount < ActionCount)
+		{
+			// A board move came after it: that's undone first
+			return false;
+		}
+		m_ClueHides.Pop();
+		if (Hide.ActionCount > ActionCount || !Hide.Widget || !Hide.Panel || Hide.Widget->GetParent())
+		{
+			// Recorded before a reset emptied the undo list, or already back
+			continue;
+		}
+		// The clue panel was rebuilt since (Unhide Clues, a hint) if it shows this clue again with a new widget
+		UObject* Clue = GetWidgetClue(Hide.Widget);
+		const bool bShown = Clue && Hide.Panel->GetAllChildren().ContainsByPredicate([Clue](const UWidget* Child)
+		{
+			return GetWidgetClue(Child) == Clue;
+		});
+		if (bShown)
+		{
+			continue;
+		}
+
+		// Back in its place: the clues after it come off and go back on after it (AddChild updates what's on
+		// screen, InsertChildAt doesn't), each in a slot like its own
+		struct FChild
+		{
+			UWidget* Widget;
+			UPanelSlot* Slot;
+		};
+		TArray<FChild> After;
+		for (int32 Index = FMath::Max(Hide.Index, 0); Index < Hide.Panel->GetChildrenCount(); Index++)
+		{
+			UWidget* Child = Hide.Panel->GetChildAt(Index);
+			After.Add({ Child, Child->Slot });
+		}
+		for (const FChild& Child : After)
+		{
+			Child.Widget->RemoveFromParent();
+		}
+		Hide.Panel->AddChild(Hide.Widget, Hide.Slot);
+		for (const FChild& Child : After)
+		{
+			Hide.Panel->AddChild(Child.Widget, Child.Slot);
+		}
+		return true;
+	}
+	return false;
 }
 
 void UPuzzle::BeginDestroy()
