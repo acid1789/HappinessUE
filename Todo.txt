@@ -21,7 +21,6 @@ Pencil Draw Sound
 
 --- Dev tasks ---
 Back/Home/Hamburger still there on daily notification trigger
-Hide Clue Undo
 Hint broken on mobile
 
 

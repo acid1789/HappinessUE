@@ -8,6 +8,7 @@
 #include "Components/CanvasPanelSlot.h"
 #include "Components/Image.h"
 #include "Components/NativeWidgetHost.h"
+#include "Components/PanelWidget.h"
 #include "Components/ScrollBox.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/Texture2D.h"
@@ -65,8 +66,11 @@ void UHintSparkleIconWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 	if (IsDesignTime()) return;
+	// The clue's first icon runs its sparkles. Found by its place in the clue, not its name: the clues make their icons
+	// at runtime, and cooked builds (phones) don't number runtime objects' names from _0 as the editor does
 	UUserWidget* Clue = FindClue();
-	if (Clue && GetName().EndsWith(TEXT("_0")) && !ClueTicker.IsValid())
+	const UPanelWidget* Parent = GetParent();
+	if (Clue && Parent && Parent->GetChildIndex(this) == 0 && !ClueTicker.IsValid())
 	{
 		TickedClue = Clue;
 		ClueTicker = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateUObject(this, &UHintSparkleIconWidget::TickClue));

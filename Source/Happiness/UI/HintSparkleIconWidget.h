@@ -17,7 +17,7 @@ class SCanvas;
 /**
  * Moves Niagara sparkle sprites around the highlighted icon or clue.
  *
- * A clue's sparkles orbit the whole clue and are run by its first icon (_0). Clues sit in their panel's scroll box,
+ * A clue's sparkles orbit the whole clue and are run by its first icon (the first in its box). Clues sit in their panel's scroll box,
  * which stops painting, and so ticking, the clues scrolled out of view: those icons are run by a core ticker instead,
  * which scrolls the clue into view when its hint starts, follows it as the panel scrolls, and hides the sparkles
  * that leave the panel.
