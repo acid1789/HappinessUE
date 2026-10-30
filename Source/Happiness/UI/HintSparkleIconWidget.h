@@ -57,7 +57,12 @@ private:
 	void UpdateSparklePosition(const FGeometry& Geometry, bool bWholeClue);
 	/** Geometry's rectangle in the sparkle canvas */
 	bool ToSparkleSpace(const FGeometry& Geometry, FVector2D& OutTopLeft, FVector2D& OutBottomRight) const;
-	void SpawnSparkle();
+	/** Starts a sparkle; its index, or INDEX_NONE if all are in use */
+	int32 SpawnSparkle();
+	/** An icon of the cell dialog: the dialog is the board's cell up close, so its ring is there from the start */
+	bool IsInCellDialog() const;
+	/** Fill the ring at once, as many sparkles as it settles at, each partway through its life */
+	void PrefillRing();
 	FVector2D GetSparklePosition(int32 Index) const;
 	/** Where Index's sparkle is in the orbit (its center) */
 	FVector2D GetOrbitPosition(int32 Index) const;
