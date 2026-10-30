@@ -80,6 +80,8 @@ struct FIconSetEntry
 	bool bEnabled = false;
 	/** Why it is locked (when it is) */
 	FText LockedReason;
+	/** Optional store product, supplied by the purchase integration. Empty for achievement unlocks. */
+	FString ProductId;
 };
 
 /**

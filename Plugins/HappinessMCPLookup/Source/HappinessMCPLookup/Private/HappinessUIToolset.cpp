@@ -78,7 +78,7 @@ namespace
 	}
 }
 
-FString UHappinessUIToolset::RenderWidget(const FString& WidgetBlueprintPath, int32 Width, int32 Height, const FString& OutputFile, int32 PreviewPuzzleSize, bool bPreviewHint, bool bPreviewPuzzleFailed, bool bPreviewMasterRewards, int32 PreviewRulesSubject)
+FString UHappinessUIToolset::RenderWidget(const FString& WidgetBlueprintPath, int32 Width, int32 Height, const FString& OutputFile, int32 PreviewPuzzleSize, bool bPreviewHint, bool bPreviewPuzzleFailed, bool bPreviewMasterRewards, int32 PreviewRulesSubject, int32 PreviewIconSetIndex)
 {
 	if (!GEditor)
 	{
@@ -133,6 +133,11 @@ FString UHappinessUIToolset::RenderWidget(const FString& WidgetBlueprintPath, in
 
 	// Draw a few frames: the first lays the widget out, later ones can use cached child geometry
 	// (the campaign tree places its connector lines from its nodes' cached geometry)
+	if (PreviewIconSetIndex >= 0)
+	{
+		if (FIntProperty* Preview = FindFProperty<FIntProperty>(Widget->GetClass(), TEXT("PreviewIconSetIndex")))
+			Preview->SetPropertyValue_InContainer(Widget, PreviewIconSetIndex);
+	}
 	TSharedRef<SWidget> SlateWidget = Widget->TakeWidget();
 	if (bPreviewMasterRewards)
 	{

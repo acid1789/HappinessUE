@@ -375,3 +375,5 @@ Private native UPROPERTY defaults cannot be cleared through ObjectTools or Pytho
 If Unreal reports deleting an old unreferenced texture but its file remains, resave that old asset
 with `save_loaded_asset(asset, only_if_is_dirty=False)` before `delete_loaded_asset(asset)`.
 This resolved the legacy 8ball package without raw filesystem edits to a uasset.
+
+- Icon Sets catalogue render: `RenderWidget` accepts `/Script/Happiness.IconSetsPanel` and `previewIconSetIndex` (0 enabled, 1 disabled, 2 purchase, 3 achievement, 5 twelve icons). These are editor-only sample entries, never saved. Render once more after initial asset loading if a sample texture is not ready.
