@@ -93,6 +93,28 @@ void UHintSparkleIconWidget::NativeTick(const FGeometry& MyGeometry, float InDel
 	// A clue's first icon runs from TickClue; its other icons show nothing
 	if (ClueTicker.IsValid() || FindClue()) return;
 	UpdateSparkles(InDeltaTime, MyGeometry, false);
+	KeepHintTint();
+	LastTickFrame = GFrameCounter;
+	if (!BoardWatch.IsValid())
+		BoardWatch = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateUObject(this, &UHintSparkleIconWidget::TickBoardWatch));
+}
+
+void UHintSparkleIconWidget::KeepHintTint()
+{
+	const FStructProperty* ColorProperty = FindFProperty<FStructProperty>(GetClass(), TEXT("IconColor"));
+	if (!ColorProperty || ColorProperty->Struct != TBaseStructure<FLinearColor>::Get()) return;
+	FLinearColor& Color = *ColorProperty->ContainerPtrToValuePtr<FLinearColor>(this);
+	if (!HintTint.IsSet())
+		HintTint = Color;	// as the hint set it
+	else if (!Color.Equals(*HintTint) && Color.Equals(FLinearColor::White))
+		Color = *HintTint;
+}
+
+void UHintSparkleIconWidget::TickHintOver(const FGeometry& Over, float DeltaTime)
+{
+	if (!IsShowingHint() || Over.GetLocalSize().IsNearlyZero()) return;
+	UpdateSparkles(DeltaTime, Over, false);
+	KeepHintTint();
 	LastTickFrame = GFrameCounter;
 	if (!BoardWatch.IsValid())
 		BoardWatch = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateUObject(this, &UHintSparkleIconWidget::TickBoardWatch));
@@ -103,6 +125,8 @@ bool UHintSparkleIconWidget::TickBoardWatch(float DeltaTime)
 	// The sparkles are drawn over the screen, not in the icon: when the icon is no longer painted (e.g. its cell
 	// resolved and collapsed its candidates), nothing else would end them
 	if (SparkleCanvas.IsValid() && GFrameCounter - LastTickFrame <= 2) return true;
+	// Not ticked while hidden: a hint that ended meanwhile streams in again next time
+	if (!IsShowingHint()) bStreamed = false;
 	StopSparkles();
 	BoardWatch.Reset();
 	return false;
@@ -197,6 +221,7 @@ void UHintSparkleIconWidget::UpdateSparkles(float InDeltaTime, const FGeometry& 
 		// The hint has just started: the clue streams in from the hint button now, the board icon from the clue later.
 		// The cell dialog's icon is the board's, up close: its ring is already there
 		bStreamed = true;
+		HintTint.Reset();
 		StreamTime = bWholeClue ? 0.f : -CellStreamDelay;
 		if (!bWholeClue && IsInCellDialog())
 		{

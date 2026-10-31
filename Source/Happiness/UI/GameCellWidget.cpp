@@ -1,5 +1,9 @@
 #include "GameCellWidget.h"
 #include "GamePanelWidget.h"
+#include "HintSparkleIconWidget.h"
+#include "HappinessClassic/PuzzleCell.h"
+#include "HappinessClassic/Puzzle.h"
+#include "Kismet/GameplayStatics.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "Components/CanvasPanel.h"
@@ -91,6 +95,72 @@ void UGameCellWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 		}
 	}
 	UpdateEffects();
+	UpdatePlacedHint(InDeltaTime);
+}
+
+bool UGameCellWidget::IsPlacedElsewhere(int32 Icon) const
+{
+	auto ObjectProperty = [](const UObject* Owner, const TCHAR* Name) -> UObject*
+	{
+		const FObjectPropertyBase* Property = Owner ? FindFProperty<FObjectPropertyBase>(Owner->GetClass(), Name) : nullptr;
+		return Property ? Property->GetObjectPropertyValue_InContainer(Owner) : nullptr;
+	};
+	auto IntProperty = [this](const TCHAR* Name) -> int32
+	{
+		const FIntProperty* Property = FindFProperty<FIntProperty>(GetClass(), Name);
+		return Property ? Property->GetPropertyValue_InContainer(this) : -1;
+	};
+	// The dialog's cell has no ThePuzzle of its own (WBP_CellDialog's Populate): the puzzle screen's (PC_Happiness)
+	const UPuzzle* Puzzle = Cast<UPuzzle>(ObjectProperty(this, TEXT("ThePuzzle")));
+	if (!Puzzle)
+		Puzzle = Cast<UPuzzle>(ObjectProperty(ObjectProperty(UGameplayStatics::GetPlayerController(this, 0), TEXT("HappinessWidget")), TEXT("ThePuzzle")));
+	return Puzzle && Puzzle->IsPlacedElsewhere(IntProperty(TEXT("Row")), IntProperty(TEXT("Column")), Icon);
+}
+
+void UGameCellWidget::UpdatePlacedHint(float DeltaTime)
+{
+	// WBP_Cell: its puzzle cell (PuzzleCell, placed icon m_iFinalIcon), its candidate icons (AllIcons, WBP_Icon) and
+	// the placed image's color (FinalIconColor, bound to Image_FinalIcon)
+	UWidget* FinalIcon = GetWidgetFromName(TEXT("Image_FinalIcon"));
+	const FStructProperty* CellProperty = FindFProperty<FStructProperty>(GetClass(), TEXT("PuzzleCell"));
+	const FArrayProperty* IconsProperty = FindFProperty<FArrayProperty>(GetClass(), TEXT("AllIcons"));
+	const FStructProperty* ColorProperty = FindFProperty<FStructProperty>(GetClass(), TEXT("FinalIconColor"));
+	UHintSparkleIconWidget* Hinted = nullptr;
+	if (FinalIcon && FinalIcon->GetVisibility() != ESlateVisibility::Hidden && FinalIcon->GetVisibility() != ESlateVisibility::Collapsed
+		&& CellProperty && CellProperty->Struct == FPuzzleCell::StaticStruct() && IconsProperty)
+	{
+		const int32 Placed = CellProperty->ContainerPtrToValuePtr<FPuzzleCell>(this)->m_iFinalIcon;
+		FScriptArrayHelper Icons(IconsProperty, IconsProperty->ContainerPtrToValuePtr<void>(this));
+		const FObjectPropertyBase* IconElement = CastField<FObjectPropertyBase>(IconsProperty->Inner);
+		if (IconElement && Icons.IsValidIndex(Placed))
+		{
+			Hinted = Cast<UHintSparkleIconWidget>(IconElement->GetObjectPropertyValue(Icons.GetRawPtr(Placed)));
+			if (Hinted && !Hinted->IsShowingHint())
+				Hinted = nullptr;
+		}
+	}
+	FLinearColor* FinalColor = ColorProperty && ColorProperty->Struct == TBaseStructure<FLinearColor>::Get()
+		? ColorProperty->ContainerPtrToValuePtr<FLinearColor>(this) : nullptr;
+	if (Hinted)
+	{
+		Hinted->TickHintOver(FinalIcon->GetCachedGeometry(), DeltaTime);
+		const FStructProperty* IconColor = FindFProperty<FStructProperty>(Hinted->GetClass(), TEXT("IconColor"));
+		if (FinalColor && IconColor && IconColor->Struct == TBaseStructure<FLinearColor>::Get())
+		{
+			if (!bTintedPlacedIcon)
+			{
+				PlacedIconColor = *FinalColor;
+				bTintedPlacedIcon = true;
+			}
+			*FinalColor = *IconColor->ContainerPtrToValuePtr<FLinearColor>(Hinted);
+		}
+	}
+	else if (bTintedPlacedIcon)
+	{
+		if (FinalColor)
+			*FinalColor = PlacedIconColor;
+		bTintedPlacedIcon = false;
+	}
 }
 
 void UGameCellWidget::NativeDestruct()

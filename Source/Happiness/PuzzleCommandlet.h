@@ -18,6 +18,8 @@ class UPuzzle;
  *                          trace: show + every hint step
  *   -all                   in batch mode, print passing puzzles too
  *   -noauto                disable UPuzzle::AutoSetIcons during the hint solve
+ *   -mistakes              at hint steps 8 and 25, plant a wrong placement and a wrongly ruled out icon: the hint must
+ *                          point at the mistake (UPuzzle::FindErrorHint); reports how many a clue proves, with examples
  *   -out=Path              output file (default <Project>/Saved/PuzzleCLI.txt)
  */
 UCLASS()

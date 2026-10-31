@@ -133,6 +133,100 @@ namespace
 	FString ExplainExamples;
 	int32 NumExplainExamples = 0;
 
+	// -mistakes: partway through each hint solve, a wrong placement and (separately) a correct icon ruled out; the
+	// hint must point at the mistake (UPuzzle::FindErrorHint)
+	bool bCheckMistakes = false;
+	int32 MistakeChecks = 0, MistakesFound = 0, MistakesProved = 0, UnplaceChecks = 0, UnplaceFails = 0;
+	FString MistakeFailures, MistakeExamples;
+	int32 NumMistakeExamples = 0;
+
+	FString HelpString(const FClueHelp& Help);
+
+	void CheckMistakeHints(UPuzzle& P)
+	{
+		const TArray<FPuzzleRow> Board = P.m_Rows;
+		// The first open cell
+		int Row = -1, Col = -1;
+		for (int r = 0; r < P.m_iSize && Row < 0; r++)
+			for (int c = 0; c < P.m_iSize && Row < 0; c++)
+				if (P.m_Rows[r].m_Cells[c].m_iFinalIcon < 0)
+				{
+					Row = r;
+					Col = c;
+				}
+		if (Row < 0)
+			return;
+		const int Sol = P.SolutionIcon(Row, Col);
+		int Wrong = -1;
+		for (int i = 0; i < P.m_iSize && Wrong < 0; i++)
+			if (i != Sol && P.m_Rows[Row].m_Cells[Col].m_bValues[i])
+				Wrong = i;
+
+		for (int Kind = 0; Kind < 2; Kind++)
+		{
+			const bool bPlace = Kind == 0;
+			if (bPlace && Wrong < 0)
+				continue;
+			P.m_Rows = Board;
+			P.m_bHypothetical = true;
+			if (bPlace)
+				P.PlayerSetFinalIcon(Row, Col, Wrong, nullptr);	// a player move, so it can be backed out
+			else
+				P.EliminateIcon(Row, Col, Sol);
+			P.m_bHypothetical = false;
+			MistakeChecks++;
+			const TArray<FPuzzleRow> Mistaken = P.m_Rows;
+			UHint* H = P.GenerateHint(P.m_Clues);
+			const bool bBoardKept = P.m_Rows.Num() == Mistaken.Num();
+			// It must name a real mistake: an icon placed where it doesn't go, or the right icon ruled out
+			const bool bReal = H && H->bError && (H->bSetFinalIcon
+				? P.SolutionIcon(H->Row, H->Col) == H->Icon && !P.m_Rows[H->Row].m_Cells[H->Col].m_bValues[H->Icon]
+				: P.m_Rows[H->Row].m_Cells[H->Col].m_iFinalIcon == H->Icon && P.SolutionIcon(H->Row, H->Col) != H->Icon);
+			if (bReal && bBoardKept)
+			{
+				MistakesFound++;
+				MistakesProved += H->bErrorProvedByClue ? 1 : 0;
+				if (NumMistakeExamples < 12)
+				{
+					MistakeExamples += FString::Printf(TEXT("  %s %s r%dc%d icon=%d | %s | %s\n"), bPlace ? TEXT("placed") : TEXT("ruledout"),
+						H->bErrorProvedByClue ? TEXT("proved") : TEXT("LATER"), H->Row, H->Col, H->Icon, *H->TheClue->ToString(),
+						*HelpString(H->GetExplanation()));
+					NumMistakeExamples++;
+				}
+			}
+			else if (MistakeFailures.Len() < 4000)
+			{
+				MistakeFailures += FString::Printf(TEXT("  %s r%dc%d: %s\n"), bPlace ? TEXT("placed") : TEXT("ruledout"), Row, Col,
+					!H ? TEXT("no hint") : !H->bError ? TEXT("not a mistake hint") : TEXT("points elsewhere"));
+			}
+			if (bPlace)
+			{
+				// Backing the placement out by ruling the icon out of its cell: the icon is possible again in the row's
+				// other open cells (or placed in the only one left), gone from this cell, and the row's other placed
+				// icons stay as they were
+				UnplaceChecks++;
+				P.m_Rows = Mistaken;
+				P.PlayerEliminateIcon(Row, Col, Wrong, nullptr);
+				bool bOk = P.m_Rows[Row].m_Cells[Col].m_iFinalIcon != Wrong && !P.m_Rows[Row].m_Cells[Col].m_bValues[Wrong];
+				for (int c = 0; c < P.m_iSize && bOk; c++)
+				{
+					const FPuzzleCell& Before = Mistaken[Row].m_Cells[c];
+					const FPuzzleCell& After = P.m_Rows[Row].m_Cells[c];
+					if (c != Col)
+						bOk = Before.m_iFinalIcon >= 0 ? After.m_iFinalIcon == Before.m_iFinalIcon
+							: After.m_bValues[Wrong] || After.m_iFinalIcon == Wrong;
+				}
+				if (!bOk)
+				{
+					UnplaceFails++;
+					if (MistakeFailures.Len() < 4000)
+						MistakeFailures += FString::Printf(TEXT("  unplace r%dc%d icon=%d: row not restored\n"), Row, Col, Wrong);
+				}
+			}
+		}
+		P.m_Rows = Board;
+	}
+
 	FString HelpString(const FClueHelp& Help)
 	{
 		FString S;
@@ -156,6 +250,9 @@ namespace
 				Res.Failure = TEXT("step limit");
 				return Res;
 			}
+
+			if (bCheckMistakes && (Res.Steps == 8 || Res.Steps == 25))
+				CheckMistakeHints(P);
 
 			UHint* H = P.GenerateHint(P.m_Clues);
 			if (!H)
@@ -285,6 +382,7 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 	const bool bTrace = Mode == TEXT("trace");
 	// -explain: build every hint's explanation (UHint::GetExplanation) and report how many fell back to the plain action
 	const bool bExplain = FParse::Param(Cmd, TEXT("explain"));
+	bCheckMistakes = FParse::Param(Cmd, TEXT("mistakes"));
 
 	// -dailies=YYYYMMDD:N checks the daily puzzles of N dates from that one, one summary line per date
 	FString Dailies;
@@ -689,6 +787,13 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 		Out += FString::Printf(TEXT("CAMPAIGN lesson=%s failedToRequireLesson=%d lessonClues=%.0f%% lessonHints=%.0f%% lessonCluesPerPuzzle=%.1f\n"),
 			*LessonName, CampaignFails, AllClues ? 100.0 * CluesByLesson[Own] / AllClues : 0.0,
 			AllHints ? 100.0 * HintsByLesson[Own] / AllHints : 0.0, double(CluesByLesson[Own]) / FMath::Max(1, SeedMax - SeedMin + 1));
+	}
+
+	if (bCheckMistakes)
+	{
+		Out += FString::Printf(TEXT("MISTAKES checks=%d found=%d proved=%d unplace=%d unplaceFails=%d\n"), MistakeChecks, MistakesFound,
+			MistakesProved, UnplaceChecks, UnplaceFails);
+		Out += MistakeFailures + MistakeExamples;
 	}
 
 	if (bExplain)

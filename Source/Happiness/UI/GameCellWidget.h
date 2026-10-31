@@ -105,6 +105,13 @@ public:
 	/** Shows the icon PlayFirework hid */
 	void EndFirework();
 
+	/**
+	 * Icon is placed in another cell of this cell's row (WBP_Cell's Row, Column) in the open puzzle (the puzzle
+	 * screen's). WBP_CellDialog's Reset leaves those out, as clearing a cell on the board does.
+	 */
+	UFUNCTION(BlueprintPure, Category = "Puzzle")
+	bool IsPlacedElsewhere(int32 Icon) const;
+
 	/** Z order of the effects' overlay in the screen's root canvas: above the board (0), below the ad banner (5) */
 	UPROPERTY(EditAnywhere, Category = "Pulse")
 	int32 EffectZOrder = 1;
@@ -121,6 +128,13 @@ protected:
 
 	/** Starts the effects for what changed since the last tick */
 	void UpdateEffects();
+	/**
+	 * A hint on the cell's placed icon (a mistake: placed where it doesn't go): its sparkles go around the big image,
+	 * which takes the hinted icon's tint (red), until the hint ends
+	 */
+	void UpdatePlacedHint(float DeltaTime);
+	bool bTintedPlacedIcon = false;
+	FLinearColor PlacedIconColor = FLinearColor::White;
 	/** Plays effect Index (0: the pulse, 1 + n: candidate icon n breaking) over the widget Over, showing Icon */
 	class UNiagaraComponent* PlayEffect(int32 Index, UNiagaraSystem* System, UTexture* Icon, const UWidget& Over);
 	void RemoveEffects();

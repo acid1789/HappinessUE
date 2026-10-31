@@ -293,8 +293,21 @@ public:
 	UFUNCTION(BlueprintCallable)
 	bool UndoClueHide(int32 ActionCount);
 
+	// The placed icon of the cell at Row, Col is being cleared (WBP_Happiness's RestoreIocn and BreakFinalIcon, which
+	// rebuild that cell's own candidates): it becomes possible again in every other open cell of the row. Placed
+	// cells are left alone.
+	UFUNCTION(BlueprintCallable)
+	void ClearPlacement(int Row, int Col);
+
+	// Icon is placed in another cell of the row (WBP_CellDialog's Reset leaves those out, as clearing a cell does)
+	UFUNCTION(BlueprintPure)
+	bool IsPlacedElsewhere(int Row, int Col, int Icon) const;
+
 private:
 	UHint* FindBestHint(const TArray<UClue*>& VisibleClues, UClue*& OutClue);
+	// With mistakes on the board (an icon placed where it doesn't go, or ruled out where it does), the hint points at
+	// one: the clue that shows it's wrong and why (UHint::bError). Null when the board has none.
+	UHint* FindErrorHint(const TArray<UClue*>& VisibleClues, UClue*& OutClue);
 
 
 
@@ -360,6 +373,11 @@ private:
 	// The clues the player hid, the last one last (RecordClueHide)
 	UPROPERTY(Transient)
 	TArray<FClueHide> m_ClueHides;
+
+	// A player ruling out a cell's placed icon: the placement is cleared first (ClearPlacement, and the cell's
+	// candidates every icon not placed elsewhere in the row, as BreakFinalIcon), so the icon can then be ruled out
+	// like any other
+	void UnplaceIcon(int Row, int Col);
 
 	void RecordPlayerMove(UObject* View, TFunctionRef<void()> Move);
 	// Still showing steps of the last move: there are steps left and nothing else has changed the board since

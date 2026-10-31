@@ -67,7 +67,19 @@ takes no taps.
 
 - `Puzzle.*`: generation, solving, rating (`ComputeRating`/`GetRating`), hint selection (`GenerateHint`).
 - `Clue.*`: every clue type, its analysis and its help text.
-- `Hint.*`: one hint (`UHint`): the action and its plain-English explanation (`GetExplanation`). Rule from the
+- `Hint.*`: one hint (`UHint`): the action and its plain-English explanation (`GetExplanation`). With mistakes on the board (an icon placed
+  where it doesn't go, or the right icon ruled out) a hint points at one instead (`UPuzzle::FindErrorHint`,
+  `UHint::bError`): its reasons come from the board with the mistakes corrected (`FixPuzzle` on a copy): a clue that
+  shows it straight away (its own explanation), else one that would leave an icon nowhere to go were the mistake
+  right, else the clue that settles that cell later ("No clue puts it there yet"). Wrong placements first. The cell's
+  placed image then gets the hint's sparkles and red tint (`UGameCellWidget::UpdatePlacedHint`); once it's cleared, the
+  hint goes on as the elimination. Clearing a placed icon (dialog Reset All, a middle click: `RestoreIocn` /
+  `BreakFinalIcon`, which call `UPuzzle::ClearPlacement`) makes the icon possible again in the row's other open cells
+  (placed cells are left alone: the analyzers expect a placed cell's candidates to be only its icon, and a cleared
+  cell's candidates are rebuilt from the row anyway). The cell dialog's Reset brings back only the icons not placed
+  elsewhere in the row (`UGameCellWidget::IsPlacedElsewhere`, the puzzle screen's `UPuzzle::IsPlacedElsewhere`): committing an icon placed elsewhere restores it here, which
+  breaks that other placement (`RestoreIocn`). Ruling a placed icon out (right click)
+  clears the placement first (`UnplaceIcon`), so the icon can't be left with nowhere to go. Test: `Tools/puzzle.sh -mistakes`. Rule from the
   user: a hint is **one action** that follows directly from the clue and the current board, explained as
   "reason, then result".
 - `CampaignTree.*`, `CampaignProgress.*`, `FreePlaySettings.*`, `HappinessSaveGame.*`: modes and progress.

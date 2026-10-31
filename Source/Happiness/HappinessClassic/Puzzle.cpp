@@ -632,6 +632,11 @@ void UPuzzle::EliminateIconWithClue(UClue* TheClue, int Row, int Col, int Icon)
 
 	auto& Cell = m_Rows[Row].m_Cells[Col];
 
+	if (Cell.m_iFinalIcon == Icon && m_bRecordingCollateral && !m_bHypothetical)
+	{
+		UnplaceIcon(Row, Col);
+	}
+
 	if (Cell.m_iFinalIcon == Icon)
 	{
 		if (!m_bHypothetical)
@@ -733,6 +738,10 @@ UClue* UPuzzle::GetHintClue(const TArray<UClue*>& VisibleClues)
 
 UHint* UPuzzle::FindBestHint(const TArray<UClue*>& VisibleClues, UClue*& OutClue)
 {
+	// Mistakes come first: a hint from a wrong board would only lead further astray
+	if (UHint* ErrorHint = FindErrorHint(VisibleClues, OutClue))
+		return ErrorHint;
+
 	// Every clue that can do something now, hidden or not, ranked: a placement first, then the clue that works out
 	// the most (candidates removed when applied fully), then one on screen, then the easier clue type
 	UHint* Best = nullptr;
@@ -775,6 +784,229 @@ UHint* UPuzzle::FindBestHint(const TArray<UClue*>& VisibleClues, UClue*& OutClue
 
 	OutClue = BestClue;
 	return Best;
+}
+
+UHint* UPuzzle::FindErrorHint(const TArray<UClue*>& VisibleClues, UClue*& OutClue)
+{
+	struct FMistake
+	{
+		int Row;
+		int Col;
+		int Icon;
+		bool bPlaced;	// Icon placed in this cell where it doesn't go; else Icon, which goes here, ruled out of it
+	};
+	TArray<FMistake> Mistakes;
+	for (int Row = 0; Row < m_Rows.Num(); Row++)
+	{
+		for (int Col = 0; Col < m_Rows[Row].m_Cells.Num(); Col++)
+		{
+			const FPuzzleCell& Cell = m_Rows[Row].m_Cells[Col];
+			const int Solution = SolutionIcon(Row, Col);
+			if (Cell.m_iFinalIcon >= 0 && Cell.m_iFinalIcon != Solution)
+				Mistakes.Add({ Row, Col, Cell.m_iFinalIcon, true });
+			else if (Cell.m_iFinalIcon < 0 && !Cell.m_bValues[Solution])
+				Mistakes.Add({ Row, Col, Solution, false });
+		}
+	}
+	if (Mistakes.Num() == 0)
+		return nullptr;
+
+	// The reasons come from the board as it would be without any mistakes: what the player got right
+	const TArray<FPuzzleRow> Board = m_Rows;
+	FixPuzzle();
+	const TArray<FPuzzleRow> Corrected = m_Rows;
+
+	// The board (after a clue's analysis) shows the mistake for what it is: the placed icon ruled out of the cell, or
+	// the ruled out icon placed in it
+	auto Shows = [this](const FMistake& Mistake)
+	{
+		const FPuzzleCell& Cell = m_Rows[Mistake.Row].m_Cells[Mistake.Col];
+		return Mistake.bPlaced ? !Cell.m_bValues[Mistake.Icon]
+			: Cell.m_iFinalIcon == Mistake.Icon || Cell.GetRemainingIcon() == Mistake.Icon;
+	};
+	// Applies the clue to the board as it is; true if it worked anything out
+	auto Apply = [this](UClue& Clue)
+	{
+		const int UseCount = Clue.m_iUseCount;
+		Clue.Analyze(*this);
+		const bool bProgress = Clue.m_iUseCount > UseCount;
+		Clue.m_iUseCount = UseCount;
+		return bProgress;
+	};
+	TArray<UClue*> AllClues = m_VeritcalClues;
+	AllClues.Append(m_HorizontalClues);
+	AllClues.RemoveAll([](const UClue* Clue) { return Clue == nullptr; });
+	// The clues on screen first
+	AllClues.StableSort([&VisibleClues](const UClue& A, const UClue& B) { return VisibleClues.Contains(&A) && !VisibleClues.Contains(&B); });
+
+	// A clue that shows one of the mistakes straight from that board: a wrong placement before a wrong ruling out,
+	// then a clue on screen, then the easier clue type
+	int BestMistake = INDEX_NONE;
+	UClue* BestClue = nullptr;
+	for (int Index = 0; Index < Mistakes.Num(); Index++)
+	{
+		for (UClue* Clue : AllClues)
+		{
+			m_Rows = Corrected;
+			if (!Apply(*Clue) || !Shows(Mistakes[Index]))
+				continue;
+			const bool bBetter = BestMistake == INDEX_NONE
+				|| (Mistakes[Index].bPlaced && !Mistakes[BestMistake].bPlaced)
+				|| (Mistakes[Index].bPlaced == Mistakes[BestMistake].bPlaced
+					&& (VisibleClues.Contains(Clue) != VisibleClues.Contains(BestClue) ? VisibleClues.Contains(Clue)
+						: GetClueRatingWeight(Clue->GetCampaignLesson()) < GetClueRatingWeight(BestClue->GetCampaignLesson())));
+			if (bBetter)
+			{
+				BestMistake = Index;
+				BestClue = Clue;
+			}
+		}
+	}
+
+	// Else a clue that, were the mistake right, leaves something with nowhere to go: an icon with no column in its
+	// row, or a cell with no icon
+	FClueHelp ContradictionReason;
+	bool bByContradiction = false;
+	if (!BestClue)
+	{
+		struct FDeadEnd
+		{
+			bool bFound = false;
+			int Row = 0;
+			int Icon = -1;	// an icon with no column left; -1: the cell at Col has no icon left
+			int Col = 0;
+		};
+		auto FindDeadEnd = [this]()
+		{
+			FDeadEnd Dead;
+			for (int Row = 0; Row < m_Rows.Num() && !Dead.bFound; Row++)
+			{
+				for (int Icon = 0; Icon < m_iSize && !Dead.bFound; Icon++)
+				{
+					bool bSomewhere = false;
+					for (int Col = 0; Col < m_iSize && !bSomewhere; Col++)
+						bSomewhere = m_Rows[Row].m_Cells[Col].m_bValues[Icon];
+					if (!bSomewhere)
+						Dead = { true, Row, Icon, 0 };
+				}
+				for (int Col = 0; Col < m_iSize && !Dead.bFound; Col++)
+				{
+					if (!m_Rows[Row].m_Cells[Col].m_bValues.Contains(true))
+						Dead = { true, Row, -1, Col };
+				}
+			}
+			return Dead;
+		};
+		TGuardValue<bool> Hypothetical(m_bHypothetical, true);
+		FDeadEnd BestDead;
+		for (int Index = 0; Index < Mistakes.Num(); Index++)
+		{
+			const FMistake& Mistake = Mistakes[Index];
+			m_Rows = Corrected;
+			// The mistake alone, before any clue
+			if (Mistake.bPlaced)
+				SetFinalIcon(Mistake.Row, Mistake.Col, Mistake.Icon);
+			else
+				EliminateIcon(Mistake.Row, Mistake.Col, Mistake.Icon);
+			if (FindDeadEnd().bFound)
+				continue;
+			const TArray<FPuzzleRow> Assumed = m_Rows;
+			for (UClue* Clue : AllClues)
+			{
+				m_Rows = Assumed;
+				Apply(*Clue);
+				const FDeadEnd Dead = FindDeadEnd();
+				if (!Dead.bFound)
+					continue;
+				const bool bBetter = BestMistake == INDEX_NONE
+					|| (Mistake.bPlaced && !Mistakes[BestMistake].bPlaced)
+					|| (Mistake.bPlaced == Mistakes[BestMistake].bPlaced
+						&& (VisibleClues.Contains(Clue) != VisibleClues.Contains(BestClue) ? VisibleClues.Contains(Clue)
+							: GetClueRatingWeight(Clue->GetCampaignLesson()) < GetClueRatingWeight(BestClue->GetCampaignLesson())));
+				if (bBetter)
+				{
+					BestMistake = Index;
+					BestClue = Clue;
+					BestDead = Dead;
+				}
+			}
+		}
+		if (BestClue)
+		{
+			// "If [X] were in this cell, this clue would leave [Y] nowhere to go." / "... no icon for column 3 of [Y]'s row."
+			bByContradiction = true;
+			const FMistake& Mistake = Mistakes[BestMistake];
+			ContradictionReason.AddText(Mistake.bPlaced ? TEXT("If") : TEXT("Without"));
+			ContradictionReason.AddIcon(Mistake.Row, Mistake.Icon);
+			ContradictionReason.AddText(Mistake.bPlaced ? TEXT("were in this cell, this clue would leave") : TEXT("in this cell, this clue would leave"));
+			if (BestDead.Icon >= 0)
+			{
+				ContradictionReason.AddIcon(BestDead.Row, BestDead.Icon);
+				ContradictionReason.AddText(TEXT("nowhere to go."));
+			}
+			else
+			{
+				ContradictionReason.AddText(FString::Printf(TEXT("nothing at all for column %d of that row."), BestDead.Col + 1));
+			}
+		}
+	}
+
+	bool bProvedByClue = BestClue != nullptr;
+	if (!BestClue)
+	{
+		// No single clue shows any of them yet: point at the first, with the clue that settles its cell when the
+		// puzzle is worked through from that board
+		BestMistake = 0;
+		m_Rows = Corrected;
+		for (int Step = 0; Step < 1000 && !BestClue; Step++)
+		{
+			bool bProgress = false;
+			for (UClue* Clue : AllClues)
+			{
+				SetMarker();
+				if (!Apply(*Clue))
+				{
+					RestoreMarker();
+					continue;
+				}
+				bProgress = true;
+				if (Shows(Mistakes[BestMistake]))
+					BestClue = Clue;
+				break;
+			}
+			if (!bProgress)
+				break;
+		}
+		// Or, failing that, a clue with an icon from its row
+		for (int Index = 0; Index < AllClues.Num() && !BestClue; Index++)
+		{
+			TArray<int> Rows;
+			AllClues[Index]->GetRows(Rows);
+			if (Rows.Contains(Mistakes[BestMistake].Row))
+				BestClue = AllClues[Index];
+		}
+		if (!BestClue && AllClues.Num() > 0)
+			BestClue = AllClues[0];
+	}
+	if (!BestClue)
+	{
+		m_Rows = Board;
+		return nullptr;
+	}
+
+	// The hint, made on the corrected board, aimed at the mistake's cell
+	m_Rows = Corrected;
+	const FMistake& Mistake = Mistakes[BestMistake];
+	UHint* Hint = NewObject<UHint>(this);
+	Hint->Init(*this, *BestClue);
+	Hint->TheClue = BestClue;
+	Hint->Row = Mistake.Row;
+	Hint->Col = Mistake.Col;
+	Hint->Icon = Mistake.Icon;
+	Hint->MakeError(Mistake.bPlaced, bProvedByClue, bByContradiction ? &ContradictionReason : nullptr);
+	m_Rows = Board;
+	OutClue = BestClue;
+	return Hint;
 }
 
 void UPuzzle::BuildClueLists()
@@ -1359,6 +1591,47 @@ namespace
 		const FObjectPropertyBase* Property = ClueWidget ? FindFProperty<FObjectPropertyBase>(ClueWidget->GetClass(), TEXT("Clue")) : nullptr;
 		return Property ? Property->GetObjectPropertyValue_InContainer(ClueWidget) : nullptr;
 	}
+}
+
+void UPuzzle::ClearPlacement(int Row, int Col)
+{
+	if (!m_Rows.IsValidIndex(Row) || !m_Rows[Row].m_Cells.IsValidIndex(Col))
+		return;
+	const int Placed = m_Rows[Row].m_Cells[Col].m_iFinalIcon;
+	if (Placed < 0)
+		return;
+	// Only the open cells: a placed cell's candidates are just its icon (the analyzers rely on it), and are rebuilt
+	// from the row if it's cleared itself
+	for (int Other = 0; Other < m_Rows[Row].m_Cells.Num(); Other++)
+	{
+		if (Other != Col && m_Rows[Row].m_Cells[Other].m_iFinalIcon < 0)
+			m_Rows[Row].m_Cells[Other].m_bValues[Placed] = true;
+	}
+}
+
+bool UPuzzle::IsPlacedElsewhere(int Row, int Col, int Icon) const
+{
+	if (!m_Rows.IsValidIndex(Row) || Icon < 0)
+		return false;
+	for (int Other = 0; Other < m_Rows[Row].m_Cells.Num(); Other++)
+	{
+		if (Other != Col && m_Rows[Row].m_Cells[Other].m_iFinalIcon == Icon)
+			return true;
+	}
+	return false;
+}
+
+void UPuzzle::UnplaceIcon(int Row, int Col)
+{
+	FPuzzleCell& Cell = m_Rows[Row].m_Cells[Col];
+	// Every icon not placed elsewhere in the row
+	TArray<bool> Candidates;
+	Candidates.Init(true, Cell.m_bValues.Num());
+	for (int Icon = 0; Icon < Candidates.Num(); Icon++)
+		Candidates[Icon] = !IsPlacedElsewhere(Row, Col, Icon);
+	ClearPlacement(Row, Col);
+	Cell.m_iFinalIcon = -1;
+	Cell.m_bValues = Candidates;
 }
 
 void UPuzzle::RecordClueHide(UWidget* ClueWidget, int32 ActionCount)

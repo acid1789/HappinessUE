@@ -802,8 +802,43 @@ bool UHint::ExplainPlacementByRow(FClueHelp& Help)
 	return true;
 }
 
+void UHint::MakeError(bool bPlaced, bool bProvedByClue, const FClueHelp* GivenReason)
+{
+	// The reason given, or the clue's own, on the board as it would be without the mistakes (the board now): for a
+	// wrong placement why Icon can't be in this cell, for a wrongly ruled out icon why it goes here
+	bSetFinalIcon = !bPlaced;
+	const FClueHelp Reason = GivenReason ? *GivenReason : bProvedByClue ? GetExplanation() : FClueHelp();
+
+	FClueHelp Help;
+	Help.AddText(TEXT("That's a mistake: "));
+	Help.AddIcon(Row, Icon);
+	Help.AddText(bPlaced ? TEXT(" doesn't go in this cell.") : TEXT(" was ruled out of this cell, but it goes here."));
+	if (Reason.Segments.Num() == 0)
+	{
+		// No clue shows it from the board yet: the player had nothing to go on
+		Help.AddText(bPlaced ? TEXT(" No clue puts it there yet.") : TEXT(" No clue rules it out yet."));
+	}
+	else
+	{
+		Help.AddText(TEXT(" "));
+		Help.Segments.Append(Reason.Segments);
+		// Explanations mostly end with their own full stop, but not all
+		const FClueHelpSegment& Last = Reason.Segments.Last();
+		if (Last.Type != EClueHelpSegementType::Text || !Last.Text.TrimEnd().EndsWith(TEXT(".")))
+			Help.AddText(TEXT("."));
+	}
+	Help.AddText(bPlaced ? TEXT(" Take ") : TEXT(" Bring "));
+	Help.AddIcon(Row, Icon);
+	Help.AddText(bPlaced ? TEXT(" out of this cell.") : TEXT(" back into this cell."));
+	ErrorExplanation = Help;
+	bError = true;
+	bErrorProvedByClue = bProvedByClue;
+}
+
 FClueHelp UHint::GetExplanation()
 {
+	if (bError)
+		return ErrorExplanation;
 	bIndirectPlacement = false;
 	UPuzzle* P = GetTypedOuter<UPuzzle>();
 	if (!P || !TheClue)
@@ -1638,6 +1673,12 @@ FClueHelp UHint::GetExplanation()
 bool UHint::ShouldHide(UPuzzle& P) const
 {
 	const auto& Cell = P.m_Rows[Row].m_Cells[Col];
+
+	if (bError && bSetFinalIcon)
+	{
+		// A wrongly ruled out icon: done once it's back
+		return Cell.m_bValues[Icon];
+	}
 
 	if ((Cell.m_iFinalIcon == Icon && bSetFinalIcon) ||
 		(!Cell.m_bValues[Icon] && !bSetFinalIcon))

@@ -32,6 +32,19 @@ public:
 	UPROPERTY(BlueprintReadOnly)
 	int Impact = 0;
 
+	/**
+	 * A mistake on the board (UPuzzle::FindErrorHint): Icon was placed in the cell at Row, Col where it doesn't go
+	 * (shown as an elimination: take it out), or, with bSetFinalIcon, ruled out of the cell it goes in (bring it back).
+	 * TheClue shows why; GetExplanation says so and how to fix it.
+	 */
+	UPROPERTY(BlueprintReadOnly)
+	bool bError = false;
+
+	/** A mistake's explanation, made with the board as it would be without the mistakes */
+	FClueHelp ErrorExplanation;
+	/** The mistake's clue shows it straight from that board (else it's the clue that settles the cell later on) */
+	bool bErrorProvedByClue = false;
+
 
 	UHint() = default;
 
@@ -64,6 +77,9 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable)
 	FClueHelp GetExplanation();
+
+	/** Turn this hint (Init with its clue, and aimed at the mistake's cell) into the mistake's, on the corrected board */
+	void MakeError(bool bPlaced, bool bProvedByClue, const FClueHelp* Reason = nullptr);
 
 private:
 	/**

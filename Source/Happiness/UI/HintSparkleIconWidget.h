@@ -34,6 +34,15 @@ class HAPPINESS_API UHintSparkleIconWidget : public UUserWidget
 public:
 	UHintSparkleIconWidget(const FObjectInitializer& ObjectInitializer);
 
+	/** WBP_Icon's ShowingHint: the hint points at this icon */
+	bool IsShowingHint() const;
+
+	/**
+	 * A board icon that is its cell's placed icon, hinted (a mistake hint: placed where it doesn't go): the cell shows
+	 * its big image, not this icon, so the cell (UGameCellWidget) runs the sparkles around that image (Over) each tick
+	 */
+	void TickHintOver(const FGeometry& Over, float DeltaTime);
+
 protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
@@ -41,8 +50,14 @@ protected:
 	virtual void BeginDestroy() override;
 
 private:
-	bool IsShowingHint() const;
 	void HideOldOutline();
+	/**
+	 * Keep the hint's tint (WBP_Icon's IconColor, red for an elimination) while the hint lasts: the cell's refresh
+	 * (ApplyPuzzleCell, WBP_Icon's SetVisible) turns it white, e.g. when a wrongly placed icon is cleared and the small
+	 * icons come back. Taken when the hint starts.
+	 */
+	void KeepHintTint();
+	TOptional<FLinearColor> HintTint;
 	/** The clue this icon is in (none for a board icon) */
 	UUserWidget* FindClue() const;
 	/** A clue's first icon, each frame: runs its clue's sparkles */

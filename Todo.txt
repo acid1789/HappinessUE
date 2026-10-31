@@ -20,14 +20,13 @@ Game Rules
 Pencil Draw Sound
 
 --- Dev tasks ---
-Hint Cell Dialog
-
+Not Same Column
+Save Undo History
 
 --- Art Tasks ---
 Streak Saver Art
 Options Menu Visuals
-Player Info Menu
-Remove Adds Artwork
+Remove Ads Artwork
 
 
 --- Store Product IDs (create in Play Console and App Store Connect) ---
