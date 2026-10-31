@@ -7,6 +7,8 @@
 #include "Components/GridPanel.h"
 #include "Components/HorizontalBox.h"
 #include "Components/Image.h"
+#include "Components/Button.h"
+#include "Components/TextBlock.h"
 #include "Editor.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "ImageUtils.h"
@@ -78,7 +80,7 @@ namespace
 	}
 }
 
-FString UHappinessUIToolset::RenderWidget(const FString& WidgetBlueprintPath, int32 Width, int32 Height, const FString& OutputFile, int32 PreviewPuzzleSize, bool bPreviewHint, bool bPreviewPuzzleFailed, bool bPreviewMasterRewards, int32 PreviewRulesSubject, int32 PreviewIconSetIndex)
+FString UHappinessUIToolset::RenderWidget(const FString& WidgetBlueprintPath, int32 Width, int32 Height, const FString& OutputFile, int32 PreviewPuzzleSize, bool bPreviewHint, bool bPreviewPuzzleFailed, bool bPreviewMasterRewards, int32 PreviewRulesSubject, int32 PreviewIconSetIndex, bool bPreviewRemoveAds)
 {
 	if (!GEditor)
 	{
@@ -139,6 +141,19 @@ FString UHappinessUIToolset::RenderWidget(const FString& WidgetBlueprintPath, in
 			Preview->SetPropertyValue_InContainer(Widget, PreviewIconSetIndex);
 	}
 	TSharedRef<SWidget> SlateWidget = Widget->TakeWidget();
+	if (bPreviewRemoveAds)
+	{
+		if (UWidget* Dialog = Widget->GetWidgetFromName(TEXT("AdsPurchaseDialog")))
+			Dialog->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+		// Preview only: show the normal purchase face even though the editor has no phone store.
+		if (UUserWidget* Controls = Cast<UUserWidget>(Widget->GetWidgetFromName(TEXT("PurchaseControls"))))
+		{
+			if (UButton* Buy = Cast<UButton>(Controls->GetWidgetFromName(TEXT("BuyButton")))) Buy->SetIsEnabled(true);
+			if (const FObjectProperty* Status = FindFProperty<FObjectProperty>(Controls->GetClass(), TEXT("PurchaseStatus")))
+				if (UTextBlock* Label = Cast<UTextBlock>(Status->GetObjectPropertyValue_InContainer(Controls)))
+					Label->SetText(FText::FromString(TEXT("One-time purchase")));
+		}
+	}
 	if (bPreviewMasterRewards)
 	{
 		// Code-built Player Info has twelve live reward images directly in its widget tree.
