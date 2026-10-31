@@ -2,101 +2,85 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "HappinessClassic/IconSets.h"
 #include "IconSetsPanel.generated.h"
 
 class UButton;
 class UCanvasPanel;
 class UFont;
-class UHorizontalBox;
+class UVerticalBox;
 class UScrollBox;
 class UTextBlock;
 class UTexture2D;
 class USoundBase;
 class UIconSetsPanel;
-struct FIconSetEntry;
 
-/** Routes one card's click to the panel (UButton::OnClicked has no parameters) */
+/** Routes a row's selection or status button to its set. */
 UCLASS()
 class UIconSetCardClick : public UObject
 {
 	GENERATED_BODY()
-
 public:
 	TWeakObjectPtr<UIconSetsPanel> Panel;
 	int32 Index = INDEX_NONE;
-
-	UFUNCTION()
-	void HandleClicked();
+	bool bAction = false;
+	UFUNCTION() void HandleClicked();
 };
 
-/**
- * The icon sets screen, opened from the player info's Icon Sets button (over the whole menu). A left/right scrolling
- * row of cards, one per icon set the player knows of (UIconSetSubsystem::GetEntries: hidden locked sets are left
- * out): its name, its icons, and whether it is on. Tapping an unlocked set turns it on or off, down to
- * UIconSetSubsystem::MinEnabledSets; a locked one shows what unlocks it. Built in code, in the pause menu's garden style.
- */
+/** A scrolling collection list and a large preview. Hidden locked sets come filtered by the subsystem. */
 UCLASS()
 class HAPPINESS_API UIconSetsPanel : public UUserWidget
 {
 	GENERATED_BODY()
-
 public:
 	UIconSetsPanel(const FObjectInitializer& ObjectInitializer);
-
-	/** Reads the sets again and shows the panel */
 	void Show();
-
 	void Hide();
-
-	/** Called when a card is tapped */
+	void SelectSet(int32 Index);
 	void ToggleSet(int32 Index);
 
+#if WITH_EDITORONLY_DATA
+	UPROPERTY(Transient) int32 PreviewIconSetIndex = -1;
+#endif
+#if WITH_EDITOR
+	/** Render-only sample states; never writes player progress or set choices. */
+	void PreviewCatalogue(int32 Index);
+#endif
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
-
 private:
 	void BuildLayout();
-	/** Remake the cards and the count line from the sets */
 	void Refresh();
+	void UpdateDetail();
 	void UpdateStatus();
-	UWidget* MakeCard(int32 Index, const FIconSetEntry& Entry);
-	void ScrollBy(int32 Cards);
+	TArray<FIconSetEntry> GetEntries() const;
+	UWidget* MakeRow(int32 Index, const FIconSetEntry& Entry);
+	UButton* MakeStateButton(UCanvasPanel* Canvas, const FIconSetEntry& Entry, int32 Index,
+		FVector2D Position, FVector2D Extent, int32 FontSize);
+	FSlateBrush StateBrush(const FIconSetEntry& Entry) const;
+	FText StateLabel(const FIconSetEntry& Entry) const;
 	void PlaySound(USoundBase* Sound) const;
-	/** A purchase started or ended, or prices came in: the cards again, while showing */
 	void HandleStoreChanged();
-	/** Show a message on the count line for a while, in the warning color */
 	void ShowMessage(const FText& Message);
-
-	UFUNCTION()
-	void HandleCloseClicked();
-
-	UFUNCTION()
-	void HandleLeftClicked();
-
-	UFUNCTION()
-	void HandleRightClicked();
+	UFUNCTION() void HandleCloseClicked();
 
 	UPROPERTY() TObjectPtr<UTexture2D> PanelTexture;
 	UPROPERTY() TObjectPtr<UTexture2D> ButtonTexture;
 	UPROPERTY() TObjectPtr<UFont> PanelFont;
 	UPROPERTY() TObjectPtr<USoundBase> AcceptSound;
 	UPROPERTY() TObjectPtr<USoundBase> CancelSound;
-
 	UPROPERTY(Transient) TObjectPtr<UScrollBox> Scroll;
-	UPROPERTY(Transient) TObjectPtr<UHorizontalBox> CardRow;
+	UPROPERTY(Transient) TObjectPtr<UVerticalBox> CardRows;
+	UPROPERTY(Transient) TObjectPtr<UCanvasPanel> Detail;
 	UPROPERTY(Transient) TObjectPtr<UTextBlock> StatusText;
-	UPROPERTY(Transient) TObjectPtr<UButton> LeftButton;
-	UPROPERTY(Transient) TObjectPtr<UButton> RightButton;
-	UPROPERTY(Transient) TArray<TObjectPtr<UWidget>> Cards;
 	UPROPERTY(Transient) TArray<TObjectPtr<UIconSetCardClick>> CardClicks;
-
-	/** The sets on the cards, in order (UIconSetSubsystem::GetEntries) */
+	UPROPERTY(Transient) TArray<TObjectPtr<UIconSetCardClick>> DetailClicks;
 	UPROPERTY(Transient) TArray<TObjectPtr<UObject>> CardSets;
-
-	/** While above zero, the count line shows why a set couldn't be turned off (or what unlocks one) */
+	TArray<FIconSetEntry> PreviewEntries;
+	FName SelectedId;
 	float MessageSeconds = 0.f;
 
 	FDelegateHandle StoreChangedHandle;

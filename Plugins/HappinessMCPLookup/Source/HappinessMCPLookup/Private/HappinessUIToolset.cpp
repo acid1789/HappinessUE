@@ -78,7 +78,7 @@ namespace
 	}
 }
 
-FString UHappinessUIToolset::RenderWidget(const FString& WidgetBlueprintPath, int32 Width, int32 Height, const FString& OutputFile, int32 PreviewPuzzleSize, bool bPreviewHint, bool bPreviewPuzzleFailed, bool bPreviewMasterRewards, int32 PreviewRulesSubject)
+FString UHappinessUIToolset::RenderWidget(const FString& WidgetBlueprintPath, int32 Width, int32 Height, const FString& OutputFile, int32 PreviewPuzzleSize, bool bPreviewHint, bool bPreviewPuzzleFailed, bool bPreviewMasterRewards, int32 PreviewRulesSubject, int32 PreviewIconSetIndex)
 {
 	if (!GEditor)
 	{
@@ -97,7 +97,8 @@ FString UHappinessUIToolset::RenderWidget(const FString& WidgetBlueprintPath, in
 		PackagePath.LeftInline(Dot);
 	}
 	const FString AssetName = FPaths::GetBaseFilename(PackagePath);
-	const FString ClassPath = FString::Printf(TEXT("%s.%s_C"), *PackagePath, *AssetName);
+	const FString ClassPath = WidgetBlueprintPath.StartsWith(TEXT("/Script/"))
+		? WidgetBlueprintPath : FString::Printf(TEXT("%s.%s_C"), *PackagePath, *AssetName);
 
 	UClass* WidgetClass = LoadClass<UUserWidget>(nullptr, *ClassPath);
 	if (!WidgetClass)
@@ -132,9 +133,20 @@ FString UHappinessUIToolset::RenderWidget(const FString& WidgetBlueprintPath, in
 
 	// Draw a few frames: the first lays the widget out, later ones can use cached child geometry
 	// (the campaign tree places its connector lines from its nodes' cached geometry)
+	if (PreviewIconSetIndex >= 0)
+	{
+		if (FIntProperty* Preview = FindFProperty<FIntProperty>(Widget->GetClass(), TEXT("PreviewIconSetIndex")))
+			Preview->SetPropertyValue_InContainer(Widget, PreviewIconSetIndex);
+	}
 	TSharedRef<SWidget> SlateWidget = Widget->TakeWidget();
 	if (bPreviewMasterRewards)
 	{
+		// Code-built Player Info has twelve live reward images directly in its widget tree.
+		for (int32 Index = 0; Index < 12; ++Index)
+		{
+			if (UWidget* Reward = Widget->GetWidgetFromName(*FString::Printf(TEXT("Reward%d"), Index)))
+				Reward->SetRenderOpacity(Index < 5 ? 1.f : .25f);
+		}
 		if (const FObjectProperty* BadgeProperty = FindFProperty<FObjectProperty>(Widget->GetClass(), TEXT("PlayerLevelBadge")))
 		{
 			if (UUserWidget* Badge = Cast<UUserWidget>(BadgeProperty->GetObjectPropertyValue_InContainer(Widget)))

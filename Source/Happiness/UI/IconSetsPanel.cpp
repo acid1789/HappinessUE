@@ -7,62 +7,75 @@
 #include "Components/ButtonSlot.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
-#include "Components/HorizontalBox.h"
-#include "Components/HorizontalBoxSlot.h"
 #include "Components/Image.h"
 #include "Components/ScaleBox.h"
+#include "Components/ScaleBoxSlot.h"
 #include "Components/ScrollBox.h"
 #include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
-#include "Components/UniformGridPanel.h"
-#include "Components/UniformGridSlot.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Engine/Font.h"
 #include "Engine/Texture2D.h"
 #include "Ads/IconSetStore.h"
-#include "HappinessClassic/IconSets.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
-#include "UI/PauseMenuWidget.h"
-#include "UI/PlayerInfoPanel.h"
 #include "UObject/ConstructorHelpers.h"
 
 #define LOCTEXT_NAMESPACE "IconSetsPanel"
 
 namespace
 {
-	// The pause menu's garden colors
 	const FLinearColor SetsInk(.17f, .085f, .035f);
-	const FLinearColor SetsSage(.16f, .29f, .075f);
 	const FLinearColor SetsIvory(1.f, .95f, .8f);
 	const FLinearColor SetsWarning(.55f, .12f, .04f);
-	const FLinearColor SetsGold(.78f, .6f, .25f);
-	// The player info's window, half as big again (same shape, so the frame art keeps its proportions)
-	const FVector2D SetsWindowSize(1560.f, 780.f);
-	const FVector2D SetsCardSize(290.f, 430.f);
-	constexpr float SetsCardGap = 24.f;
-	constexpr float SetsIconSize = 56.f;
-	constexpr float SetsIconGap = 10.f;
-	constexpr int32 SetsIconColumns = 4;
+	const FVector2D SetsWindowSize(1600.f, 800.f);
 	constexpr float SetsMessageDuration = 3.5f;
-	constexpr float SetsDisabledIconOpacity = .4f;
-	constexpr float SetsLockedIconOpacity = .25f;
+
+	UCanvasPanelSlot* SetsPlace(UCanvasPanel* Canvas, UWidget* Widget, FVector2D Position, FVector2D Size, int32 Layer)
+	{
+		UCanvasPanelSlot* Slot = Canvas->AddChildToCanvas(Widget);
+		Slot->SetPosition(Position);
+		Slot->SetSize(Size);
+		Slot->SetZOrder(Layer);
+		return Slot;
+	}
+
+	UTextBlock* SetsText(UWidgetTree* Tree, UFont* Font, const FText& Text, int32 Points, const FLinearColor& Color)
+	{
+		UTextBlock* Label = Tree->ConstructWidget<UTextBlock>();
+		Label->SetText(Text);
+		Label->SetFont(FSlateFontInfo(Font, Points));
+		Label->SetColorAndOpacity(Color);
+		Label->SetJustification(ETextJustify::Center);
+		Label->SetVisibility(ESlateVisibility::HitTestInvisible);
+		return Label;
+	}
+
+	FButtonStyle SetsHitStyle(float Radius)
+	{
+		FButtonStyle Style;
+		Style.Normal = Style.Disabled = FSlateRoundedBoxBrush(FLinearColor::Transparent, Radius);
+		Style.Hovered = FSlateRoundedBoxBrush(FLinearColor(1.f, 1.f, .9f, .10f), Radius);
+		Style.Pressed = FSlateRoundedBoxBrush(FLinearColor(.12f, .18f, .06f, .14f), Radius);
+		Style.NormalPadding = Style.PressedPadding = FMargin(0.f);
+		return Style;
+	}
 }
 
 void UIconSetCardClick::HandleClicked()
 {
 	if (UIconSetsPanel* Owner = Panel.Get())
 	{
-		Owner->ToggleSet(Index);
+		if (bAction) Owner->ToggleSet(Index);
+		else Owner->SelectSet(Index);
 	}
 }
 
-UIconSetsPanel::UIconSetsPanel(const FObjectInitializer& ObjectInitializer)
-	: Super(ObjectInitializer)
+UIconSetsPanel::UIconSetsPanel(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
-	static ConstructorHelpers::FObjectFinder<UTexture2D> Panel(TEXT("/Game/General/Textures/T_PauseGardenPanel.T_PauseGardenPanel"));
-	static ConstructorHelpers::FObjectFinder<UTexture2D> Buttons(TEXT("/Game/General/Textures/T_LessonNotebookButtons.T_LessonNotebookButtons"));
+	static ConstructorHelpers::FObjectFinder<UTexture2D> Panel(TEXT("/Game/General/Textures/T_IconSetsCatalogue.T_IconSetsCatalogue"));
+	static ConstructorHelpers::FObjectFinder<UTexture2D> Buttons(TEXT("/Game/General/Textures/T_IconSetStates.T_IconSetStates"));
 	static ConstructorHelpers::FObjectFinder<UFont> Font(TEXT("/Game/Happiness/UI/Fonts/LessonsSerif_Font.LessonsSerif_Font"));
 	static ConstructorHelpers::FObjectFinder<USoundBase> Accept(TEXT("/Game/General/Audio/Cues/MenuAccept.MenuAccept"));
 	static ConstructorHelpers::FObjectFinder<USoundBase> Cancel(TEXT("/Game/General/Audio/Cues/MenuCancel.MenuCancel"));
@@ -75,24 +88,19 @@ UIconSetsPanel::UIconSetsPanel(const FObjectInitializer& ObjectInitializer)
 
 TSharedRef<SWidget> UIconSetsPanel::RebuildWidget()
 {
-	if (WidgetTree && !WidgetTree->RootWidget)
-	{
-		BuildLayout();
-	}
+	if (WidgetTree && !WidgetTree->RootWidget) BuildLayout();
 	return Super::RebuildWidget();
 }
 
 void UIconSetsPanel::BuildLayout()
 {
-	UCanvasPanel* Root = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("SetsCanvas"));
+	UCanvasPanel* Root = WidgetTree->ConstructWidget<UCanvasPanel>();
 	WidgetTree->RootWidget = Root;
-
-	// The menu behind dims; a tap on it closes the screen
-	UButton* Outside = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("OutsideButton"));
-	FButtonStyle DimStyle;
-	DimStyle.Normal = DimStyle.Hovered = DimStyle.Pressed = DimStyle.Disabled = FSlateRoundedBoxBrush(FLinearColor(0.f, 0.f, 0.f, .35f), 0.f);
-	DimStyle.NormalPadding = DimStyle.PressedPadding = FMargin(0.f);
-	Outside->SetStyle(DimStyle);
+	UButton* Outside = WidgetTree->ConstructWidget<UButton>();
+	FButtonStyle Dim;
+	Dim.Normal = Dim.Hovered = Dim.Pressed = Dim.Disabled = FSlateRoundedBoxBrush(FLinearColor(0.f, 0.f, 0.f, .35f), 0.f);
+	Dim.NormalPadding = Dim.PressedPadding = FMargin(0.f);
+	Outside->SetStyle(Dim);
 	Outside->OnClicked.AddUniqueDynamic(this, &UIconSetsPanel::HandleCloseClicked);
 	UCanvasPanelSlot* OutsideSlot = Root->AddChildToCanvas(Outside);
 	OutsideSlot->SetAnchors(FAnchors(0.f, 0.f, 1.f, 1.f));
@@ -109,254 +117,247 @@ void UIconSetsPanel::BuildLayout()
 	Size->SetWidthOverride(SetsWindowSize.X);
 	Size->SetHeightOverride(SetsWindowSize.Y);
 	Fit->AddChild(Size);
-	UCanvasPanel* Window = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("Window"));
+	UCanvasPanel* Window = WidgetTree->ConstructWidget<UCanvasPanel>();
 	Size->AddChild(Window);
-
-	auto Place = [&](UWidget* Widget, FVector2D Position, FVector2D Extent)
-	{
-		UCanvasPanelSlot* WindowSlot = Window->AddChildToCanvas(Widget);
-		WindowSlot->SetPosition(Position);
-		WindowSlot->SetSize(Extent);
-		return WindowSlot;
-	};
-
-	// The window takes the taps on it, so they don't close it
 	UImage* Surface = WidgetTree->ConstructWidget<UImage>();
-	FSlateBrush SurfaceBrush;
-	SurfaceBrush.SetResourceObject(PanelTexture);
-	SurfaceBrush.DrawAs = ESlateBrushDrawType::Image;
-	SurfaceBrush.SetUVRegion(FBox2f(FVector2f(.008f, .05f), FVector2f(.992f, .93f)));
-	Surface->SetBrush(SurfaceBrush);
-	Place(Surface, FVector2D::ZeroVector, SetsWindowSize);
+	Surface->SetBrushFromTexture(PanelTexture);
+	SetsPlace(Window, Surface, FVector2D::ZeroVector, SetsWindowSize, 0);
+	SetsPlace(Window, SetsText(WidgetTree, PanelFont, LOCTEXT("Title", "Icon Sets"), 48, SetsInk),
+		FVector2D(630.f, 21.f), FVector2D(340.f, 75.f), 1);
 
-	// The title on the notebook buttons' ivory face, as the player info's
-	FSlateBrush Face;
-	Face.DrawAs = ESlateBrushDrawType::Image;
-	Face.SetResourceObject(ButtonTexture);
-	Face.SetUVRegion(FBox2f(FVector2f(.03f, .06f), FVector2f(.98f, .485f)));
-	UImage* TitlePlate = WidgetTree->ConstructWidget<UImage>();
-	TitlePlate->SetBrush(Face);
-	TitlePlate->SetVisibility(ESlateVisibility::HitTestInvisible);
-	Place(TitlePlate, FVector2D((SetsWindowSize.X - 440.f) * .5f, 64.f), FVector2D(440.f, 100.f));
-	UTextBlock* Title = WidgetTree->ConstructWidget<UTextBlock>();
-	Title->SetText(LOCTEXT("Title", "Icon Sets"));
-	Title->SetFont(FSlateFontInfo(PanelFont, 50));
-	Title->SetColorAndOpacity(SetsInk);
-	Title->SetJustification(ETextJustify::Center);
-	Title->SetVisibility(ESlateVisibility::HitTestInvisible);
-	Place(Title, FVector2D((SetsWindowSize.X - 440.f) * .5f, 80.f), FVector2D(440.f, 72.f));
-
-	UButton* Close = UPlayerInfoPanel::MakeCloseButton(*WidgetTree);
+	UButton* Close = WidgetTree->ConstructWidget<UButton>();
+	Close->SetStyle(SetsHitStyle(48.f));
 	Close->OnClicked.AddUniqueDynamic(this, &UIconSetsPanel::HandleCloseClicked);
-	// Right of the corner's leaves, inside the frame (the player info's place, scaled with the window)
-	Place(Close, FVector2D(1414.f, 104.f), FVector2D(76.f, 76.f));
+	SetsPlace(Window, Close, FVector2D(1485.f, 43.f), FVector2D(96.f), 2);
 
-	StatusText = WidgetTree->ConstructWidget<UTextBlock>();
-	StatusText->SetFont(FSlateFontInfo(PanelFont, 30));
-	StatusText->SetJustification(ETextJustify::Center);
-	StatusText->SetVisibility(ESlateVisibility::HitTestInvisible);
-	Place(StatusText, FVector2D(150.f, 184.f), FVector2D(SetsWindowSize.X - 300.f, 46.f));
-
-	// The cards, scrolled left and right (dragged, or with the arrows either side)
-	Scroll = WidgetTree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(), TEXT("SetsScroll"));
-	Scroll->SetOrientation(Orient_Horizontal);
-	Scroll->SetScrollBarVisibility(ESlateVisibility::Collapsed);
+	Scroll = WidgetTree->ConstructWidget<UScrollBox>();
+	Scroll->SetOrientation(Orient_Vertical);
+	Scroll->SetScrollBarVisibility(ESlateVisibility::Visible);
 	Scroll->SetAnimateWheelScrolling(true);
 	Scroll->SetConsumeMouseWheel(EConsumeMouseWheel::Always);
-	CardRow = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("CardRow"));
-	Scroll->AddChild(CardRow);
-	const float ScrollLeft = 160.f;
-	Place(Scroll, FVector2D(ScrollLeft, 250.f), FVector2D(SetsWindowSize.X - 2.f * ScrollLeft, SetsCardSize.Y));
+	Scroll->SetScrollbarThickness(FVector2D(7.f, 7.f));
+	FScrollBarStyle Bar = Scroll->GetWidgetBarStyle();
+	Bar.NormalThumbImage = Bar.HoveredThumbImage = Bar.DraggedThumbImage = FSlateRoundedBoxBrush(FLinearColor(.38f, .51f, .16f), 3.f);
+	Scroll->SetWidgetBarStyle(Bar);
+	CardRows = WidgetTree->ConstructWidget<UVerticalBox>();
+	Scroll->AddChild(CardRows);
+	SetsPlace(Window, Scroll, FVector2D(76.f, 156.f), FVector2D(582.f, 520.f), 3);
 
-	auto MakeArrow = [&](const TCHAR* Name, bool bLeft)
-	{
-		// The close button's round face, with an arrow for the cross
-		UButton* Arrow = UPlayerInfoPanel::MakeCloseButton(*WidgetTree, Name);
-		Arrow->SetClickMethod(EButtonClickMethod::PreciseClick);
-		USizeBox* GlyphSize = CastChecked<USizeBox>(Arrow->GetChildAt(0));
-		UPauseMenuGlyph* Glyph = WidgetTree->ConstructWidget<UPauseMenuGlyph>();
-		// The play triangle, mirrored for the left
-		Glyph->Symbol = 8;
-		Glyph->Color = SetsInk;
-		Glyph->SetVisibility(ESlateVisibility::HitTestInvisible);
-		Glyph->SetRenderTransformPivot(FVector2D(.5f));
-		Glyph->SetRenderScale(FVector2D(bLeft ? -1.f : 1.f, 1.f));
-		GlyphSize->SetContent(Glyph);
-		GlyphSize->SetWidthOverride(36.f);
-		GlyphSize->SetHeightOverride(36.f);
-		const float X = bLeft ? ScrollLeft - 110.f : SetsWindowSize.X - ScrollLeft + 26.f;
-		Place(Arrow, FVector2D(X, 250.f + (SetsCardSize.Y - 84.f) * .5f), FVector2D(84.f, 84.f));
-		return Arrow;
-	};
-	LeftButton = MakeArrow(TEXT("LeftButton"), true);
-	RightButton = MakeArrow(TEXT("RightButton"), false);
-	LeftButton->OnClicked.AddUniqueDynamic(this, &UIconSetsPanel::HandleLeftClicked);
-	RightButton->OnClicked.AddUniqueDynamic(this, &UIconSetsPanel::HandleRightClicked);
-
+	Detail = WidgetTree->ConstructWidget<UCanvasPanel>();
+	Detail->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	SetsPlace(Window, Detail, FVector2D(740.f, 142.f), FVector2D(782.f, 580.f), 4);
+	StatusText = SetsText(WidgetTree, PanelFont, FText::GetEmpty(), 22, SetsInk);
+	StatusText->SetAutoWrapText(true);
+	SetsPlace(Window, StatusText, FVector2D(88.f, 690.f), FVector2D(550.f, 55.f), 5);
 	Refresh();
+#if WITH_EDITOR
+	if (PreviewIconSetIndex >= 0) PreviewCatalogue(PreviewIconSetIndex);
+#endif
 }
 
-UWidget* UIconSetsPanel::MakeCard(int32 Index, const FIconSetEntry& Entry)
+TArray<FIconSetEntry> UIconSetsPanel::GetEntries() const
 {
-	// The card: a cream tile, greyed while the set is off or locked
-	UButton* Card = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), *FString::Printf(TEXT("Card%d"), Index));
-	const FLinearColor Fill = Entry.bEnabled ? FLinearColor(1.f, .97f, .86f) : FLinearColor(.86f, .84f, .78f);
-	const FLinearColor Rim = Entry.bEnabled ? SetsGold : FLinearColor(.6f, .56f, .48f);
+	if (!PreviewEntries.IsEmpty()) return PreviewEntries;
+	const UIconSetSubsystem* Sets = UIconSetSubsystem::Get(this);
+	return Sets ? Sets->GetEntries() : TArray<FIconSetEntry>();
+}
+
+FSlateBrush UIconSetsPanel::StateBrush(const FIconSetEntry& Entry) const
+{
+	const int32 Row = Entry.bUnlocked ? (Entry.bEnabled ? 0 : 1) : (Entry.bForSale ? 3 : 2);
+	// Measured bounds of each painted face; exclude the atlas's transparent gutters.
+	constexpr float Tops[] = {.083f, .305f, .524f, .745f};
+	constexpr float Bottoms[] = {.284f, .510f, .731f, .954f};
+	FSlateBrush Brush;
+	Brush.SetResourceObject(ButtonTexture);
+	Brush.DrawAs = ESlateBrushDrawType::Image;
+	Brush.SetUVRegion(FBox2f(FVector2f(.048f, Tops[Row]), FVector2f(.952f, Bottoms[Row])));
+	return Brush;
+}
+
+FText UIconSetsPanel::StateLabel(const FIconSetEntry& Entry) const
+{
+	if (Entry.bUnlocked) return Entry.bEnabled ? LOCTEXT("Enabled", "Enabled") : LOCTEXT("Disabled", "Disabled");
+	if (!Entry.bForSale) return Entry.LockedReason;
+	if (const UIconSetStoreSubsystem* Store = UIconSetStoreSubsystem::Get(this))
+	{
+		if (Store->IsPurchasing(Entry.Id)) return LOCTEXT("Purchasing", "Purchasing...");
+		if (Store->IsPending(Entry.Id)) return LOCTEXT("PaymentPending", "Payment pending");
+		const FText Price = Store->GetPriceText(Entry.Id);
+		if (!Price.IsEmpty()) return FText::Format(LOCTEXT("BuyPrice", "Buy {0}"), Price);
+	}
+	return LOCTEXT("BuySet", "Buy Set");
+}
+
+UButton* UIconSetsPanel::MakeStateButton(UCanvasPanel* Canvas, const FIconSetEntry& Entry, int32 Index,
+	FVector2D Position, FVector2D Extent, int32 FontSize)
+{
+	UButton* Button = WidgetTree->ConstructWidget<UButton>();
 	FButtonStyle Style;
-	Style.Normal = Style.Hovered = Style.Pressed = Style.Disabled = FSlateRoundedBoxBrush(Fill, 26.f, Rim, Entry.bEnabled ? 4.f : 2.f);
-	Style.Hovered.TintColor = FLinearColor(1.05f, 1.05f, 1.02f);
-	Style.Pressed.TintColor = FLinearColor(.88f, .9f, .84f);
-	Style.NormalPadding = Style.PressedPadding = FMargin(18.f, 22.f);
-	Card->SetStyle(Style);
-	Card->SetCursor(EMouseCursor::Hand);
-	// A drag across the cards scrolls them rather than tapping one
-	Card->SetTouchMethod(EButtonTouchMethod::PreciseTap);
-	Card->SetClickMethod(EButtonClickMethod::PreciseClick);
+	Style.Normal = Style.Hovered = Style.Pressed = Style.Disabled = StateBrush(Entry);
+	Style.Hovered.TintColor = FLinearColor(1.08f, 1.08f, 1.04f);
+	Style.Pressed.TintColor = FLinearColor(.85f, .88f, .8f);
+	Style.NormalPadding = Style.PressedPadding = FMargin(0.f);
+	Button->SetStyle(Style);
+	Button->SetCursor(EMouseCursor::Hand);
+	Button->SetTouchMethod(EButtonTouchMethod::PreciseTap);
+	Button->SetClickMethod(EButtonClickMethod::PreciseClick);
+	SetsPlace(Canvas, Button, Position, Extent, 3);
 	UIconSetCardClick* Click = NewObject<UIconSetCardClick>(this);
 	Click->Panel = this;
 	Click->Index = Index;
-	Card->OnClicked.AddUniqueDynamic(Click, &UIconSetCardClick::HandleClicked);
-	CardClicks.Add(Click);
+	Click->bAction = true;
+	Button->OnClicked.AddUniqueDynamic(Click, &UIconSetCardClick::HandleClicked);
+	(Canvas == Detail ? DetailClicks : CardClicks).Add(Click);
+	const FText LabelText = Canvas == Detail && !Entry.bUnlocked && !Entry.bForSale
+		? LOCTEXT("Locked", "Locked") : StateLabel(Entry);
+	UTextBlock* Label = SetsText(WidgetTree, PanelFont, LabelText, FontSize,
+		Entry.bUnlocked && Entry.bEnabled ? SetsIvory : SetsInk);
+	Label->SetWrapTextAt(Extent.X * .7f);
+	UScaleBox* Fit = WidgetTree->ConstructWidget<UScaleBox>();
+	Fit->SetStretch(EStretch::ScaleToFit);
+	Fit->SetStretchDirection(EStretchDirection::DownOnly);
+	Fit->SetVisibility(ESlateVisibility::HitTestInvisible);
+	Fit->AddChild(Label);
+	SetsPlace(Canvas, Fit, Position + FVector2D(Extent.X * .23f, 4.f), FVector2D(Extent.X * .72f, Extent.Y - 8.f), 4);
+	return Button;
+}
 
-	UVerticalBox* Column = WidgetTree->ConstructWidget<UVerticalBox>();
-	Column->SetVisibility(ESlateVisibility::HitTestInvisible);
-	UTextBlock* Name = WidgetTree->ConstructWidget<UTextBlock>();
-	Name->SetText(Entry.Name);
-	Name->SetFont(FSlateFontInfo(PanelFont, 34));
-	Name->SetColorAndOpacity(Entry.bUnlocked ? SetsInk : SetsInk.CopyWithNewOpacity(.6f));
-	Name->SetJustification(ETextJustify::Center);
-	// Wrapped to the card's width; a name that needs more than two lines shrinks to fit
-	Name->SetWrapTextAt(SetsCardSize.X - 36.f);
+UWidget* UIconSetsPanel::MakeRow(int32 Index, const FIconSetEntry& Entry)
+{
+	UCanvasPanel* Row = WidgetTree->ConstructWidget<UCanvasPanel>();
+	UButton* Select = WidgetTree->ConstructWidget<UButton>();
+	const bool bSelected = Entry.Id == SelectedId;
+	FButtonStyle Style;
+	Style.Normal = Style.Hovered = Style.Pressed = Style.Disabled = FSlateRoundedBoxBrush(
+		bSelected ? FLinearColor(.76f, .91f, 1.f, .55f) : FLinearColor(1.f, .97f, .86f, .35f), 17.f,
+		bSelected ? FLinearColor(.025f, .56f, 1.f) : FLinearColor(.65f, .45f, .18f, .55f), bSelected ? 2.5f : 1.f);
+	Style.Hovered.TintColor = FLinearColor(1.06f, 1.06f, 1.02f);
+	Style.NormalPadding = Style.PressedPadding = FMargin(0.f);
+	Select->SetStyle(Style);
+	Select->SetTouchMethod(EButtonTouchMethod::PreciseTap);
+	Select->SetClickMethod(EButtonClickMethod::PreciseClick);
+	Select->SetCursor(EMouseCursor::Hand);
+	SetsPlace(Row, Select, FVector2D::ZeroVector, FVector2D(562.f, 99.f), 0);
+	UIconSetCardClick* Click = NewObject<UIconSetCardClick>(this);
+	Click->Panel = this;
+	Click->Index = Index;
+	Select->OnClicked.AddUniqueDynamic(Click, &UIconSetCardClick::HandleClicked);
+	CardClicks.Add(Click);
+	const TArray<UTexture2D*> Textures = UIconSetSubsystem::GetIconTextures(Entry.IconSet);
+	UImage* Thumb = WidgetTree->ConstructWidget<UImage>();
+	if (!Textures.IsEmpty()) Thumb->SetBrushFromTexture(Textures[0]);
+	Thumb->SetVisibility(ESlateVisibility::HitTestInvisible);
+	SetsPlace(Row, Thumb, FVector2D(12.f, 11.f), FVector2D(76.f), 1);
+	UTextBlock* Name = SetsText(WidgetTree, PanelFont, Entry.Name, 25, SetsInk);
+	Name->SetJustification(ETextJustify::Left);
+	Name->SetWrapTextAt(191.f);
 	UScaleBox* NameFit = WidgetTree->ConstructWidget<UScaleBox>();
 	NameFit->SetStretch(EStretch::ScaleToFit);
 	NameFit->SetStretchDirection(EStretchDirection::DownOnly);
-	NameFit->AddChild(Name);
-	USizeBox* NameSize = WidgetTree->ConstructWidget<USizeBox>();
-	// Two lines at full size; with three rows of icons (12) the card is still just tall enough
-	NameSize->SetHeightOverride(112.f);
-	NameSize->AddChild(NameFit);
-	UVerticalBoxSlot* NameSlot = Column->AddChildToVerticalBox(NameSize);
-	NameSlot->SetHorizontalAlignment(HAlign_Fill);
-
-	UUniformGridPanel* Icons = WidgetTree->ConstructWidget<UUniformGridPanel>();
-	Icons->SetSlotPadding(FMargin(SetsIconGap * .5f));
-	const TArray<UTexture2D*> Textures = UIconSetSubsystem::GetIconTextures(Entry.IconSet);
-	for (int32 Icon = 0; Icon < Textures.Num(); Icon++)
-	{
-		UImage* Image = WidgetTree->ConstructWidget<UImage>();
-		if (Textures[Icon])
-		{
-			Image->SetBrushFromTexture(Textures[Icon]);
-		}
-		Image->SetRenderOpacity(Entry.bEnabled ? 1.f : Entry.bUnlocked ? SetsDisabledIconOpacity : SetsLockedIconOpacity);
-		USizeBox* ImageSize = WidgetTree->ConstructWidget<USizeBox>();
-		ImageSize->SetWidthOverride(SetsIconSize);
-		ImageSize->SetHeightOverride(SetsIconSize);
-		ImageSize->AddChild(Image);
-		Icons->AddChildToUniformGrid(ImageSize, Icon / SetsIconColumns, Icon % SetsIconColumns);
-	}
-	UVerticalBoxSlot* IconsSlot = Column->AddChildToVerticalBox(Icons);
-	IconsSlot->SetHorizontalAlignment(HAlign_Center);
-	IconsSlot->SetVerticalAlignment(VAlign_Center);
-	IconsSlot->SetPadding(FMargin(0.f, 0.f, 0.f, 12.f));
-	IconsSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-
-	// At the bottom: On / Off, what unlocks it, or (for sale) its price
-	UBorder* Pill = WidgetTree->ConstructWidget<UBorder>();
-	const FLinearColor PillFill = Entry.bEnabled ? SetsSage : Entry.bUnlocked ? FLinearColor(.7f, .67f, .6f)
-		: Entry.bForSale ? SetsGold : FLinearColor(.44f, .28f, .1f, .18f);
-	Pill->SetBrush(FSlateRoundedBoxBrush(PillFill, 24.f));
-	Pill->SetPadding(FMargin(12.f, 6.f));
-	Pill->SetHorizontalAlignment(HAlign_Center);
-	Pill->SetVerticalAlignment(VAlign_Center);
-	UTextBlock* State = WidgetTree->ConstructWidget<UTextBlock>();
-	FText StateText = Entry.bEnabled ? LOCTEXT("On", "Enabled") : Entry.bUnlocked ? LOCTEXT("Off", "Disabled")
-		: FText::Format(LOCTEXT("Locked", "Locked: {0}"), Entry.LockedReason);
-	if (const UIconSetStoreSubsystem* Store = Entry.bForSale ? UIconSetStoreSubsystem::Get(this) : nullptr)
-	{
-		const FText Price = Store->GetPriceText(Entry.Id);
-		StateText = Store->IsPurchasing(Entry.Id) ? LOCTEXT("Purchasing", "Purchasing...")
-			: Store->IsPending(Entry.Id) ? LOCTEXT("PaymentPending", "Payment pending")
-			: Price.IsEmpty() ? LOCTEXT("Buy", "Buy") : FText::Format(LOCTEXT("BuyPrice", "Buy {0}"), Price);
-	}
-	State->SetText(StateText);
-	State->SetFont(FSlateFontInfo(PanelFont, Entry.bUnlocked || Entry.bForSale ? 28 : 22));
-	State->SetColorAndOpacity(Entry.bEnabled || Entry.bForSale ? SetsIvory : SetsInk);
-	State->SetJustification(ETextJustify::Center);
-	State->SetAutoWrapText(true);
-	Pill->SetContent(State);
-	USizeBox* PillSize = WidgetTree->ConstructWidget<USizeBox>();
-	PillSize->SetMinDesiredHeight(54.f);
-	PillSize->AddChild(Pill);
-	UVerticalBoxSlot* PillSlot = Column->AddChildToVerticalBox(PillSize);
-	PillSlot->SetHorizontalAlignment(HAlign_Fill);
-
-	UButtonSlot* ContentSlot = CastChecked<UButtonSlot>(Card->AddChild(Column));
-	ContentSlot->SetHorizontalAlignment(HAlign_Fill);
-	ContentSlot->SetVerticalAlignment(VAlign_Fill);
-
-	USizeBox* Sized = WidgetTree->ConstructWidget<USizeBox>();
-	Sized->SetWidthOverride(SetsCardSize.X);
-	Sized->SetHeightOverride(SetsCardSize.Y);
-	Sized->AddChild(Card);
-	return Sized;
+	NameFit->SetVisibility(ESlateVisibility::HitTestInvisible);
+	CastChecked<UScaleBoxSlot>(NameFit->AddChild(Name))->SetHorizontalAlignment(HAlign_Left);
+	SetsPlace(Row, NameFit, FVector2D(100.f, 8.f), FVector2D(191.f, 83.f), 2);
+	MakeStateButton(Row, Entry, Index, FVector2D(300.f, 22.f), FVector2D(250.f, 55.f), Entry.bUnlocked ? 24 : 20);
+	USizeBox* Size = WidgetTree->ConstructWidget<USizeBox>();
+	Size->SetWidthOverride(562.f);
+	Size->SetHeightOverride(99.f);
+	Size->AddChild(Row);
+	return Size;
 }
 
 void UIconSetsPanel::Refresh()
 {
-	if (!CardRow)
-	{
-		return;
-	}
-	const UIconSetSubsystem* IconSets = UIconSetSubsystem::Get(this);
-	const TArray<FIconSetEntry> Entries = IconSets ? IconSets->GetEntries() : TArray<FIconSetEntry>();
-	CardRow->ClearChildren();
-	Cards.Reset();
+	if (!CardRows) return;
+	const float Offset = Scroll->GetScrollOffset();
+	const TArray<FIconSetEntry> Entries = GetEntries();
+	if (!Entries.ContainsByPredicate([this](const FIconSetEntry& E) { return E.Id == SelectedId; }))
+		SelectedId = Entries.IsEmpty() ? NAME_None : Entries[0].Id;
+	CardRows->ClearChildren();
 	CardClicks.Reset();
 	CardSets.Reset();
-	for (int32 Index = 0; Index < Entries.Num(); Index++)
+	for (int32 Index = 0; Index < Entries.Num(); ++Index)
 	{
-		if (UWidget* Card = MakeCard(Index, Entries[Index]))
-		{
-			UHorizontalBoxSlot* CardSlot = CardRow->AddChildToHorizontalBox(Card);
-			CardSlot->SetPadding(FMargin(Index == 0 ? 0.f : SetsCardGap, 0.f, 0.f, 0.f));
-			Cards.Add(Card);
-			CardSets.Add(Entries[Index].IconSet);
-		}
+		UVerticalBoxSlot* RowSlot = CardRows->AddChildToVerticalBox(MakeRow(Index, Entries[Index]));
+		RowSlot->SetPadding(FMargin(0.f, 0.f, 6.f, 10.f));
+		CardSets.Add(Entries[Index].IconSet);
 	}
+	Scroll->SetScrollOffset(Offset);
+	UpdateDetail();
 	UpdateStatus();
+}
+
+void UIconSetsPanel::UpdateDetail()
+{
+	if (!Detail) return;
+	Detail->ClearChildren();
+	DetailClicks.Reset();
+	const TArray<FIconSetEntry> Entries = GetEntries();
+	const int32 Index = Entries.IndexOfByPredicate([this](const FIconSetEntry& E) { return E.Id == SelectedId; });
+	if (Index == INDEX_NONE)
+	{
+		SetsPlace(Detail, SetsText(WidgetTree, PanelFont, LOCTEXT("NoSets", "No icon sets available"), 32, SetsInk),
+			FVector2D(0.f, 80.f), FVector2D(782.f, 70.f), 0);
+		return;
+	}
+	const FIconSetEntry& Entry = Entries[Index];
+	UTextBlock* Title = SetsText(WidgetTree, PanelFont, Entry.Name, 42, SetsInk);
+	UScaleBox* TitleFit = WidgetTree->ConstructWidget<UScaleBox>();
+	TitleFit->SetStretch(EStretch::ScaleToFit);
+	TitleFit->SetStretchDirection(EStretchDirection::DownOnly);
+	TitleFit->SetVisibility(ESlateVisibility::HitTestInvisible);
+	TitleFit->AddChild(Title);
+	SetsPlace(Detail, TitleFit, FVector2D(10.f, 0.f), FVector2D(762.f, 70.f), 0);
+	const TArray<UTexture2D*> Textures = UIconSetSubsystem::GetIconTextures(Entry.IconSet);
+	const int32 Rows = FMath::Max(1, FMath::DivideAndRoundUp(Textures.Num(), 4));
+	const float Side = FMath::Min(160.f, (355.f - 14.f * (Rows - 1)) / Rows);
+	const int32 Columns = FMath::Min(4, Textures.Num());
+	const float GridWidth = Columns * Side + FMath::Max(0, Columns - 1) * 14.f;
+	const float GridHeight = Rows * Side + (Rows - 1) * 14.f;
+	for (int32 Icon = 0; Icon < Textures.Num(); ++Icon)
+	{
+		UImage* Image = WidgetTree->ConstructWidget<UImage>();
+		Image->SetBrushFromTexture(Textures[Icon]);
+		Image->SetVisibility(ESlateVisibility::HitTestInvisible);
+		SetsPlace(Detail, Image, FVector2D((782.f - GridWidth) * .5f + (Icon % 4) * (Side + 14.f),
+			84.f + (355.f - GridHeight) * .5f + (Icon / 4) * (Side + 14.f)), FVector2D(Side), 1);
+	}
+	MakeStateButton(Detail, Entry, Index, FVector2D(191.f, 460.f), FVector2D(400.f, 88.f), 34);
+	const FText Help = Entry.bUnlocked ? (Entry.bEnabled ? LOCTEXT("TapOff", "Tap to disable") : LOCTEXT("TapOn", "Tap to enable"))
+		: Entry.bForSale ? LOCTEXT("TapBuy", "Tap to purchase this set") : Entry.LockedReason;
+	UTextBlock* Hint = SetsText(WidgetTree, PanelFont, Help, 21, SetsInk);
+	Hint->SetAutoWrapText(true);
+	SetsPlace(Detail, Hint, FVector2D(20.f, 557.f), FVector2D(742.f, 65.f), 5);
+}
+
+void UIconSetsPanel::SelectSet(int32 Index)
+{
+	const TArray<FIconSetEntry> Entries = GetEntries();
+	if (!Entries.IsValidIndex(Index)) return;
+	SelectedId = Entries[Index].Id;
+	PlaySound(AcceptSound);
+	Refresh();
 }
 
 void UIconSetsPanel::UpdateStatus()
 {
-	if (!StatusText || MessageSeconds > 0.f)
-	{
-		return;
-	}
-	const UIconSetSubsystem* IconSets = UIconSetSubsystem::Get(this);
-	int32 Unlocked = 0;
-	for (const FIconSetEntry& Entry : IconSets ? IconSets->GetEntries() : TArray<FIconSetEntry>())
-	{
-		Unlocked += Entry.bUnlocked ? 1 : 0;
-	}
-	StatusText->SetText(FText::Format(LOCTEXT("Count", "{0} of {1} sets enabled. Tap a set to enable or disable it."),
-		IconSets ? IconSets->GetNumEnabled() : 0, Unlocked));
-	StatusText->SetColorAndOpacity(SetsSage);
+	if (!StatusText || MessageSeconds > 0.f) return;
+	int32 Enabled = 0;
+	for (const FIconSetEntry& Entry : GetEntries()) Enabled += Entry.bEnabled ? 1 : 0;
+	if (!PreviewEntries.IsEmpty()) Enabled = 10; // The render shows a sample of a larger collection.
+	StatusText->SetText(FText::Format(LOCTEXT("Count", "{0} sets enabled  |  Minimum {1}"), Enabled, UIconSetSubsystem::MinEnabledSets));
+	StatusText->SetColorAndOpacity(SetsInk);
 }
 
 void UIconSetsPanel::ToggleSet(int32 Index)
 {
-	UIconSetSubsystem* IconSets = UIconSetSubsystem::Get(this);
-	const TArray<FIconSetEntry> Entries = IconSets ? IconSets->GetEntries() : TArray<FIconSetEntry>();
-	if (!Entries.IsValidIndex(Index))
-	{
-		return;
-	}
+	const TArray<FIconSetEntry> Entries = GetEntries();
+	if (!Entries.IsValidIndex(Index)) return;
 	const FIconSetEntry& Entry = Entries[Index];
+	SelectedId = Entry.Id;
 	FText Message;
 	if (Entry.bForSale)
 	{
-		// Open the store's purchase flow; the store's answer remakes the cards (HandleStoreChanged)
 		UIconSetStoreSubsystem* Store = UIconSetStoreSubsystem::Get(this);
 		if (Store && Store->Buy(Entry.Id))
 		{
@@ -367,29 +368,22 @@ void UIconSetsPanel::ToggleSet(int32 Index)
 			? FText::Format(LOCTEXT("PendingMessage", "{0} is waiting for your payment to clear."), Entry.Name)
 			: LOCTEXT("NoStore", "The store can't be reached right now. Check your connection and try again.");
 	}
-	else if (!Entry.bUnlocked)
+	else if (!Entry.bUnlocked) Message = Entry.LockedReason;
+	else if (UIconSetSubsystem* Sets = UIconSetSubsystem::Get(this))
 	{
-		Message = FText::Format(LOCTEXT("LockedMessage", "{0} is locked. {1} to unlock it."), Entry.Name, Entry.LockedReason);
-	}
-	else if (!IconSets->SetEnabled(Entry.IconSet, !Entry.bEnabled))
-	{
-		Message = FText::Format(LOCTEXT("TooFew", "At least {0} sets must stay enabled to play."), UIconSetSubsystem::MinEnabledSets);
+		if (!Sets->SetEnabled(Entry.IconSet, !Entry.bEnabled))
+			Message = FText::Format(LOCTEXT("TooFew", "At least {0} sets must stay enabled to play."), UIconSetSubsystem::MinEnabledSets);
 	}
 	if (!Message.IsEmpty())
 	{
 		PlaySound(CancelSound);
+		Refresh();
 		ShowMessage(Message);
 		return;
 	}
 	PlaySound(AcceptSound);
 	MessageSeconds = 0.f;
-	// Remake the cards, keeping the scroll where it is
-	const float Offset = Scroll ? Scroll->GetScrollOffset() : 0.f;
 	Refresh();
-	if (Scroll)
-	{
-		Scroll->SetScrollOffset(Offset);
-	}
 }
 
 void UIconSetsPanel::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
@@ -400,36 +394,6 @@ void UIconSetsPanel::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 		MessageSeconds = 0.f;
 		UpdateStatus();
 	}
-	// The arrows fade at the ends of the row
-	if (Scroll && LeftButton && RightButton)
-	{
-		const float Offset = Scroll->GetScrollOffset();
-		const float End = Scroll->GetScrollOffsetOfEnd();
-		LeftButton->SetRenderOpacity(Offset > 1.f ? 1.f : .35f);
-		RightButton->SetRenderOpacity(Offset < End - 1.f ? 1.f : .35f);
-	}
-}
-
-void UIconSetsPanel::ScrollBy(int32 CardCount)
-{
-	if (!Scroll || Cards.Num() == 0)
-	{
-		return;
-	}
-	const float Step = SetsCardSize.X + SetsCardGap;
-	const int32 First = FMath::RoundToInt(Scroll->GetScrollOffset() / Step);
-	const int32 Target = FMath::Clamp(First + CardCount, 0, Cards.Num() - 1);
-	Scroll->ScrollWidgetIntoView(Cards[Target], true, EDescendantScrollDestination::TopOrLeft);
-}
-
-void UIconSetsPanel::HandleLeftClicked()
-{
-	ScrollBy(-3);
-}
-
-void UIconSetsPanel::HandleRightClicked()
-{
-	ScrollBy(3);
 }
 
 void UIconSetsPanel::NativeConstruct()
@@ -476,30 +440,38 @@ void UIconSetsPanel::Show()
 {
 	MessageSeconds = 0.f;
 	Refresh();
-	if (Scroll)
-	{
-		Scroll->ScrollToStart();
-	}
 	SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 }
 
-void UIconSetsPanel::Hide()
-{
-	SetVisibility(ESlateVisibility::Collapsed);
-}
-
-void UIconSetsPanel::HandleCloseClicked()
-{
-	PlaySound(CancelSound);
-	Hide();
-}
-
+void UIconSetsPanel::Hide() { SetVisibility(ESlateVisibility::Collapsed); }
+void UIconSetsPanel::HandleCloseClicked() { PlaySound(CancelSound); Hide(); }
 void UIconSetsPanel::PlaySound(USoundBase* Sound) const
 {
-	if (Sound)
-	{
-		UGameplayStatics::PlaySound2D(this, Sound, 1.f, 1.f, 0.f, nullptr, nullptr, true);
-	}
+	if (Sound) UGameplayStatics::PlaySound2D(this, Sound, 1.f, 1.f, 0.f, nullptr, nullptr, true);
 }
+
+#if WITH_EDITOR
+void UIconSetsPanel::PreviewCatalogue(int32 Index)
+{
+	PreviewEntries.Reset();
+	const TCHAR* Assets[] = { TEXT("IS_Flowers2"), TEXT("IS_Balls"), TEXT("IS_SeaLife"), TEXT("IS_MythicalCreatures"), TEXT("IS_GardenVisitors"), TEXT("IS_MasterRewardGems") };
+	const TCHAR* Names[] = { TEXT("Flowers"), TEXT("Balls"), TEXT("Sea Life"), TEXT("Mythical Creatures"), TEXT("Garden Visitors"), TEXT("Master Reward Gems") };
+	for (int32 I = 0; I < UE_ARRAY_COUNT(Assets); ++I)
+	{
+		const FString Path = FString::Printf(TEXT("/Game/Happiness/IconSets/%s.%s"), Assets[I], Assets[I]);
+		FIconSetEntry Entry;
+		Entry.IconSet = LoadObject<UPrimaryDataAsset>(nullptr, *Path);
+		Entry.Id = FName(Assets[I]);
+		Entry.Name = FText::FromString(Names[I]);
+		Entry.bUnlocked = I != 2 && I != 3;
+		Entry.bEnabled = Entry.bUnlocked && I != 1;
+		if (I == 2) Entry.bForSale = true;
+		if (I == 3) Entry.LockedReason = LOCTEXT("PreviewLock", "Complete Campaign");
+		PreviewEntries.Add(Entry);
+	}
+	SelectedId = PreviewEntries[FMath::Clamp(Index, 0, PreviewEntries.Num() - 1)].Id;
+	Refresh();
+}
+#endif
 
 #undef LOCTEXT_NAMESPACE

@@ -173,6 +173,7 @@ python Tools/mcp_call.py HappinessMCPLookup.HappinessUIToolset RenderWidget \
 - The game is landscape, so render at **1920 × 1080** (and check wider mobile aspect ratios when relevant).
 - For a populated board layout check, pass `previewPuzzleSize: 3` (3–8) to `RenderWidget` with `WBP_GameSelect`, `WBP_Happiness`, or `WBP_GamePanel`. It creates sample cells and icons only in the render instance, using the actual widget classes and native panel sizing. This checks layout, not puzzle generation or interaction; no asset visibility needs to be changed.
 - For hint placement, render WBP_Happiness with previewPuzzleSize: 4 and bPreviewHint: true. This hides popup overlays and shows the hint only in the render instance.
+- Native C++ screens can be rendered with their class path in `widgetBlueprintPath`, e.g. `/Script/Happiness.PlayerInfoPanel`. For Player Info, `bPreviewMasterRewards: true` shows five earned gems and seven locked gems only in the render instance.
 - It renders the **designer** state: placeholder texts, default visibility, no game running. Anything set at
   runtime (scores, which buttons are locked, mode-dependent tick marks) won't show.
 
@@ -374,3 +375,5 @@ Private native UPROPERTY defaults cannot be cleared through ObjectTools or Pytho
 If Unreal reports deleting an old unreferenced texture but its file remains, resave that old asset
 with `save_loaded_asset(asset, only_if_is_dirty=False)` before `delete_loaded_asset(asset)`.
 This resolved the legacy 8ball package without raw filesystem edits to a uasset.
+
+- Icon Sets catalogue render: `RenderWidget` accepts `/Script/Happiness.IconSetsPanel` and `previewIconSetIndex` (0 enabled, 1 disabled, 2 purchase, 3 achievement, 5 twelve icons). These are editor-only sample entries, never saved. Render once more after initial asset loading if a sample texture is not ready.

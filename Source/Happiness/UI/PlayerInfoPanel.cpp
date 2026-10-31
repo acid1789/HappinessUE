@@ -6,8 +6,6 @@
 #include "Components/ButtonSlot.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
-#include "Components/HorizontalBox.h"
-#include "Components/HorizontalBoxSlot.h"
 #include "Components/Image.h"
 #include "Components/ScaleBox.h"
 #include "Components/SizeBox.h"
@@ -20,7 +18,6 @@
 #include "Sound/SoundBase.h"
 #include "UI/GameRulesWidget.h"
 #include "UI/IconSetsPanel.h"
-#include "UI/LessonPopupWidget.h"
 #include "UI/PauseMenuWidget.h"
 #include "UI/PlayerLevelBadge.h"
 #include "UObject/ConstructorHelpers.h"
@@ -31,26 +28,20 @@ namespace
 {
 	// The pause menu's garden colors
 	const FLinearColor InfoInk(.17f, .085f, .035f);
-	const FLinearColor InfoSage(.16f, .29f, .075f);
-	const FVector2D InfoWindowSize(1200.f, 600.f);
-	constexpr float InfoRewardSize = 68.f;
-	constexpr float InfoRewardGap = 10.f;
+	const FVector2D InfoWindowSize(1500.f, 750.f);
+	constexpr float InfoRewardSize = 116.f;
 }
 
 UPlayerInfoPanel::UPlayerInfoPanel(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
-	static ConstructorHelpers::FObjectFinder<UTexture2D> Panel(TEXT("/Game/General/Textures/T_PauseGardenPanel.T_PauseGardenPanel"));
-	static ConstructorHelpers::FObjectFinder<UTexture2D> Buttons(TEXT("/Game/General/Textures/T_LessonNotebookButtons.T_LessonNotebookButtons"));
+	static ConstructorHelpers::FObjectFinder<UTexture2D> Panel(TEXT("/Game/General/Textures/T_PlayerInfoCabinet.T_PlayerInfoCabinet"));
 	static ConstructorHelpers::FObjectFinder<UTexture2D> RewardArt(TEXT("/Game/General/Textures/T_MasterRewardGems.T_MasterRewardGems"));
-	static ConstructorHelpers::FObjectFinder<UTexture2D> Daisy(TEXT("/Game/Happiness/IconSets/Icons/Basic/Flowers/Daisy.Daisy"));
 	static ConstructorHelpers::FObjectFinder<UFont> Font(TEXT("/Game/Happiness/UI/Fonts/LessonsSerif_Font.LessonsSerif_Font"));
 	static ConstructorHelpers::FObjectFinder<USoundBase> Accept(TEXT("/Game/General/Audio/Cues/MenuAccept.MenuAccept"));
 	static ConstructorHelpers::FObjectFinder<USoundBase> Cancel(TEXT("/Game/General/Audio/Cues/MenuCancel.MenuCancel"));
 	PanelTexture = Panel.Object;
-	ButtonTexture = Buttons.Object;
 	RewardAtlasTexture = RewardArt.Object;
-	IconSetsTexture = Daisy.Object;
 	PanelFont = Font.Object;
 	AcceptSound = Accept.Object;
 	CancelSound = Cancel.Object;
@@ -116,105 +107,63 @@ void UPlayerInfoPanel::BuildLayout()
 		Block->SetVisibility(ESlateVisibility::HitTestInvisible);
 		return Block;
 	};
-	// The notebook buttons' ivory face (the pause menu's buttons)
-	FSlateBrush Face;
-	Face.DrawAs = ESlateBrushDrawType::Image;
-	Face.SetResourceObject(ButtonTexture);
-	Face.SetUVRegion(FBox2f(FVector2f(.03f, .06f), FVector2f(.98f, .485f)));
-
-	// The window takes the taps on it, so they don't close it
+	// Artwork is tightly cropped. Coordinates follow its two-row cabinet and three button faces.
 	UImage* Surface = WidgetTree->ConstructWidget<UImage>();
-	FSlateBrush SurfaceBrush;
-	SurfaceBrush.SetResourceObject(PanelTexture);
-	SurfaceBrush.DrawAs = ESlateBrushDrawType::Image;
-	SurfaceBrush.SetUVRegion(FBox2f(FVector2f(.008f, .05f), FVector2f(.992f, .93f)));
-	Surface->SetBrush(SurfaceBrush);
-	Place(Surface, FVector2D::ZeroVector, InfoWindowSize);
+	Surface->SetBrushFromTexture(PanelTexture);
+	Place(Surface, FVector2D::ZeroVector, InfoWindowSize)->SetZOrder(0);
 
-	UImage* TitlePlate = WidgetTree->ConstructWidget<UImage>();
-	TitlePlate->SetBrush(Face);
-	TitlePlate->SetVisibility(ESlateVisibility::HitTestInvisible);
-	Place(TitlePlate, FVector2D(390.f, 50.f), FVector2D(420.f, 96.f));
-	Place(MakeText(LOCTEXT("Title", "Player Info"), 48, InfoInk), FVector2D(390.f, 66.f), FVector2D(420.f, 70.f));
+	Place(MakeText(LOCTEXT("Title", "Player Info"), 52, InfoInk),
+		FVector2D(565.f, 54.f), FVector2D(370.f, 82.f))->SetZOrder(1);
+	Place(MakeText(LOCTEXT("MasteredClues", "Mastered Clues"), 34, InfoInk),
+		FVector2D(285.f, 247.f), FVector2D(440.f, 58.f))->SetZOrder(2);
 
-	// Mastered Clues: the badge's rewards in a row, the earned ones in full
-	Place(MakeText(LOCTEXT("MasteredClues", "Mastered Clues"), 36, InfoSage), FVector2D(100.f, 182.f), FVector2D(1000.f, 50.f));
-	UImage* Tray = WidgetTree->ConstructWidget<UImage>();
-	Tray->SetBrush(FSlateRoundedBoxBrush(FLinearColor(1.f, .97f, .86f, .65f), 26.f, FLinearColor(.78f, .6f, .25f, .9f), 2.f));
-	Tray->SetVisibility(ESlateVisibility::HitTestInvisible);
-	Place(Tray, FVector2D(110.f, 240.f), FVector2D(980.f, 104.f))->SetZOrder(1);
-	UHorizontalBox* RewardRow = WidgetTree->ConstructWidget<UHorizontalBox>();
-	RewardRow->SetVisibility(ESlateVisibility::HitTestInvisible);
 	Rewards.Reset();
+	constexpr float RewardCentersX[] = {146.f, 284.f, 423.f, 561.f, 700.f, 838.f};
+	constexpr float RewardCentersY[] = {405.f, 553.f};
 	const int32 NumRewards = UCampaignTree::GetNumColumns();
-	for (int32 Index = 0; Index < NumRewards; Index++)
+	for (int32 Index = 0; Index < NumRewards; ++Index)
 	{
-		UImage* Reward = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(), *FString::Printf(TEXT("Reward%d"), Index));
+		UImage* Reward = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(),
+			*FString::Printf(TEXT("Reward%d"), Index));
 		Reward->SetBrush(UPlayerLevelBadge::MakeRewardBrush(RewardAtlasTexture, Index, InfoRewardSize));
-		UHorizontalBoxSlot* RewardSlot = RewardRow->AddChildToHorizontalBox(Reward);
-		RewardSlot->SetVerticalAlignment(VAlign_Center);
-		RewardSlot->SetPadding(FMargin(Index == 0 ? 0.f : InfoRewardGap, 0.f, 0.f, 0.f));
+		Reward->SetVisibility(ESlateVisibility::HitTestInvisible);
+		Place(Reward, FVector2D(RewardCentersX[Index % 6], RewardCentersY[Index / 6]) - FVector2D(InfoRewardSize * .5f),
+			FVector2D(InfoRewardSize))->SetZOrder(3);
 		Rewards.Add(Reward);
 	}
-	const float RowWidth = NumRewards * InfoRewardSize + FMath::Max(NumRewards - 1, 0) * InfoRewardGap;
-	// Explicitly over the tray: the canvas doesn't keep the order of children at the same Z, and the tray's cream
-	// over the rewards washed them out
-	Place(RewardRow, FVector2D((InfoWindowSize.X - RowWidth) * .5f, 258.f), FVector2D(RowWidth, InfoRewardSize))->SetZOrder(2);
 
-	UImage* Divider = WidgetTree->ConstructWidget<UImage>();
-	Divider->SetBrush(FSlateRoundedBoxBrush(FLinearColor(.44f, .28f, .1f, .35f), 0.f));
-	Divider->SetVisibility(ESlateVisibility::HitTestInvisible);
-	Place(Divider, FVector2D(110.f, 376.f), FVector2D(980.f, 1.f));
-
-	// The three buttons, each with an icon in the pause menu's style
-	auto MakeButton = [&](const TCHAR* Name, const FText& Label, UWidget* Icon, float X)
+	// Transparent hit areas cover the painted faces, with a soft hover/press response.
+	auto MakeButton = [&](const TCHAR* Name, const FText& Label, float Y, float LabelX, float LabelWidth, int32 LabelPoints)
 	{
 		UButton* Button = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), Name);
 		FButtonStyle Style;
-		Style.Normal = Style.Hovered = Style.Pressed = Style.Disabled = Face;
-		Style.Hovered.TintColor = FLinearColor(1.08f, 1.08f, 1.04f);
-		Style.Pressed.TintColor = FLinearColor(.83f, .88f, .78f);
-		Style.Disabled.TintColor = FLinearColor(.77f, .76f, .68f);
-		// Inside the leaves at the face's ends
-		Style.NormalPadding = Style.PressedPadding = FMargin(44.f, 8.f);
+		Style.Normal = Style.Disabled = FSlateRoundedBoxBrush(FLinearColor::Transparent, 20.f);
+		Style.Hovered = FSlateRoundedBoxBrush(FLinearColor(1.f, 1.f, .9f, .10f), 20.f);
+		Style.Pressed = FSlateRoundedBoxBrush(FLinearColor(.12f, .18f, .06f, .16f), 20.f);
+		Style.NormalPadding = Style.PressedPadding = FMargin(0.f);
 		Button->SetStyle(Style);
 		Button->SetCursor(EMouseCursor::Hand);
-		UHorizontalBox* Row = WidgetTree->ConstructWidget<UHorizontalBox>();
-		USizeBox* IconSize = WidgetTree->ConstructWidget<USizeBox>();
-		IconSize->SetWidthOverride(40.f);
-		IconSize->SetHeightOverride(40.f);
-		Icon->SetVisibility(ESlateVisibility::HitTestInvisible);
-		IconSize->AddChild(Icon);
-		UHorizontalBoxSlot* IconSlot = Row->AddChildToHorizontalBox(IconSize);
-		IconSlot->SetPadding(FMargin(0.f, 0.f, 12.f, 0.f));
-		IconSlot->SetVerticalAlignment(VAlign_Center);
-		Row->AddChildToHorizontalBox(MakeText(Label, 28, InfoInk))->SetVerticalAlignment(VAlign_Center);
-		UButtonSlot* ContentSlot = CastChecked<UButtonSlot>(Button->AddChild(Row));
-		ContentSlot->SetHorizontalAlignment(HAlign_Center);
-		ContentSlot->SetVerticalAlignment(VAlign_Center);
-		Place(Button, FVector2D(X, 408.f), FVector2D(316.f, 106.f));
+		Place(Button, FVector2D(991.f, Y), FVector2D(455.f, 137.f))->SetZOrder(4);
+		Place(MakeText(Label, LabelPoints, InfoInk), FVector2D(LabelX, Y + 43.f), FVector2D(LabelWidth, 55.f))->SetZOrder(5);
 		return Button;
 	};
-	UPauseMenuGlyph* Gear = WidgetTree->ConstructWidget<UPauseMenuGlyph>();
-	Gear->Symbol = 3;
-	Gear->Color = InfoInk;
-	OptionsButton = MakeButton(TEXT("OptionsButton"), LOCTEXT("Options", "Options"), Gear, 110.f);
-	ULessonPopupGlyph* Book = WidgetTree->ConstructWidget<ULessonPopupGlyph>();
-	Book->Symbol = 0;
-	Book->Color = InfoInk;
-	RulesButton = MakeButton(TEXT("RulesButton"), LOCTEXT("Rules", "Game Rules"), Book, 442.f);
-	UImage* Flower = WidgetTree->ConstructWidget<UImage>();
-	Flower->SetBrushFromTexture(IconSetsTexture);
-	IconSetsButton = MakeButton(TEXT("IconSetsButton"), LOCTEXT("IconSets", "Icon Sets"), Flower, 774.f);
+	OptionsButton = MakeButton(TEXT("OptionsButton"), LOCTEXT("Options", "Options"), 214.f, 1180.f, 205.f, 31);
+	RulesButton = MakeButton(TEXT("RulesButton"), LOCTEXT("Rules", "Game Rules"), 383.f, 1248.f, 175.f, 26);
+	IconSetsButton = MakeButton(TEXT("IconSetsButton"), LOCTEXT("IconSets", "Icon Sets"), 552.f, 1260.f, 145.f, 26);
 	OptionsButton->OnClicked.AddUniqueDynamic(this, &UPlayerInfoPanel::HandleOptionsClicked);
 	RulesButton->OnClicked.AddUniqueDynamic(this, &UPlayerInfoPanel::HandleRulesClicked);
 	IconSetsButton->OnClicked.AddUniqueDynamic(this, &UPlayerInfoPanel::HandleIconSetsClicked);
 
-	// Close: a round ivory button in the top right corner
-	CloseButton = MakeCloseButton(*WidgetTree);
+	CloseButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("CloseButton"));
+	FButtonStyle CloseStyle;
+	CloseStyle.Normal = CloseStyle.Disabled = FSlateRoundedBoxBrush(FLinearColor::Transparent, 55.f);
+	CloseStyle.Hovered = FSlateRoundedBoxBrush(FLinearColor(1.f, 1.f, .9f, .10f), 55.f);
+	CloseStyle.Pressed = FSlateRoundedBoxBrush(FLinearColor(.12f, .18f, .06f, .16f), 55.f);
+	CloseStyle.NormalPadding = CloseStyle.PressedPadding = FMargin(0.f);
+	CloseButton->SetStyle(CloseStyle);
+	CloseButton->SetCursor(EMouseCursor::Hand);
 	CloseButton->OnClicked.AddUniqueDynamic(this, &UPlayerInfoPanel::HandleCloseClicked);
-	// Right of the corner's leaves, inside the frame
-	Place(CloseButton, FVector2D(1088.f, 80.f), FVector2D(66.f, 66.f));
+	Place(CloseButton, FVector2D(1344.f, 79.f), FVector2D(113.f))->SetZOrder(4);
 
 	Refresh();
 }

@@ -234,3 +234,7 @@ Learn More broadcasts `OnLearnMoreRequested(ECampaignLesson)`. `UCampaignTreeWid
 WBP_GameRules (`RulesClass`) over the tree and popup (Z 300 in its root canvas), selected at that clue's subject
 with the index scrolled to it (`UGameRulesWidget::ShowLesson`); its Close returns to the popup. A clue type with
 no rules subject, and Game Basics (VerticalTwo, which teaches the game itself), open at Basics > Objective.
+
+### Icon Sets catalogue UI
+
+`UI/IconSetsPanel` is a code-built book: a vertical selectable list on the left, a large square icon grid and state button on the right. Row status buttons and the large button enable/disable the set; row backgrounds select the preview. `UIconSetSubsystem::GetEntries` filters hidden sets and supplies achievement locks; `SetEnabled` keeps at least eight enabled. Purchase presentation follows `FIconSetEntry::bForSale` and `UIconSetStoreSubsystem`: localized prices, purchasing/pending states, and `Buy(Entry.Id)`. Store change notifications refresh both the list and the selected preview while preserving selection and scroll position.
