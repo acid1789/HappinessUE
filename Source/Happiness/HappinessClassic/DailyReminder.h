@@ -13,6 +13,10 @@
  *
  * Permission: asked for once, after the first daily solve (iOS always asks; Android 13+ asks for POST_NOTIFICATIONS,
  * declared in Happiness_UPL.xml). Players turn reminders off in the phone's settings. Android and iOS only.
+ *
+ * Tapping a reminder while the game is open in the background brings it back on the main menu (the mode screen), so
+ * the player can go to the daily from wherever they left it: the game level is opened again, as at a start. A puzzle
+ * in progress was saved by the player's last action. At a cold start the game starts there anyway.
  */
 UCLASS(Config = Game)
 class HAPPINESS_API UDailyReminderSubsystem : public UGameInstanceSubsystem
@@ -54,10 +58,22 @@ public:
 
 private:
 	void HandleForeground();
+	void HandleBackground() { bWasBackgrounded = true; }
+	/** iOS: a reminder was tapped (the engine's ApplicationReceivedLocalNotificationDelegate) */
+	void HandleNotificationTapped(FString Event, int32 FireDate, int32 AppState);
+	/** Android: a reminder brought the running game back (Happiness_UPL.xml's onNewIntent). Clears it. */
+	static bool TakeNotificationTap();
+	/** Back to the main menu: the game level again, as at a start */
+	void ReturnToMainMenu();
 	/** Ask for permission to notify, the first time today's daily is solved */
 	void RequestPermissionOnce();
 	/** Remove reminders already shown and the app icon's badge (iOS) */
 	void ClearShown();
 
 	FDelegateHandle ForegroundHandle;
+	FDelegateHandle BackgroundHandle;
+	FDelegateHandle NotificationHandle;
+
+	/** The game has been in the background since it started: a tapped reminder brings back a running game */
+	bool bWasBackgrounded = false;
 };

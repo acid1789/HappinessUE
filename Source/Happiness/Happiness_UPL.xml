@@ -39,8 +39,29 @@
 		</insert>
 	</gameActivityOnCreateBeginningAdditions>
 
+	<gameActivityOnNewIntentAdditions>
+		<insert>
+		// A reminder tapped while the game was already running (a cold start comes through onCreate instead):
+		// UDailyReminderSubsystem takes it as the game comes back, and goes to the main menu
+		if (newIntent != null &amp;&amp; newIntent.getBooleanExtra("localNotificationAppLaunched", false))
+		{
+			Happiness_bNotificationTapped = true;
+		}
+		</insert>
+	</gameActivityOnNewIntentAdditions>
+
 	<gameActivityClassAdditions>
 		<insert>
+	/** A reminder brought the running game back (onNewIntent), until UDailyReminderSubsystem takes it */
+	private volatile boolean Happiness_bNotificationTapped = false;
+
+	public boolean AndroidThunkJava_Happiness_TakeNotificationTap()
+	{
+		boolean bTapped = Happiness_bNotificationTapped;
+		Happiness_bNotificationTapped = false;
+		return bTapped;
+	}
+
 	/**
 	 * Hide Back/Home/Recents again each time the game's window gets focus back. The engine hides them in onResume, but
 	 * coming back from a notification the shade is still closing then, and on Android 11+ the bars it brings stay up

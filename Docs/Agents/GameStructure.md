@@ -54,7 +54,9 @@ the end screen; the remaining bursts go off behind it. The burst icons stay hidd
 A board completed **with mistakes** gets no end screen and records no result. `RefreshPuzzle` shows `PuzzleFailed`
 (`UI/PuzzleFailedWidget`, Z 20), `ShowFinalErrors` marks the wrong icons (if that option is on) and `UnhideClues` brings back every hidden clue. It is a small
 ivory banner across the top edge of the grid; the rest of it is clear but blocks the board. Undo (`OnUndo`) runs
-`Undo` then `RefreshPuzzle`, so with nothing to undo it simply shows again; Restart (`OnRestart`) resets like the pause menu's Reset Puzzle. A **reset** (`UPuzzle::ResetBoard`) keeps the clock and the hints used; only an end screen's Restart (`RestartPuzzle`, `UPuzzle::Reset`) starts over at 0:00 with no hints.
+`Undo` then `RefreshPuzzle`, so with nothing to undo it simply shows again; Restart (`OnRestart`) resets like the pause menu's Reset Puzzle. A **reset** (`UPuzzle::ResetBoard`) keeps the clock and the hints used; only an end screen's Restart (`RestartPuzzle`) starts over as if the puzzle had just been entered: no hint or selected
+clue, `UPuzzle::Reset` (no hints used), the clock at 0:00, then `SetPuzzle` again (clue panels rebuilt, undo list
+emptied; `RestoreUndo` only acts on the first `SetPuzzle` after a load) and one save through `RefreshPuzzle`.
 The widget builds its own layout in C++ (`RebuildWidget`) with the existing hint-reading frame and notebook button art.
 
 The player controller `General/Blueprints/PC_Happiness` starts, loads and saves puzzles and holds the player's
@@ -147,7 +149,11 @@ itself (alerts and sound, no push); Android 13+ asks for `POST_NOTIFICATIONS` th
 `bRestoreNotificationsOnReboot` brings Android's back after a restart.
 Tapping one starts or resumes GameActivity without SplashActivity; `Happiness_UPL.xml` keeps Back/Home/Recents hidden
 then: it passes the full-screen settings on at a cold start, and hides the bars again whenever the game's window gets
-focus back (`onWindowFocusChanged`), as the notification shade closes after the engine's own `onResume` hide. On Android the small icon is the
+focus back (`onWindowFocusChanged`), as the notification shade closes after the engine's own `onResume` hide.
+Tapping one while the game is running in the background goes to the main menu (`UDailyReminderSubsystem::ReturnToMainMenu`
+opens the game level again, as at a start): Android catches the tap in `onNewIntent` (`Happiness_UPL.xml`,
+`AndroidThunkJava_Happiness_TakeNotificationTap`, read as the game comes back), iOS through the engine's
+`ApplicationReceivedLocalNotificationDelegate`; only once the game has been in the background, so a cold start is left alone. On Android the small icon is the
 `ic_notification` drawable if there is one, else the app icon. Test on a phone with `Happiness.Reminder.Test [seconds]`.
 Android and iOS only; it does nothing in the editor.
 
@@ -180,6 +186,16 @@ which resumes or opens the settings): between `BeginResume` and `EndResume`, loa
 played: today's unsolved daily; a lesson puzzle whose stage is still on that seed
 (`UCampaignSubsystem::ResumeLessonPuzzle` restores its session). Finishing a puzzle (`HappinessFinished`) saves no
 puzzle into its slot. The pause menu's Main Menu saves the puzzle, like Save and Quit, rather than dropping it.
+The undo list goes with the puzzle: as a game save is written, `UHappinessSaveGame` takes the puzzle screen's
+`ActionList` (`HappinessAction` entries, as property text, `UndoActions`) and the puzzle's solution (`UndoSolution`);
+`WBP_Happiness`'s `SetPuzzle` empties the list, then `UHappinessSaveGame::RestoreUndo` brings the saved one back if
+the screen shows that puzzle on the board it was saved with (a resume; a new puzzle never matches). Hidden clues go
+with it too (`HiddenClues`: each clue's place in the puzzle's horizontal or vertical clues, in the order they were
+hidden, with its undo step; `UPuzzle::GetHiddenClues` / `RestoreHiddenClues`, which takes them off the rebuilt clue
+panels in that order). `Undo` removes the action before `RefreshPuzzle` saves. Clue changes aren't board moves, so
+`HideSelectedClue`, `Undo` (when it brings a clue back) and `UnhideClues` call `SaveHappiness` themselves.
+A save of a solved board (the solving move, the end screen's saves) clears `ActivePuzzle`, so leaving the game on the
+end screen doesn't resume a finished puzzle (`UHappinessSaveGame::IsBoardSolved`; `CanResume` also refuses such a slot).
 `UHappinessSaveGame::HasActivePuzzle` is now always false, so `WBP_GameSelect` never resumes at startup. A save from
 before slots has its puzzle moved into the slot of the mode it was being played in (`MigrateOldSave`). Each lesson's progress includes the time spent on its
 puzzles (`FLessonProgress::PlaySeconds`, counted by `UCampaignSubsystem::TickPlayTime` while one is on screen,

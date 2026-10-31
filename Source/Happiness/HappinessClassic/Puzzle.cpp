@@ -1634,6 +1634,83 @@ void UPuzzle::UnplaceIcon(int Row, int Col)
 	Cell.m_bValues = Candidates;
 }
 
+namespace
+{
+	UWidget* FindClueWidget(const UPanelWidget* List, const UObject* Clue)
+	{
+		const TArray<UWidget*> Children = List->GetAllChildren();
+		UWidget* const* Found = Children.FindByPredicate([Clue](const UWidget* Child) { return GetWidgetClue(Child) == Clue; });
+		return Found ? *Found : nullptr;
+	}
+}
+
+void UPuzzle::GetHiddenClues(const UPanelWidget* HorizontalList, const UPanelWidget* VerticalList, TArray<FSavedClueHide>& Out) const
+{
+	Out.Reset();
+	if (!HorizontalList || !VerticalList)
+	{
+		return;
+	}
+	auto Add = [&Out](bool bVertical, int32 ClueIndex, int32 ActionCount)
+	{
+		// A clue hidden again (after Unhide Clues) is where it was last hidden
+		Out.RemoveAll([&](const FSavedClueHide& Saved) { return Saved.bVertical == bVertical && Saved.ClueIndex == ClueIndex; });
+		FSavedClueHide& Saved = Out.AddDefaulted_GetRef();
+		Saved.bVertical = bVertical;
+		Saved.ClueIndex = ClueIndex;
+		Saved.ActionCount = ActionCount;
+	};
+	// The hides that can be undone, in their order
+	for (const FClueHide& Hide : m_ClueHides)
+	{
+		const bool bVertical = Hide.Panel == VerticalList;
+		UClue* Clue = Cast<UClue>(GetWidgetClue(Hide.Widget));
+		const int32 ClueIndex = (bVertical ? m_VeritcalClues : m_HorizontalClues).IndexOfByKey(Clue);
+		if ((bVertical || Hide.Panel == HorizontalList) && ClueIndex != INDEX_NONE && !FindClueWidget(Hide.Panel, Clue))
+		{
+			Add(bVertical, ClueIndex, Hide.ActionCount);
+		}
+	}
+	// Any others
+	for (const bool bVertical : { false, true })
+	{
+		const TArray<UClue*>& Clues = bVertical ? m_VeritcalClues : m_HorizontalClues;
+		for (int32 ClueIndex = 0; ClueIndex < Clues.Num(); ClueIndex++)
+		{
+			const bool bSaved = Out.ContainsByPredicate([&](const FSavedClueHide& Saved) { return Saved.bVertical == bVertical && Saved.ClueIndex == ClueIndex; });
+			if (!bSaved && !FindClueWidget(bVertical ? VerticalList : HorizontalList, Clues[ClueIndex]))
+			{
+				Add(bVertical, ClueIndex, -1);
+			}
+		}
+	}
+}
+
+void UPuzzle::RestoreHiddenClues(UPanelWidget* HorizontalList, UPanelWidget* VerticalList, const TArray<FSavedClueHide>& Hidden)
+{
+	m_ClueHides.Reset();
+	if (!HorizontalList || !VerticalList)
+	{
+		return;
+	}
+	for (const FSavedClueHide& Saved : Hidden)
+	{
+		UPanelWidget* List = Saved.bVertical ? VerticalList : HorizontalList;
+		const TArray<UClue*>& Clues = Saved.bVertical ? m_VeritcalClues : m_HorizontalClues;
+		UWidget* Widget = Clues.IsValidIndex(Saved.ClueIndex) ? FindClueWidget(List, Clues[Saved.ClueIndex]) : nullptr;
+		if (!Widget)
+		{
+			continue;
+		}
+		// Hidden in the same order, each comes off at the place it had then
+		if (Saved.ActionCount >= 0)
+		{
+			RecordClueHide(Widget, Saved.ActionCount);
+		}
+		Widget->RemoveFromParent();
+	}
+}
+
 void UPuzzle::RecordClueHide(UWidget* ClueWidget, int32 ActionCount)
 {
 	UPanelWidget* Panel = ClueWidget ? ClueWidget->GetParent() : nullptr;

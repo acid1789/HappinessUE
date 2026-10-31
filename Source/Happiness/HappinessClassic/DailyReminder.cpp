@@ -5,6 +5,7 @@
 #include "Engine/GameInstance.h"
 #include "HAL/IConsoleManager.h"
 #include "Kismet/BlueprintPlatformLibrary.h"
+#include "Kismet/GameplayStatics.h"
 #include "Misc/ConfigCacheIni.h"
 #include "Misc/CoreDelegates.h"
 #include "Misc/DateTime.h"
@@ -48,6 +49,8 @@ void UDailyReminderSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 		Daily->OnChanged.AddUniqueDynamic(this, &UDailyReminderSubsystem::Reschedule);
 	}
 	ForegroundHandle = FCoreDelegates::ApplicationHasEnteredForegroundDelegate.AddUObject(this, &UDailyReminderSubsystem::HandleForeground);
+	BackgroundHandle = FCoreDelegates::ApplicationWillEnterBackgroundDelegate.AddUObject(this, &UDailyReminderSubsystem::HandleBackground);
+	NotificationHandle = FCoreDelegates::ApplicationReceivedLocalNotificationDelegate.AddUObject(this, &UDailyReminderSubsystem::HandleNotificationTapped);
 	ClearShown();
 	Reschedule();
 }
@@ -55,6 +58,8 @@ void UDailyReminderSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 void UDailyReminderSubsystem::Deinitialize()
 {
 	FCoreDelegates::ApplicationHasEnteredForegroundDelegate.Remove(ForegroundHandle);
+	FCoreDelegates::ApplicationWillEnterBackgroundDelegate.Remove(BackgroundHandle);
+	FCoreDelegates::ApplicationReceivedLocalNotificationDelegate.Remove(NotificationHandle);
 	Super::Deinitialize();
 }
 
@@ -63,6 +68,43 @@ void UDailyReminderSubsystem::HandleForeground()
 	// The day may have changed while the app was away
 	ClearShown();
 	Reschedule();
+	if (TakeNotificationTap() && bWasBackgrounded)
+	{
+		ReturnToMainMenu();
+	}
+}
+
+void UDailyReminderSubsystem::HandleNotificationTapped(FString Event, int32 FireDate, int32 AppState)
+{
+	// At a cold start (never backgrounded yet) the game is starting on the main menu anyway
+	if (Event == ActivationEvent && bWasBackgrounded)
+	{
+		ReturnToMainMenu();
+	}
+}
+
+bool UDailyReminderSubsystem::TakeNotificationTap()
+{
+#if PLATFORM_ANDROID
+	if (JNIEnv* Env = FAndroidApplication::GetJavaEnv())
+	{
+		static jmethodID Method = FJavaWrapper::FindMethod(Env, FJavaWrapper::GameActivityClassID,
+			"AndroidThunkJava_Happiness_TakeNotificationTap", "()Z", false);
+		return Method && FJavaWrapper::CallBooleanMethod(Env, FJavaWrapper::GameActivityThis, Method);
+	}
+#endif
+	return false;
+}
+
+void UDailyReminderSubsystem::ReturnToMainMenu()
+{
+	UWorld* World = GetGameInstance() ? GetGameInstance()->GetWorld() : nullptr;
+	if (!World)
+	{
+		return;
+	}
+	UE_LOG(LogDailyReminder, Log, TEXT("A reminder brought the game back: to the main menu"));
+	UGameplayStatics::OpenLevel(World, FName(*UGameplayStatics::GetCurrentLevelName(World, false)));
 }
 
 void UDailyReminderSubsystem::Reschedule()
