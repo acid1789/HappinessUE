@@ -147,7 +147,11 @@ itself (alerts and sound, no push); Android 13+ asks for `POST_NOTIFICATIONS` th
 `bRestoreNotificationsOnReboot` brings Android's back after a restart.
 Tapping one starts or resumes GameActivity without SplashActivity; `Happiness_UPL.xml` keeps Back/Home/Recents hidden
 then: it passes the full-screen settings on at a cold start, and hides the bars again whenever the game's window gets
-focus back (`onWindowFocusChanged`), as the notification shade closes after the engine's own `onResume` hide. On Android the small icon is the
+focus back (`onWindowFocusChanged`), as the notification shade closes after the engine's own `onResume` hide.
+Tapping one while the game is running in the background goes to the main menu (`UDailyReminderSubsystem::ReturnToMainMenu`
+opens the game level again, as at a start): Android catches the tap in `onNewIntent` (`Happiness_UPL.xml`,
+`AndroidThunkJava_Happiness_TakeNotificationTap`, read as the game comes back), iOS through the engine's
+`ApplicationReceivedLocalNotificationDelegate`; only once the game has been in the background, so a cold start is left alone. On Android the small icon is the
 `ic_notification` drawable if there is one, else the app icon. Test on a phone with `Happiness.Reminder.Test [seconds]`.
 Android and iOS only; it does nothing in the editor.
 

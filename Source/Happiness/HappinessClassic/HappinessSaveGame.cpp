@@ -62,7 +62,7 @@ namespace
 		return RowProperty && RowProperty->Struct == FPuzzleRow::StaticStruct() ? RowsProperty->ContainerPtrToValuePtr<TArray<FPuzzleRow>>(&Save) : nullptr;
 	}
 
-	bool SameRows(const TArray<FPuzzleRow>& A, const TArray<FPuzzleRow>& B)
+	bool SaveGameSameRows(const TArray<FPuzzleRow>& A, const TArray<FPuzzleRow>& B)
 	{
 		if (A.Num() != B.Num())
 		{
@@ -125,7 +125,7 @@ void UHappinessSaveGame::RestoreUndo(UUserWidget* Screen)
 	}
 	// The board as saved (SG_Happiness's Rows): the puzzle was just loaded from this save
 	const TArray<FPuzzleRow>* SavedRows = GetSavedRows(*Save);
-	if (!SavedRows || !SameRows(*SavedRows, Puzzle->m_Rows))
+	if (!SavedRows || !SaveGameSameRows(*SavedRows, Puzzle->m_Rows))
 	{
 		UE_LOG(LogTemp, Log, TEXT("RestoreUndo: the board isn't the saved one"));
 		return;
