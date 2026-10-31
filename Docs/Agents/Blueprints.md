@@ -104,3 +104,5 @@ with `read_graph_dsl` to confirm the result.
   (e.g. `RemoveFromParent` over `GetAllChildren`) skips every other item. Iterate with `ReverseforEachLoop`.
 - **Local variables are per call,** so a function can call itself (used by `WBP_Happiness.DoHint`).
 - After C++ changes to a widget's parent class, recompile the Widget Blueprint and the Blueprints that use it.
+
+- The graph DSL can omit an alternate execution path joining a shared tail. Before fixing an apparently missing Is Not Valid path, inspect its actual connected pins; WBP_Options Apply already connects both puzzle-present and puzzle-absent paths to the general settings/save tail.

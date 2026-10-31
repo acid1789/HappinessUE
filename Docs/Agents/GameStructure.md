@@ -41,7 +41,7 @@ functions (`GetNumStages`, `GetStageSize`, `GetMaxPoints`, ...) follow it.
 | `Happiness/UI/WBP_CampaignEndScreen` | `UI/CampaignEndScreenWidget` | Campaign end screen: Free Play scoring plus campaign progress |
 | (`PuzzleFailed` in `WBP_Happiness`) | `UI/PuzzleFailedWidget` | Completed with mistakes: Undo / Restart over the board |
 | `Happiness/UI/WBP_PauseMenu`, `WBP_ConfirmDialog`, `WBP_CellDialog`, `WBP_HelpPanel` | — | Overlays in the puzzle screen |
-| `Happiness/UI/WBP_Options` | — | Options: volumes, checkboxes, `WBP_RemoveAds` (`UI/RemoveAdsPanel`). Opened from the pause menu and from the player info; Apply refreshes the puzzle screen only when there is one and it is visible, and sets the puzzle's AutoSetIcons only when there is a puzzle |
+| `Happiness/UI/WBP_Options` | `UI/OptionsMenuWidget` | Garden Options A: Sound Effect Volume, Music Volume, Prevent Sleep on Idle, Animate Hint Button. Native layout reuses the original Blueprint controls and delegates; Show/Apply/Cancel and sound previews stay in the Blueprint. Only the four requested settings are displayed; hidden legacy controls retain their loaded values. SettingsScroll holds the settings, with Apply/Cancel fixed below. Add future WBP_CheckBox children to the designer's ExtraSettings vertical box: native layout applies the same row/check styling and includes them in scrolling; wire their settings in Show/Apply as usual. Opened from pause and Player Info. |
 
 A correctly solved puzzle celebrates before its end screen. `WBP_Happiness.RefreshPuzzle` asks the board
 (`UGamePanelWidget::PlaySolvedFireworks`) first: if it returns true, every icon bursts into confetti

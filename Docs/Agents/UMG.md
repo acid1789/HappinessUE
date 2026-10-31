@@ -117,3 +117,5 @@ python Tools/umg.py reorder_widget_tree '{"root": "Content", "tree": "[\"TitleTe
 - **EditableTextBox fonts:** set `WidgetStyle.textStyle.font`. A top-level `WidgetStyle.font` is silently ignored in UE 5.8; copy the neighboring TextBlock font into the nested text style to match it.
 
 - TextBlock `ColorAndOpacity` is an `FSlateColor`: set `{"specifiedColor":{"r":0.17,"g":0.085,"b":0.035,"a":1},"colorUseRule":"UseColor_Specified"}`. Flat RGBA keys are silently ignored on new TextBlocks; query the stored nested value to confirm. Images use an `FLinearColor` instead.
+
+- When a native layout reuses Blueprint-typed controls (such as WBP_CheckBox), look them up by name into differently named transient members. Declaring a same-named BindWidget as UUserWidget promotes the Blueprint variable to that base type and breaks graph calls to the specific Blueprint class.
