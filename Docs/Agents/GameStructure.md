@@ -180,6 +180,16 @@ which resumes or opens the settings): between `BeginResume` and `EndResume`, loa
 played: today's unsolved daily; a lesson puzzle whose stage is still on that seed
 (`UCampaignSubsystem::ResumeLessonPuzzle` restores its session). Finishing a puzzle (`HappinessFinished`) saves no
 puzzle into its slot. The pause menu's Main Menu saves the puzzle, like Save and Quit, rather than dropping it.
+The undo list goes with the puzzle: as a game save is written, `UHappinessSaveGame` takes the puzzle screen's
+`ActionList` (`HappinessAction` entries, as property text, `UndoActions`) and the puzzle's solution (`UndoSolution`);
+`WBP_Happiness`'s `SetPuzzle` empties the list, then `UHappinessSaveGame::RestoreUndo` brings the saved one back if
+the screen shows that puzzle on the board it was saved with (a resume; a new puzzle never matches). Hidden clues go
+with it too (`HiddenClues`: each clue's place in the puzzle's horizontal or vertical clues, in the order they were
+hidden, with its undo step; `UPuzzle::GetHiddenClues` / `RestoreHiddenClues`, which takes them off the rebuilt clue
+panels in that order). `Undo` removes the action before `RefreshPuzzle` saves. Clue changes aren't board moves, so
+`HideSelectedClue`, `Undo` (when it brings a clue back) and `UnhideClues` call `SaveHappiness` themselves.
+A save of a solved board (the solving move, the end screen's saves) clears `ActivePuzzle`, so leaving the game on the
+end screen doesn't resume a finished puzzle (`UHappinessSaveGame::IsBoardSolved`; `CanResume` also refuses such a slot).
 `UHappinessSaveGame::HasActivePuzzle` is now always false, so `WBP_GameSelect` never resumes at startup. A save from
 before slots has its puzzle moved into the slot of the mode it was being played in (`MigrateOldSave`). Each lesson's progress includes the time spent on its
 puzzles (`FLessonProgress::PlaySeconds`, counted by `UCampaignSubsystem::TickPlayTime` while one is on screen,

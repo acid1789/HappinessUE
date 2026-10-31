@@ -7,7 +7,10 @@
 #include "IconSets.h"
 #include "DailyPuzzle.h"
 #include "PuzzleSlots.h"
+#include "Puzzle.h"
 #include "HappinessSaveGame.generated.h"
+
+class UUserWidget;
 
 /**
  * Parent of SG_Happiness, the game's save. Adds the campaign progress, the free play settings and the icon set choices to it.
@@ -89,9 +92,41 @@ public:
 	UPROPERTY(SaveGame)
 	FPuzzleSlotInfo PuzzleSlot;
 
+	/**
+	 * The puzzle's undo list: the puzzle screen's ActionList (WBP_Happiness, HappinessAction entries) as property
+	 * text, taken as the save is written (SaveHappiness), and the puzzle's solution, which tells the puzzle apart.
+	 * Empty when no puzzle is being played.
+	 */
+	UPROPERTY(SaveGame)
+	FString UndoActions;
+
+	UPROPERTY(SaveGame)
+	TArray<int32> UndoSolution;
+
+	/** The clues the player hid, in the order they were (UPuzzle::GetHiddenClues) */
+	UPROPERTY(SaveGame)
+	TArray<FSavedClueHide> HiddenClues;
+
+	/**
+	 * WBP_Happiness's SetPuzzle, after emptying its undo list and building its clue panels: if Screen shows the game
+	 * save's puzzle (PC_Happiness's SaveGame) on the board it was saved with, that is a resume, and the saved undo
+	 * list and hidden clues come back.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Happiness")
+	static void RestoreUndo(UUserWidget* Screen);
+
+	/** The saved board (SG_Happiness's Rows) is the solved puzzle (UndoSolution): it isn't in progress any more */
+	bool IsBoardSolved() const;
+
 private:
+	/** UndoActions, UndoSolution and HiddenClues from the puzzle being played (PC_Happiness's HappinessPuzzle, on its screen) */
+	void CaptureUndo();
+
 	/** Read from disk, so not a new save of the current game: writing it again doesn't touch the puzzle slots */
 	bool bLoadedFromDisk = false;
+
+	/** The last game save read from disk (PC_Happiness's LoadHappiness, as a puzzle is resumed): RestoreUndo's */
+	static TWeakObjectPtr<UHappinessSaveGame> LastLoaded;
 
 	static bool bOldSaveChecked;
 	static bool bOldSaveReset;

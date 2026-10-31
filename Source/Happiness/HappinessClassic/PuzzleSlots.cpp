@@ -33,6 +33,9 @@ namespace
 			}
 			It->CopyCompleteValue_InContainer(&To, &From);
 		}
+		To.UndoActions = From.UndoActions;
+		To.UndoSolution = From.UndoSolution;
+		To.HiddenClues = From.HiddenClues;
 	}
 
 	/** SG_Happiness's ActivePuzzle: it holds a puzzle in progress */
@@ -125,7 +128,8 @@ void UPuzzleSlotSubsystem::NotePuzzleStarted(const UObject* WorldContextObject)
 bool UPuzzleSlotSubsystem::CanResume(EPuzzleSlot Slot, FPuzzleSlotInfo* OutInfo) const
 {
 	const UHappinessSaveGame* SlotSave = LoadSlot(Slot);
-	if (!SlotSave || !HasPuzzle(*SlotSave) || SlotSave->PuzzleSlot.Slot != Slot)
+	// A solved board is over, even in a slot saved before that was marked on save
+	if (!SlotSave || !HasPuzzle(*SlotSave) || SlotSave->PuzzleSlot.Slot != Slot || SlotSave->IsBoardSolved())
 	{
 		return false;
 	}

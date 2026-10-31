@@ -6,6 +6,8 @@
 #include "HappinessClassic/CampaignTree.h"
 #include "HappinessClassic/CampaignProgress.h"
 #include "HappinessClassic/DailyPuzzle.h"
+#include "HappinessClassic/HappinessSaveGame.h"
+#include "Kismet/GameplayStatics.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "Misc/OutputDevice.h"
@@ -349,6 +351,52 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 	int32 SeedMin = 1, SeedMax = 1, Size = 6, Diff = 1;
 	FString SeedRange, Mode = TEXT("batch");
 	FString OutPath = FPaths::ProjectSavedDir() / TEXT("PuzzleCLI.txt");
+
+	// TEMP diagnostic: does a save slot's undo list match its puzzle as LoadHappiness rebuilds it
+	FString CheckSlot;
+	if (FParse::Value(Cmd, TEXT("checkslot="), CheckSlot))
+	{
+		UHappinessSaveGame* Save = Cast<UHappinessSaveGame>(UGameplayStatics::LoadGameFromSlot(CheckSlot, 0));
+		if (!Save)
+		{
+			UE_LOG(LogTemp, Display, TEXT("CHECKSLOT: no save"));
+			return 1;
+		}
+		auto GetInt = [Save](const TCHAR* Name)
+		{
+			const FIntProperty* P = FindFProperty<FIntProperty>(Save->GetClass(), Name);
+			return P ? P->GetPropertyValue_InContainer(Save) : -999;
+		};
+		const int32 Number = GetInt(TEXT("Number")), PSize = GetInt(TEXT("PuzzleSize")), PDiff = GetInt(TEXT("Difficulty"));
+		UPuzzle* P = NewObject<UPuzzle>();
+		P->Init(Number, PSize, PDiff);
+		FString SavedSol, GenSol;
+		for (int32 V : Save->UndoSolution) SavedSol += FString::Printf(TEXT("%d"), V);
+		for (int32 V : P->m_Solution) GenSol += FString::Printf(TEXT("%d"), V);
+		UE_LOG(LogTemp, Display, TEXT("CHECKSLOT: number=%d size=%d diff=%d actions=%d chars hidden=%d"), Number, PSize, PDiff, Save->UndoActions.Len(), Save->HiddenClues.Num());
+		UE_LOG(LogTemp, Display, TEXT("CHECKSLOT: saved solution %s"), *SavedSol);
+		UE_LOG(LogTemp, Display, TEXT("CHECKSLOT: built solution %s"), *GenSol);
+		const FArrayProperty* RowsProperty = FindFProperty<FArrayProperty>(Save->GetClass(), TEXT("Rows"));
+		const FStructProperty* RowProperty = RowsProperty ? CastField<FStructProperty>(RowsProperty->Inner) : nullptr;
+		UE_LOG(LogTemp, Display, TEXT("CHECKSLOT: rows property %d struct %s"), RowsProperty != nullptr,
+			RowProperty ? *RowProperty->Struct->GetPathName() : TEXT("none"));
+		if (RowProperty)
+		{
+			const TArray<FPuzzleRow>& Rows = *RowsProperty->ContainerPtrToValuePtr<TArray<FPuzzleRow>>(Save);
+			for (const FPuzzleRow& Row : Rows)
+			{
+				FString Line;
+				for (const FPuzzleCell& Cell : Row.m_Cells)
+				{
+					Line += FString::Printf(TEXT("[%d:"), Cell.m_iFinalIcon);
+					for (bool b : Cell.m_bValues) Line += b ? TEXT("1") : TEXT("0");
+					Line += TEXT("] ");
+				}
+				UE_LOG(LogTemp, Display, TEXT("CHECKSLOT: row %s"), *Line);
+			}
+		}
+		return 0;
+	}
 
 	if (FParse::Value(Cmd, TEXT("seeds="), SeedRange))
 	{

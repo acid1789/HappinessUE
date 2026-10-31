@@ -35,6 +35,23 @@ struct FClueHide
 	int32 ActionCount = 0;
 };
 
+/** A hidden clue in a save (UPuzzle::GetHiddenClues): its place in the puzzle's horizontal or vertical clues */
+USTRUCT()
+struct FSavedClueHide
+{
+	GENERATED_BODY()
+
+	UPROPERTY(SaveGame)
+	bool bVertical = false;
+
+	UPROPERTY(SaveGame)
+	int32 ClueIndex = INDEX_NONE;
+
+	/** Its undo step (FClueHide::ActionCount), or -1 if it has none */
+	UPROPERTY(SaveGame)
+	int32 ActionCount = -1;
+};
+
 /** How hard a puzzle is to solve, from UPuzzle::ComputeRating */
 USTRUCT(BlueprintType)
 struct FPuzzleRating
@@ -292,6 +309,14 @@ public:
 	// undo list (since reset) are dropped, and so are clues already back on show (Unhide Clues, a hint).
 	UFUNCTION(BlueprintCallable)
 	bool UndoClueHide(int32 ActionCount);
+
+	// Saving the hidden clues (UHappinessSaveGame): the clues missing from the clue panels' lists (WBP_Happiness's
+	// HorizontalCluePanel and VerticalCluePanel, their ScrollList), in the order they were hidden, with their undo steps
+	void GetHiddenClues(const UPanelWidget* HorizontalList, const UPanelWidget* VerticalList, TArray<FSavedClueHide>& Out) const;
+
+	// Back from a save, on freshly built clue lists: those clues come off again, in the same order, and their undo
+	// steps are recorded again
+	void RestoreHiddenClues(UPanelWidget* HorizontalList, UPanelWidget* VerticalList, const TArray<FSavedClueHide>& Hidden);
 
 	// The placed icon of the cell at Row, Col is being cleared (WBP_Happiness's RestoreIocn and BreakFinalIcon, which
 	// rebuild that cell's own candidates): it becomes possible again in every other open cell of the row. Placed
