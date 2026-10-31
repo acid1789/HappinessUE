@@ -113,8 +113,10 @@ void UHappinessSaveGame::CaptureUndo()
 
 void UHappinessSaveGame::RestoreUndo(UUserWidget* Screen)
 {
-	// The game save LoadHappiness just loaded (PC_Happiness keeps it only in a local variable)
+	// The game save LoadHappiness just loaded (PC_Happiness keeps it only in a local variable). Only for the puzzle set
+	// up right after the load: a later SetPuzzle (Restart Puzzle) starts afresh.
 	UHappinessSaveGame* Save = LastLoaded.Get();
+	LastLoaded = nullptr;
 	UPuzzle* Puzzle = Cast<UPuzzle>(GetSaveObjectProperty(Screen, TEXT("ThePuzzle")));
 	const FArrayProperty* Actions = FindActionList(Screen);
 	if (!Save || !Puzzle || !Actions || Save->UndoSolution.IsEmpty() || Save->UndoSolution != Puzzle->m_Solution)

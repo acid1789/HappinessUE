@@ -54,7 +54,9 @@ the end screen; the remaining bursts go off behind it. The burst icons stay hidd
 A board completed **with mistakes** gets no end screen and records no result. `RefreshPuzzle` shows `PuzzleFailed`
 (`UI/PuzzleFailedWidget`, Z 20), `ShowFinalErrors` marks the wrong icons (if that option is on) and `UnhideClues` brings back every hidden clue. It is a small
 ivory banner across the top edge of the grid; the rest of it is clear but blocks the board. Undo (`OnUndo`) runs
-`Undo` then `RefreshPuzzle`, so with nothing to undo it simply shows again; Restart (`OnRestart`) resets like the pause menu's Reset Puzzle. A **reset** (`UPuzzle::ResetBoard`) keeps the clock and the hints used; only an end screen's Restart (`RestartPuzzle`, `UPuzzle::Reset`) starts over at 0:00 with no hints.
+`Undo` then `RefreshPuzzle`, so with nothing to undo it simply shows again; Restart (`OnRestart`) resets like the pause menu's Reset Puzzle. A **reset** (`UPuzzle::ResetBoard`) keeps the clock and the hints used; only an end screen's Restart (`RestartPuzzle`) starts over as if the puzzle had just been entered: no hint or selected
+clue, `UPuzzle::Reset` (no hints used), the clock at 0:00, then `SetPuzzle` again (clue panels rebuilt, undo list
+emptied; `RestoreUndo` only acts on the first `SetPuzzle` after a load) and one save through `RefreshPuzzle`.
 The widget builds its own layout in C++ (`RebuildWidget`) with the existing hint-reading frame and notebook button art.
 
 The player controller `General/Blueprints/PC_Happiness` starts, loads and saves puzzles and holds the player's
