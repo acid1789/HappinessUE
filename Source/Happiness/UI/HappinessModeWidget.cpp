@@ -8,6 +8,7 @@
 #include "Ads/AdRemoval.h"
 #include "Blueprint/WidgetTree.h"
 #include "Engine/Font.h"
+#include "Engine/Texture2D.h"
 #include "HappinessClassic/DailyPuzzle.h"
 #include "HappinessClassic/PuzzleSlots.h"
 #include "Components/Image.h"
@@ -29,6 +30,8 @@ UHappinessModeWidget::UHappinessModeWidget(const FObjectInitializer& ObjectIniti
 {
 	static ConstructorHelpers::FObjectFinder<USoundBase> Unlock(TEXT("/Game/General/Audio/Cues/PuzzleComplete.PuzzleComplete"));
 	UnlockSound = Unlock.Object;
+	static ConstructorHelpers::FObjectFinder<UTexture2D> SaverArt(TEXT("/Game/General/Textures/T_StreakSaverButton.T_StreakSaverButton"));
+	StreakSaverButtonTexture = SaverArt.Object;
 	ConfirmDialogClass = TSoftClassPtr<UConfirmDialogWidget>(FSoftObjectPath(TEXT("/Game/Happiness/UI/WBP_ConfirmDialog.WBP_ConfirmDialog_C")));
 }
 
@@ -316,40 +319,45 @@ void UHappinessModeWidget::MakeStreakSaverButton()
 	{
 		return;
 	}
-	const FLinearColor Ink(0.32f, 0.22f, 0.13f, 1.f);
-	const FLinearColor Gold(0.78f, 0.6f, 0.25f, 1.f);
-	auto Pill = [Gold](const FLinearColor& Fill)
-	{
-		FSlateBrush Brush;
-		Brush.DrawAs = ESlateBrushDrawType::RoundedBox;
-		Brush.TintColor = FSlateColor(Fill);
-		Brush.OutlineSettings = FSlateBrushOutlineSettings(FVector4(20.f, 20.f, 20.f, 20.f), FSlateColor(Gold), 2.f);
-		return Brush;
-	};
+	const FLinearColor SaverInk(.17f, .085f, .035f);
+	FSlateBrush Face;
+	Face.SetResourceObject(StreakSaverButtonTexture);
+	Face.DrawAs = ESlateBrushDrawType::Image;
 	FButtonStyle Style;
-	Style.SetNormal(Pill(FLinearColor(1.f, 0.97f, 0.88f))).SetHovered(Pill(FLinearColor(0.98f, 0.92f, 0.76f)))
-		.SetPressed(Pill(FLinearColor(0.93f, 0.85f, 0.64f)));
-	Style.SetNormalPadding(FMargin(0.f)).SetPressedPadding(FMargin(0.f));
+	Style.Normal = Style.Hovered = Style.Pressed = Style.Disabled = Face;
+	Style.Hovered.TintColor = FLinearColor(1.08f, 1.08f, 1.04f);
+	Style.Pressed.TintColor = FLinearColor(.85f, .9f, .8f);
+	Style.NormalPadding = Style.PressedPadding = FMargin(0.f);
 
 	StreakSaverButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("StreakSaverButton"));
 	StreakSaverButton->SetStyle(Style);
-	StreakSaverLabel = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("StreakSaverLabel"));
-	if (const UFont* Font = LoadObject<UFont>(nullptr, TEXT("/Game/Happiness/UI/Fonts/LessonsSerif_Font.LessonsSerif_Font")))
+	StreakSaverButton->SetCursor(EMouseCursor::Hand);
+	UCanvasPanel* Content = WidgetTree->ConstructWidget<UCanvasPanel>();
+	StreakSaverButton->SetContent(Content);
+	UFont* Font = LoadObject<UFont>(nullptr, TEXT("/Game/Happiness/UI/Fonts/LessonsSerif_Font.LessonsSerif_Font"));
+	auto Label = [&](UTextBlock* Text, int32 Points, float Y, float Height)
 	{
-		StreakSaverLabel->SetFont(FSlateFontInfo(Font, 20));
-	}
-	StreakSaverLabel->SetColorAndOpacity(FSlateColor(Ink));
-	StreakSaverButton->SetContent(StreakSaverLabel);
+		Text->SetFont(FSlateFontInfo(Font, Points));
+		Text->SetColorAndOpacity(SaverInk);
+		Text->SetVisibility(ESlateVisibility::HitTestInvisible);
+		UCanvasPanelSlot* TextSlot = Content->AddChildToCanvas(Text);
+		TextSlot->SetPosition(FVector2D(108.f, Y));
+		TextSlot->SetSize(FVector2D(160.f, Height));
+	};
+	UTextBlock* Title = WidgetTree->ConstructWidget<UTextBlock>();
+	Title->SetText(LOCTEXT("StreakSaver", "Streak Saver"));
+	Label(Title, 20, 10.f, 30.f);
+	StreakSaverLabel = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("StreakSaverLabel"));
+	Label(StreakSaverLabel, 16, 38.f, 25.f);
 
-	// Just above the Daily tile, at its right edge: never over a tile, so taps go where they're meant
+	// A sibling above the Daily tile, with a 10px gap: their entire tap rectangles are separate.
 	const UCanvasPanelSlot* DailySlot = Cast<UCanvasPanelSlot>(DailyButton->Slot);
 	const FVector2D TileOrigin = DailySlot ? DailySlot->GetPosition() : FVector2D::ZeroVector;
-	const FVector2D TileSize = DailySlot ? DailySlot->GetSize() : FVector2D(510.f, 240.f);
 	if (UCanvasPanelSlot* ButtonSlot = Tiles->AddChildToCanvas(StreakSaverButton))
 	{
-		const FVector2D Size(190.f, 40.f);
-		ButtonSlot->SetPosition(TileOrigin + FVector2D(TileSize.X - Size.X, -Size.Y - 16.f));
-		ButtonSlot->SetSize(Size);
+		const FVector2D SaverButtonSize(300.f, 72.f);
+		ButtonSlot->SetPosition(TileOrigin + FVector2D(0.f, -SaverButtonSize.Y - 10.f));
+		ButtonSlot->SetSize(SaverButtonSize);
 		ButtonSlot->SetZOrder(DailySlot ? DailySlot->GetZOrder() + 1 : 1);
 	}
 }
@@ -563,9 +571,7 @@ void UHappinessModeWidget::RefreshStreak()
 	if (StreakSaverLabel)
 	{
 		const int32 SaverDays = Daily ? Daily->GetSaverDays() : 0;
-		StreakSaverLabel->SetText(SaverDays > 0
-			? FText::Format(LOCTEXT("SaverDays", "Saver: {0} {0}|plural(one=day,other=days)"), SaverDays)
-			: LOCTEXT("StreakSaver", "Streak Saver"));
+		StreakSaverLabel->SetText(FText::Format(LOCTEXT("SaverDaysCount", "{0} {0}|plural(one=day,other=days)"), SaverDays));
 	}
 	if (!StreakText)
 	{

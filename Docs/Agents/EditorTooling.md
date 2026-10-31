@@ -379,3 +379,5 @@ This resolved the legacy 8ball package without raw filesystem edits to a uasset.
 - Icon Sets catalogue render: `RenderWidget` accepts `/Script/Happiness.IconSetsPanel` and `previewIconSetIndex` (0 enabled, 1 disabled, 2 purchase, 3 achievement, 5 twelve icons). These are editor-only sample entries, never saved. Render once more after initial asset loading if a sample texture is not ready.
 
 - Remove Ads preview: render `WBP_HappinessMode` with `bPreviewRemoveAds: true`. Only the render instance opens the dialog and shows its normal purchase face; the editor has no phone store. Runtime purchase availability is unchanged.
+
+- Streak Saver shop render: use `/Script/Happiness.StreakSaverPanel` with `previewStreakSaverState` 0 (normal), 1 (broken streak), 2 (pending payment), or 3 (store unavailable). The flag opens only the render instance and supplies sample text with no purchases or save changes.
