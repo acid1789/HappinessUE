@@ -248,3 +248,15 @@ no rules subject, and Game Basics (VerticalTwo, which teaches the game itself), 
 ### Icon Sets catalogue UI
 
 `UI/IconSetsPanel` is a code-built book: a vertical selectable list on the left, a large square icon grid and state button on the right. Row status buttons and the large button enable/disable the set; row backgrounds select the preview. `UIconSetSubsystem::GetEntries` filters hidden sets and supplies achievement locks; `SetEnabled` keeps at least eight enabled. Purchase presentation follows `FIconSetEntry::bForSale` and `UIconSetStoreSubsystem`: localized prices, purchasing/pending states, and `Buy(Entry.Id)`. Store change notifications refresh both the list and the selected preview while preserving selection and scroll position.
+
+### Remove Ads garden purchase window
+
+`WBP_HappinessMode.AdsPurchaseDialog` uses `T_RemoveAdsGarden` with live benefit/title text and a blurred, dimmed backdrop. Its existing `PurchaseControls` (`WBP_RemoveAds`, native parent `UI/RemoveAdsPanel`) sets `bDialogLayout=true` to stack the live buy/restore buttons. The same widget in Options keeps its compact row. Native preconstruct applies the shared garden font/button faces; the ad-removal subsystem still supplies prices, pending/purchased/offline states and restore results. The background texture is directly referenced by the Blueprint for cooking.
+
+### Main-menu Streak Saver button
+
+`UHappinessModeWidget::MakeStreakSaverButton` creates a 300x72 calendar/shield button above the Daily tile, aligned with its left edge, with a 10px gap. It is a sibling of the Daily button, so neither tap rectangle overlaps and the shop stays usable after today's Daily is completed. The title is constant; the second line shows `UDailySubsystem::GetSaverDays()` with singular/plural days. `T_StreakSaverButton` is tightly cropped and included in `PAL_LoadedByCode`. The existing shop callback and purchase behavior are unchanged.
+
+### Streak Saver purchase window
+
+`UI/StreakSaverPanel` is a code-built garden panel using `T_StreakSaverShop` (listed in `PAL_LoadedByCode`). Its live status strip separates current/restorable streak length from available saver days. A wrapping recovery message sits above the three 1/7/30-day purchase cards, whose actions retain `UStreakSaverStoreSubsystem::Buy` and localized prices. Pending and offline messages sit in the footer; the round close button replaces the old bottom Close row. Preview-only data never changes transactions, inventory or saves.

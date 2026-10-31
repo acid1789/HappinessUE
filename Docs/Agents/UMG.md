@@ -115,3 +115,5 @@ python Tools/umg.py reorder_widget_tree '{"root": "Content", "tree": "[\"TitleTe
 - **Replacing a placed widget with a different Blueprint class:** preserve its name, `bIsVariable`, and instance options. Retarget function/delegate nodes with `BlueprintTools.retarget_node_class`, then recreate stale variable-get nodes (including getters on the control) and reconnect their wires. Retargeting does not support variable-get nodes; old pin types can survive a compile and cause incompatible-reference errors.
 
 - **EditableTextBox fonts:** set `WidgetStyle.textStyle.font`. A top-level `WidgetStyle.font` is silently ignored in UE 5.8; copy the neighboring TextBlock font into the nested text style to match it.
+
+- TextBlock `ColorAndOpacity` is an `FSlateColor`: set `{"specifiedColor":{"r":0.17,"g":0.085,"b":0.035,"a":1},"colorUseRule":"UseColor_Specified"}`. Flat RGBA keys are silently ignored on new TextBlocks; query the stored nested value to confirm. Images use an `FLinearColor` instead.

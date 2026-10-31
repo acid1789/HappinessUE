@@ -9,6 +9,7 @@
 class UButton;
 class USoundBase;
 class UTextBlock;
+class UTexture2D;
 
 /**
  * The streak saver shop, opened from the mode screen's Streak Saver button (UHappinessModeWidget makes both): a
@@ -22,6 +23,9 @@ class HAPPINESS_API UStreakSaverPanel : public UUserWidget
 	GENERATED_BODY()
 
 public:
+#if WITH_EDITORONLY_DATA
+	UPROPERTY(Transient) int32 PreviewStreakSaverState = -1;
+#endif
 	UStreakSaverPanel(const FObjectInitializer& ObjectInitializer);
 
 	UFUNCTION(BlueprintCallable, Category = "Streak Saver")
@@ -31,13 +35,13 @@ public:
 	void Hide();
 
 	UPROPERTY(EditAnywhere, Category = "Streak Saver")
-	FLinearColor DimColor = FLinearColor(0.f, 0.f, 0.f, 0.6f);
+	FLinearColor DimColor = FLinearColor(0.f, 0.f, 0.f, 0.35f);
 
 	UPROPERTY(EditAnywhere, Category = "Streak Saver")
 	FLinearColor WindowColor = FLinearColor(0.99f, 0.96f, 0.89f, 1.f);
 
 	UPROPERTY(EditAnywhere, Category = "Streak Saver")
-	FLinearColor InkColor = FLinearColor(0.32f, 0.22f, 0.13f, 1.f);
+	FLinearColor InkColor = FLinearColor(0.17f, 0.085f, 0.035f, 1.f);
 
 	UPROPERTY(EditAnywhere, Category = "Streak Saver")
 	FSlateFontInfo TitleFont;
@@ -63,7 +67,14 @@ protected:
 	virtual void NativeDestruct() override;
 
 private:
+	UPROPERTY() TObjectPtr<UTexture2D> ShopTexture;
+	UPROPERTY(Transient) TObjectPtr<UTextBlock> StreakCountText;
+	UPROPERTY(Transient) TObjectPtr<UTextBlock> SaverCountText;
+
 	void BuildLayout();
+#if WITH_EDITOR
+	void ApplyPreview();
+#endif
 	UTextBlock* MakeText(const FText& Text, const FSlateFontInfo& Font);
 
 	UFUNCTION()

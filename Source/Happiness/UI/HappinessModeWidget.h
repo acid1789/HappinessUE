@@ -17,6 +17,7 @@ class UPlayerLevelBadge;
 class UStreakSaverPanel;
 class UTextBlock;
 class USizeBox;
+class UTexture2D;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnHappinessModeEvent);
 
@@ -113,7 +114,9 @@ protected:
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UButton> StreakSaverButton;
 
-	/** Its label: the saver days left, once there are some */
+	UPROPERTY() TObjectPtr<UTexture2D> StreakSaverButtonTexture;
+
+	/** The saver days available, separate from the constant Streak Saver title */
 	UPROPERTY(Transient)
 	TObjectPtr<UTextBlock> StreakSaverLabel;
 
