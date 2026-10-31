@@ -205,7 +205,9 @@ void UOptionsMenuWidget::BuildLayout()
 		UCanvasPanelSlot* ControlSlot = Place(Canvas, Control, {}, {}, 3);
 		ControlSlot->SetAnchors(FAnchors(0, 0, 1, 1)); ControlSlot->SetOffsets(FMargin(0));
 	};
+#if PLATFORM_ANDROID || PLATFORM_IOS
 	Checkbox(SleepToggle, LOCTEXT("Sleep", "Prevent Sleep on Idle"));
+#endif
 	Checkbox(HintToggle, LOCTEXT("HintAnimation", "Animate Hint Button"));
 	if (ExtraSettingsHost)
 	{
