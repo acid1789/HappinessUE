@@ -6,6 +6,7 @@
 #include "HappinessClassic/CampaignTree.h"
 #include "HappinessClassic/CampaignProgress.h"
 #include "HappinessClassic/DailyPuzzle.h"
+#include "HappinessClassic/PuzzleSlots.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "Misc/OutputDevice.h"
@@ -371,6 +372,15 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 	FParse::Value(Cmd, TEXT("diff="), Diff);
 	FParse::Value(Cmd, TEXT("mode="), Mode);
 	FParse::Value(Cmd, TEXT("out="), OutPath);
+#if WITH_EDITOR
+	if (FParse::Param(Cmd, TEXT("saveresume")))
+	{
+		FString Report;
+		const bool Passed = UPuzzleSlotSubsystem::TestSaveResume(Report);
+		FFileHelper::SaveStringToFile(Report, *OutPath);
+		return Passed ? 0 : 1;
+	}
+#endif
 	const bool bAll = FParse::Param(Cmd, TEXT("all"));
 	const bool bNoAuto = FParse::Param(Cmd, TEXT("noauto"));
 	// -checkexamples: every clue's FClueExample (the game rules' boards) must hold in the solution and have a broken arrangement

@@ -2,6 +2,7 @@
 # Headless puzzle generate/solve via the Puzzle commandlet. Prints only the result file.
 #   Tools/puzzle.sh -seeds=1-500 -size=6 -diff=2          (batch, failures + summary)
 #   Tools/puzzle.sh -seed=42 -mode=show|trace             (full detail for one puzzle)
+#   Tools/puzzle.sh -saveresume                       (in-memory end-screen save/reload regression)
 #   Tools/puzzle.sh --build ...                           (rebuild HappinessEditor first)
 # Works on the checkout this script is in. --build needs that checkout's editor closed (Tools/editor.sh stop).
 source "$(dirname -- "${BASH_SOURCE[0]}")/checkout_env.sh"

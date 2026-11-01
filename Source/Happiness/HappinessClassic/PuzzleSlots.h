@@ -93,6 +93,11 @@ public:
 	/** A slot is being read or written: its save game mustn't be handed back here */
 	static bool IsSlotIO() { return bSlotIO; }
 
+#if WITH_EDITOR
+	/** In-memory save/reload regression checks, run by Tools/puzzle.sh -saveresume. */
+	static bool TestSaveResume(FString& Report);
+#endif
+
 	static UPuzzleSlotSubsystem* Get(const UObject* WorldContextObject);
 	static UPuzzleSlotSubsystem* GetInstance() { return Instance.Get(); }
 

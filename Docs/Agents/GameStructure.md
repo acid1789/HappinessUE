@@ -266,3 +266,5 @@ no rules subject, and Game Basics (VerticalTwo, which teaches the game itself), 
 ### Streak Saver purchase window
 
 `UI/StreakSaverPanel` is a code-built garden panel using `T_StreakSaverShop` (listed in `PAL_LoadedByCode`). Its live status strip separates current/restorable streak length from available saver days. A wrapping recovery message sits above the three 1/7/30-day purchase cards, whose actions retain `UStreakSaverStoreSubsystem::Buy` and localized prices. Pending and offline messages sit in the footer; the round close button replaces the old bottom Close row. Preview-only data never changes transactions, inventory or saves.
+
+Campaign/Lessons puzzle slots keep the board's original `FCampaignSaveData::OpenSeed`, not the stage's advanced `NextSeed`. Once completion advances the stage seed and closes the puzzle, its end-screen snapshot is inactive even if undo/solution capture is unavailable; leaving an unfinished session remains resumable. Resume also rejects older finished-session slots mislabeled with `OpenSeed + 1`. Regression check: `Tools/puzzle.sh -saveresume` (in-memory serialization; no player save writes).
