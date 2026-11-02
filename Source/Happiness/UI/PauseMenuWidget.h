@@ -92,6 +92,8 @@ public:
 protected:
 	virtual void NativePreConstruct() override;
 	virtual void NativeConstruct() override;
+	/** Keeps the time current while the menu is open (Reset Puzzle, confirmed over the menu, sets it back to 0) */
+	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 	/** The puzzle's time so far, set when the menu opens */
 	UPROPERTY(meta = (BindWidgetOptional))
