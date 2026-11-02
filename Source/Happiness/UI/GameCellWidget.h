@@ -33,6 +33,9 @@ struct FCellEffect
 
 	/** Where it plays, in viewport units */
 	FBox2D Rect = FBox2D(ForceInit);
+
+	/** The widget it plays over: in a scroll box (EffectClip), it follows it as it scrolls */
+	TWeakObjectPtr<const UWidget> Over;
 };
 
 /**
@@ -105,6 +108,9 @@ public:
 	/** Shows the icon PlayFirework hid */
 	void EndFirework();
 
+	/** Redraws the icons' retainer, so a change set from code (ApplyPuzzleCell) shows */
+	void RefreshIcons();
+
 	/**
 	 * Icon is placed in another cell of this cell's row (WBP_Cell's Row, Column) in the open puzzle (the puzzle
 	 * screen's). WBP_CellDialog's Reset leaves those out, as clearing a cell on the board does.
@@ -143,6 +149,14 @@ protected:
 	TArray<FCellEffect> Effects;
 	/** The canvas over the screen the effects play in */
 	TSharedPtr<class SCanvas> EffectOverlay;
+
+	/**
+	 * A cell in a scroll box (the rules' pictures), its overlay in the game viewport: the overlay is in EffectClip, a
+	 * box over the scroll box's area that clips to it, in EffectViewportCanvas (what's in the game viewport)
+	 */
+	TWeakObjectPtr<const UWidget> EffectScroll;
+	TSharedPtr<class SBox> EffectClip;
+	TSharedPtr<class SCanvas> EffectViewportCanvas;
 
 	/** Holds EffectOverlay in the screen's root canvas; null when the overlay is in the game viewport */
 	UPROPERTY(Transient)

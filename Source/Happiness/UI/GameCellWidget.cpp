@@ -13,6 +13,7 @@
 #include "Components/Image.h"
 #include "Components/NativeWidgetHost.h"
 #include "Components/PanelWidget.h"
+#include "Components/ScrollBox.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/World.h"
 #include "Engine/Texture2D.h"
@@ -22,6 +23,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Widgets/SCanvas.h"
+#include "Widgets/Layout/SBox.h"
 
 UGameCellIconRetainer::UGameCellIconRetainer(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -246,6 +248,14 @@ void UGameCellWidget::EndFirework()
 	}
 }
 
+void UGameCellWidget::RefreshIcons()
+{
+	if (IconRetainer)
+	{
+		IconRetainer->RequestRender();
+	}
+}
+
 void UGameCellWidget::UpdateEffects()
 {
 	// WBP_Cell's ApplyPuzzleCell shows Image_FinalIcon when the cell has its icon, and its candidate icons otherwise
@@ -343,7 +353,48 @@ UNiagaraComponent* UGameCellWidget::PlayEffect(int32 Index, UNiagaraSystem* Syst
 		}
 		else
 		{
-			Viewport->AddViewportWidgetContent(EffectOverlay.ToSharedRef(), 100);
+			// In a scroll box (the rules' pictures): kept to its area, so what's scrolled out of it doesn't show (up
+			// through the widgets this one is in: past a widget's root, the user widget whose tree it is)
+			const UScrollBox* Scroll = nullptr;
+			for (const UWidget* Widget = this; Widget && !Scroll; Scroll = Cast<UScrollBox>(Widget))
+			{
+				const UWidget* Parent = Widget->GetParent();
+				const UWidgetTree* Tree = Parent ? nullptr : Cast<UWidgetTree>(Widget->GetOuter());
+				Widget = Parent ? Parent : Tree ? Cast<UWidget>(Tree->GetOuter()) : nullptr;
+			}
+			if (Scroll)
+			{
+				EffectScroll = Scroll;
+				TWeakObjectPtr<UGameCellWidget> WeakThis(this);
+				// The scroll box's corners in the viewport canvas
+				auto ScrollCorner = [WeakThis](bool bFar) -> FVector2D
+				{
+					if (!WeakThis.IsValid() || !WeakThis->EffectScroll.IsValid() || !WeakThis->EffectViewportCanvas.IsValid())
+					{
+						return FVector2D::ZeroVector;
+					}
+					const FGeometry& ScrollGeometry = WeakThis->EffectScroll->GetCachedGeometry();
+					return WeakThis->EffectViewportCanvas->GetTickSpaceGeometry().AbsoluteToLocal(
+						ScrollGeometry.LocalToAbsolute(bFar ? ScrollGeometry.GetLocalSize() : FVector2D::ZeroVector));
+				};
+				EffectViewportCanvas = SNew(SCanvas).Visibility(EVisibility::HitTestInvisible)
+					+ SCanvas::Slot()
+					.Position(TAttribute<FVector2D>::CreateLambda([ScrollCorner] { return ScrollCorner(false); }))
+					.Size(TAttribute<FVector2D>::CreateLambda([ScrollCorner] { return ScrollCorner(true) - ScrollCorner(false); }))
+					[
+						SAssignNew(EffectClip, SBox)
+						.Clipping(EWidgetClipping::ClipToBounds)
+						.Visibility(EVisibility::HitTestInvisible)
+						[
+							EffectOverlay.ToSharedRef()
+						]
+					];
+				Viewport->AddViewportWidgetContent(EffectViewportCanvas.ToSharedRef(), 100);
+			}
+			else
+			{
+				Viewport->AddViewportWidgetContent(EffectOverlay.ToSharedRef(), 100);
+			}
 		}
 	}
 	if (Effects.Num() <= Index)
@@ -360,9 +411,22 @@ UNiagaraComponent* UGameCellWidget::PlayEffect(int32 Index, UNiagaraSystem* Syst
 		Effect.Widget->SetVisibility(ESlateVisibility::HitTestInvisible);
 		Effect.Material = UMaterialInstanceDynamic::Create(PulseMaterial, this);
 		TWeakObjectPtr<UGameCellWidget> WeakThis(this);
-		auto Rect = [WeakThis, Index]
+		auto Rect = [WeakThis, Index]() -> FBox2D
 		{
-			return WeakThis.IsValid() && WeakThis->Effects.IsValidIndex(Index) ? WeakThis->Effects[Index].Rect : FBox2D(FVector2D::ZeroVector, FVector2D::ZeroVector);
+			if (!WeakThis.IsValid() || !WeakThis->Effects.IsValidIndex(Index))
+			{
+				return FBox2D(FVector2D::ZeroVector, FVector2D::ZeroVector);
+			}
+			// In a scroll box: where its widget is now, in the clipping box
+			const FCellEffect& Effect = WeakThis->Effects[Index];
+			if (WeakThis->EffectClip.IsValid() && Effect.Over.IsValid())
+			{
+				const FGeometry Clip = WeakThis->EffectClip->GetTickSpaceGeometry();
+				const FGeometry& Over = Effect.Over->GetCachedGeometry();
+				return FBox2D(Clip.AbsoluteToLocal(Over.LocalToAbsolute(FVector2D::ZeroVector)),
+					Clip.AbsoluteToLocal(Over.LocalToAbsolute(Over.GetLocalSize())));
+			}
+			return Effect.Rect;
 		};
 		EffectOverlay->AddSlot()
 			.Position(TAttribute<FVector2D>::CreateLambda([Rect] { return Rect().Min; }))
@@ -393,6 +457,7 @@ UNiagaraComponent* UGameCellWidget::PlayEffect(int32 Index, UNiagaraSystem* Syst
 		USlateBlueprintLibrary::LocalToViewport(this, Geometry, Geometry.GetLocalSize(), Pixel, BottomRight);
 	}
 	Effect.Rect = FBox2D(TopLeft, BottomRight);
+	Effect.Over = &Over;
 	const FVector2D Size = Effect.Rect.GetSize();
 
 	Effect.Material->SetTextureParameterValue(TEXT("Icon"), Icon);
@@ -412,10 +477,13 @@ void UGameCellWidget::RemoveEffects()
 	{
 		if (UGameViewportClient* Viewport = GetWorld() ? GetWorld()->GetGameViewport() : nullptr)
 		{
-			Viewport->RemoveViewportWidgetContent(EffectOverlay.ToSharedRef());
+			Viewport->RemoveViewportWidgetContent(EffectViewportCanvas.IsValid() ? EffectViewportCanvas.ToSharedRef() : EffectOverlay.ToSharedRef());
 		}
 	}
 	EffectOverlay.Reset();
+	EffectViewportCanvas.Reset();
+	EffectClip.Reset();
+	EffectScroll.Reset();
 	for (FCellEffect& Effect : Effects)
 	{
 		if (Effect.Widget)

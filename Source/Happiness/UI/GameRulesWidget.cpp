@@ -22,12 +22,17 @@
 #include "Components/VerticalBoxSlot.h"
 #include "Engine/Font.h"
 #include "Engine/Texture2D.h"
+#include "Engine/World.h"
+#include "TimerManager.h"
 #include "GameFramework/PlayerController.h"
 #include "UObject/EnumProperty.h"
 #include "UObject/UnrealType.h"
 #include "HappinessClassic/Clue.h"
 #include "HappinessClassic/ClueExample.h"
 #include "HappinessClassic/Puzzle.h"
+#include "HappinessClassic/Hint.h"
+#include "UI/HintInfoWidget.h"
+#include "UI/GameCellWidget.h"
 #include "HappinessClassic/PuzzleCell.h"
 #include "Blueprint/WidgetTree.h"
 #include "Styling/SlateBrush.h"
@@ -91,7 +96,7 @@ namespace
 		{
 		case ECampaignLesson::VerticalTwo: return LOCTEXT("DetailsSameColumn", "Both icons belong in one column, even though they are in different rows. Once you place either icon, you know the other icon's column too.");
 		case ECampaignLesson::VerticalThree: return LOCTEXT("DetailsThreeColumn", "All three icons line up in a single column. Placing any one of them identifies the column for the other two.");
-		case ECampaignLesson::TwoNot: return LOCTEXT("DetailsTwoNot", "The crossed-out icon cannot be in the other icon's column. If you place one of them, rule that column out for the other.");
+		case ECampaignLesson::TwoNot: return LOCTEXT("DetailsTwoNot", "The two icons cannot be in the same column. If you place one of them, rule the other one out of that column.");
 		case ECampaignLesson::ThreeNot: return LOCTEXT("DetailsThreeNot", "The two uncrossed icons share a column. The crossed-out icon cannot be in that column, even if its own row still has several possibilities.");
 		case ECampaignLesson::EitherOr: return LOCTEXT("DetailsEitherOr", "The top icon shares a column with exactly one of the two choices below. Whichever choice shares it, the other choice must be in a different column.");
 		case ECampaignLesson::NextTo: return LOCTEXT("DetailsNextTo", "There is no column between these icons. Either icon may be on the left; placing one narrows the other to its immediate neighboring columns.");
@@ -175,12 +180,15 @@ TArray<FRulesSubject> UGameRulesWidget::MakeSubjects()
 		Subject.PictureNote = PictureNote;
 		Subject.BasicIndex = Result.Num() - 1;
 	};
-	auto Clue = [&Result](const FText& Section, ECampaignLesson Lesson, const FText& Description, const FText& Title = FText())
+	// Description: the page's main text; Caption: the text beside its example clue
+	auto Clue = [&Result](const FText& Section, ECampaignLesson Lesson, const FText& Description, const FText& Caption,
+		const FText& Title = FText())
 	{
 		FRulesSubject& Subject = Result.AddDefaulted_GetRef();
 		Subject.Section = Section;
 		Subject.Title = Title.IsEmpty() ? UCampaignTree::GetLessonDisplayName(Lesson) : Title;
 		Subject.Description = Description;
+		Subject.ExampleCaption = Caption;
 		Subject.Details = GetRulesLessonDetails(Lesson);
 		Subject.bClue = true;
 		Subject.Lesson = Lesson;
@@ -196,10 +204,10 @@ TArray<FRulesSubject> UGameRulesWidget::MakeSubjects()
 		FText());
 	// Below the diagram and button legend (scrolling with them): what each area is for
 	Result.Last().Details = LOCTEXT("LayoutDetails",
-		"Puzzle Area: The grid you solve. Each row is one set of icons, and each cell starts with every icon that might belong there.\n\n"
-		"Clue Info: Explains the selected clue in words. When you ask for a hint, its explanation appears here.\n\n"
-		"Vertical Clues: Clues about which icons share a column, or never do.\n\n"
-		"Horizontal Clues: Clues about the left-to-right order of the columns: which icons are next to, left of, or between others.");
+		"Puzzle Area:  The grid you solve. Each row is one set of icons, and each cell starts with every icon that might belong there.\n\n"
+		"Clue Info:  Explains the selected clue in words. When you ask for a hint, its explanation appears here.\n\n"
+		"Vertical Clues:  Clues about which icons share a column, or never do.\n\n"
+		"Horizontal Clues:  Clues about the left-to-right order of the columns: which icons are next to, left of, or between others.");
 	Result.Last().bLayoutDiagram = true;
 	Basic(FText(), LOCTEXT("Controls", "Controls"),
 		LOCTEXT("ControlsMouseDesc", "Left-click an icon to place it. Right-click an icon to eliminate it. Middle-click to restore it."),
@@ -209,36 +217,62 @@ TArray<FRulesSubject> UGameRulesWidget::MakeSubjects()
 	Result.Last().TouchDetails = LOCTEXT("ControlsTouchDetails", "Tap the icon you want to interact with to select it.\nEliminate/Restore:  Determines if this icon should still be a candidate in this cell.\nConfirm:  Indicates this icon should be placed in this cell.\nReset All:  Restores all icons in the cell.\nCancel:  Returns to the puzzle without making changes\nCommit:  Applies the changes to the puzzle.");
 	Result.Last().bControls = true;
 	Basic(FText(), LOCTEXT("Clues", "Clues"),
-		LOCTEXT("CluesDesc", "Tap a clue to see what it means. Hide clues you're done with (HC); Unhide Clues in the pause menu brings them back."),
+		LOCTEXT("CluesDesc", "Clues describe true things about the puzzle. Read the clues to determine where icons do and don't belong."),
 		LOCTEXT("CluesPic", "A selected clue, with its explanation above the grid"));
-	Result.Last().Details = LOCTEXT("CluesDetails", "Vertical clues describe icons that share a column or cannot share one. Horizontal clues describe their left-to-right positions. Select a clue to read its meaning above the puzzle, and hide it when you no longer need it.");
+	Result.Last().bClueSelect = true;
+	Result.Last().Details = LOCTEXT("CluesDetails", "Horizontal clues describe icons across multiple columns. Vertical clues describe icons in a single column. When you are finished with a clue you can hide the selected clue with the \"Hide Clue\" button. If you hide a clue by mistake, you can use the \"Undo\" button to restore the clue. At any time, all hidden clues can be unhidden from the Pause menu");
 	Basic(FText(), LOCTEXT("Hints", "Hints"),
-		LOCTEXT("HintsDesc", "Stuck? H points to a clue that helps, and explains why. Each hint adds 10 seconds."),
+		LOCTEXT("HintsDesc", "If you get stuck, you can get a hint by pressing the \"Hint\" button."),
 		LOCTEXT("HintsPic", "The hint panel pointing at a clue and the cell it helps with"));
-	Result.Last().Details = LOCTEXT("HintsDetails", "A hint identifies a useful clue and highlights the part of the puzzle it can help with. Read the explanation and make the deduction yourself. Each hint adds 10 seconds to your time.");
+	Result.Last().bHintMock = true;
+	Result.Last().Details = LOCTEXT("HintsDetails", "A hint identifies a useful clue and highlights the part of the puzzle it can help with. Read the explanation and make the deduction yourself. If you have made an error, a Hint will show you the error.");
 
 	const FText Vertical = LOCTEXT("Vertical", "Vertical Clues");
-	Clue(Vertical, ECampaignLesson::VerticalTwo, LOCTEXT("SameColumnDesc", "These icons are in the same column."), LOCTEXT("SameColumn", "Same Column"));
-	Clue(FText(), ECampaignLesson::VerticalThree, LOCTEXT("VerticalThreeDesc", "All three icons are in the same column."));
-	Clue(FText(), ECampaignLesson::TwoNot, LOCTEXT("TwoNotDesc", "The crossed-out icon is never in the same column as the other."));
-	Clue(FText(), ECampaignLesson::ThreeNot, LOCTEXT("ThreeNotDesc", "Two icons share a column; the crossed-out one isn't in it."));
-	Clue(FText(), ECampaignLesson::EitherOr, LOCTEXT("EitherOrDesc", "The top icon shares a column with exactly one of the two below it."));
+	Clue(Vertical, ECampaignLesson::VerticalTwo, LOCTEXT("SameColumnDesc", "Two icons that belong in the same column."),
+		LOCTEXT("SameColumnCaption", "These icons are in the same column."), LOCTEXT("SameColumn", "Same Column"));
+	Clue(FText(), ECampaignLesson::VerticalThree, LOCTEXT("VerticalThreeDesc", "Three icons that belong in the same column."),
+		LOCTEXT("VerticalThreeCaption", "All three icons are in the same column."));
+	Clue(FText(), ECampaignLesson::TwoNot, LOCTEXT("TwoNotDesc", "Two icons that are not in the same column."),
+		LOCTEXT("TwoNotCaption", "These icons are never in the same column."));
+	Clue(FText(), ECampaignLesson::ThreeNot, LOCTEXT("ThreeNotDesc", "Two icons in the same column and one icon not in that column."),
+		LOCTEXT("ThreeNotCaption", "The two icons without a cross belong in the same column. The crossed-out icon must be in a different column."));
+	Clue(FText(), ECampaignLesson::EitherOr, LOCTEXT("EitherOrDesc", "The top icon is either in the column with the middle icon or the column with the bottom icon but not both."),
+		LOCTEXT("EitherOrCaption", "The top icon shares a column with exactly one of the two below it."));
 
 	const FText Horizontal = LOCTEXT("Horizontal", "Horizontal Clues");
-	Clue(Horizontal, ECampaignLesson::NextTo, LOCTEXT("NextToDesc", "These two icons are in adjacent columns, next to each other in either order. They must be directly beside one another, with no column between them."));
-	Clue(FText(), ECampaignLesson::NotNextTo, LOCTEXT("NotNextToDesc", "The crossed-out icon is never in a column next to the other."));
-	Clue(FText(), ECampaignLesson::DirectlyLeftOf, LOCTEXT("DirectlyLeftOfDesc", "The first icon is in the column just left of the second."));
-	Clue(FText(), ECampaignLesson::LeftOf, LOCTEXT("LeftOfDesc", "The first icon is somewhere left of the second."));
-	Clue(FText(), ECampaignLesson::NotLeftOf, LOCTEXT("NotLeftOfDesc", "The first icon is never left of the second."));
-	Clue(FText(), ECampaignLesson::Edge, LOCTEXT("EdgeDesc", "The icon is in the first or last column. Crossed out: it never is."));
-	Clue(FText(), ECampaignLesson::Span, LOCTEXT("SpanDesc", "The middle icon has the other two on either side of it."));
-	Clue(FText(), ECampaignLesson::SpanNotSide, LOCTEXT("SpanNotSideDesc", "One icon is beside the middle one; the crossed-out icon isn't on its other side."));
-	Clue(FText(), ECampaignLesson::Gap, LOCTEXT("GapDesc", "Exactly one column between the two icons."));
-	Clue(FText(), ECampaignLesson::SpanNotMid, LOCTEXT("SpanNotMidDesc", "One column between the outer icons, and the crossed-out icon isn't in it."));
-	Clue(FText(), ECampaignLesson::Between, LOCTEXT("BetweenDesc", "The middle icon is somewhere between the other two."));
-	Clue(FText(), ECampaignLesson::Chain, LOCTEXT("ChainDesc", "Left to right in this order, with any gaps."));
-	Clue(FText(), ECampaignLesson::NextToEitherOr, LOCTEXT("NextToEitherOrDesc", "The middle icon is next to exactly one of the other two."));
-	Clue(FText(), ECampaignLesson::AllApart, LOCTEXT("AllApartDesc", "All three icons are in different columns."));
+	Clue(Horizontal, ECampaignLesson::NextTo, LOCTEXT("NextToDesc", "These two icons are in adjacent columns, next to each other in either order. They must be directly beside one another, with no column between them."),
+		LOCTEXT("NextToExampleCaption", "The icons must sit side by side. Either one may be on the left."));
+	Clue(FText(), ECampaignLesson::NotNextTo, LOCTEXT("NotNextToDesc", "These two icons cannot be in neighboring columns. There must be at least one column between them."),
+		LOCTEXT("NotNextToCaption", "The crossed-out icon is never in a column next to the other."));
+	Clue(FText(), ECampaignLesson::DirectlyLeftOf, LOCTEXT("DirectlyLeftOfDesc", "The first icon is in the column directly left of the column containing the second icon."),
+		LOCTEXT("DirectlyLeftOfCaption", "The first icon is in the column just left of the second."));
+	Clue(FText(), ECampaignLesson::LeftOf, LOCTEXT("LeftOfDesc", "The first icon is in a column somewhere to the left of the second icon's column."),
+		LOCTEXT("LeftOfCaption", "The first icon is somewhere left of the second."));
+	Clue(FText(), ECampaignLesson::NotLeftOf, LOCTEXT("NotLeftOfDesc", "The first icon is not in a column left of the column containing the second icon. These icons could be in the same column."),
+		LOCTEXT("NotLeftOfCaption", "The first icon is never left of the second."));
+	Clue(FText(), ECampaignLesson::Edge, LOCTEXT("EdgeDesc", "The icon is on the outer edge of the puzzle."),
+		LOCTEXT("EdgeCaption", "The icon is in the first or last column."), LOCTEXT("EdgeOuter", "Edges (outer)"));
+	Result.Last().Details = LOCTEXT("DetailsEdgeOuter", "An outer edge icon belongs in the first or last column, never in a middle one.");
+	Clue(FText(), ECampaignLesson::Edge, LOCTEXT("NotEdgeDesc", "The icon is not on the outer edge of the puzzle."),
+		LOCTEXT("NotEdgeCaption", "The icon is never in the first or last column."), LOCTEXT("EdgeInner", "Edges (inner)"));
+	Result.Last().Details = LOCTEXT("DetailsEdgeInner", "An inner edge icon is crossed out: the first and last columns are ruled out for it, so it belongs in a middle column.");
+	Result.Last().bNotEdge = true;
+	Clue(FText(), ECampaignLesson::Span, LOCTEXT("SpanDesc", "These three icons are in sequential columns. These columns could be in either direction."),
+		LOCTEXT("SpanCaption", "The middle icon has the other two on either side of it."));
+	Clue(FText(), ECampaignLesson::SpanNotSide, LOCTEXT("SpanNotSideDesc", "Three columns are still involved like a normal span. The middle and end icons are in adjacent columns with another column on the other side of the middle icon that does not contain the crossed out icon."),
+		LOCTEXT("SpanNotSideCaption", "One icon is beside the middle one; the crossed-out icon isn't on its other side."));
+	Clue(FText(), ECampaignLesson::Gap, LOCTEXT("GapDesc", "A three column block with these two icons on the edges. Any icons can be in the center column."),
+		LOCTEXT("GapCaption", "Exactly one column between the two icons."));
+	Clue(FText(), ECampaignLesson::SpanNotMid, LOCTEXT("SpanNotMidDesc", "A three column block with these two icons on the edges. Any icons can be in the center column except the crossed-out icon."),
+		LOCTEXT("SpanNotMidCaption", "One column between the outer icons, and the crossed-out icon isn't in it."));
+	Clue(FText(), ECampaignLesson::Between, LOCTEXT("BetweenDesc", "The middle icon is somewhere between the other two icons. These could be any distance away from each other and any direction, but the middle icon will always be in a column between where the other two icons are."),
+		LOCTEXT("BetweenCaption", "The middle icon is somewhere between the other two."));
+	Clue(FText(), ECampaignLesson::Chain, LOCTEXT("ChainDesc", "A compound Left Of clue. First icon is somewhere to the left of the second icon which is somewhere left of the third icon. There can be any number of columns in between these icons. This clue is always Left to Right and never the reverse direction."),
+		LOCTEXT("ChainCaption", "Left to right in this order, with any gaps."));
+	Clue(FText(), ECampaignLesson::NextToEitherOr, LOCTEXT("NextToEitherOrDesc", "The middle icon is next to exactly one of the other two."),
+		LOCTEXT("NextToEitherOrCaption", "The middle icon is next to exactly one of the other two."));
+	Clue(FText(), ECampaignLesson::AllApart, LOCTEXT("AllApartDesc", "All three icons are in different columns."),
+		LOCTEXT("AllApartCaption", "All three icons are in different columns."));
 	return Result;
 }
 
@@ -586,16 +620,17 @@ void UGameRulesWidget::Select(int32 Index)
 		EntryButtons[Entry]->SetStyle(MakeRulesEntryStyle(bSelected, TopicPillTexture));
 	}
 
+	StopBlockAnimation();
 	ExampleBox->ClearChildren();
 	IllustrationBox->ClearChildren();
 	UWidget* Example = nullptr;
 	if (Subject.bClue)
 	{
-		Example = MakeExample(Subject.Lesson);
+		Example = MakeExample(Subject.Lesson, Subject.bNotEdge);
 		UPuzzle* Puzzle = nullptr;
 		UClue* Clue = nullptr;
 		const TArray<UObject*> IconSets = GetIconSets();
-		if (FindExampleClue(Subject.Lesson, Puzzle, Clue) && IconSets.Num() > 0)
+		if (FindExampleClue(Subject.Lesson, Puzzle, Clue, Subject.bNotEdge) && IconSets.Num() > 0)
 		{
 			AddBoards(*Puzzle, *Clue, IconSets);
 		}
@@ -604,6 +639,14 @@ void UGameRulesWidget::Select(int32 Index)
 	{
 		AddLayoutDiagram();
 		AddButtonLegend();
+	}
+	else if (Subject.bClueSelect)
+	{
+		AddClueSelectMock();
+	}
+	else if (Subject.bHintMock)
+	{
+		AddHintMock();
 	}
 	else
 	{
@@ -640,9 +683,7 @@ void UGameRulesWidget::Select(int32 Index)
 		ClueFit->AddChild(Example);
 		AddArea(ClueFit, 470.f);
 		UTextBlock* Explanation = NewObject<UTextBlock>(this);
-		Explanation->SetText(Subject.Lesson == ECampaignLesson::NextTo
-			? LOCTEXT("NextToExampleCaption", "The icons must sit side by side. Either one may be on the left.")
-			: Subject.Description);
+		Explanation->SetText(Subject.ExampleCaption);
 		Explanation->SetFont(FSlateFontInfo(Serif, 23));
 		Explanation->SetColorAndOpacity(FSlateColor(RulesInk));
 		Explanation->SetAutoWrapText(true);
@@ -652,6 +693,299 @@ void UGameRulesWidget::Select(int32 Index)
 		ExampleBox->AddChild(CardSize);
 	}
 	ExampleBox->GetParent()->SetVisibility(Example ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+}
+
+namespace
+{
+	/** Calls a Blueprint function on Target, Fill giving each parameter its value (left at its default otherwise) */
+	bool CallBlueprintFunction(UObject* Target, const TCHAR* Name, TFunctionRef<void(FProperty*, uint8*)> Fill)
+	{
+		UFunction* Function = Target ? Target->FindFunction(Name) : nullptr;
+		if (!Function)
+		{
+			return false;
+		}
+		uint8* Params = static_cast<uint8*>(FMemory_Alloca(Function->ParmsSize));
+		FMemory::Memzero(Params, Function->ParmsSize);
+		for (TFieldIterator<FProperty> It(Function); It && It->HasAnyPropertyFlags(CPF_Parm); ++It)
+		{
+			It->InitializeValue_InContainer(Params);
+			Fill(*It, Params);
+		}
+		Target->ProcessEvent(Function, Params);
+		for (TFieldIterator<FProperty> It(Function); It && It->HasAnyPropertyFlags(CPF_Parm); ++It)
+		{
+			It->DestroyValue_InContainer(Params);
+		}
+		return true;
+	}
+
+	void SetCellParam(FProperty* Property, uint8* Params, const FPuzzleCell& Cell)
+	{
+		if (const FStructProperty* Struct = CastField<FStructProperty>(Property); Struct && Struct->Struct == FPuzzleCell::StaticStruct())
+		{
+			*Struct->ContainerPtrToValuePtr<FPuzzleCell>(Params) = Cell;
+		}
+	}
+}
+
+void UGameRulesWidget::AddClueSelectMock()
+{
+	const UFont* Serif = LoadObject<UFont>(nullptr, TEXT("/Game/Happiness/UI/Fonts/LessonsSerif_Font.LessonsSerif_Font"));
+	UTextBlock* Lead = NewObject<UTextBlock>(this);
+	Lead->SetText(IsTouchInput() ? LOCTEXT("ClueSelectTap", "Tap a clue to select it.") : LOCTEXT("ClueSelectClick", "Click a clue to select it."));
+	Lead->SetFont(FSlateFontInfo(Serif, 26));
+	Lead->SetColorAndOpacity(FSlateColor(RulesInk));
+	Lead->SetJustification(ETextJustify::Center);
+	if (UVerticalBoxSlot* LeadSlot = Cast<UVerticalBoxSlot>(IllustrationBox->AddChild(Lead)))
+	{
+		LeadSlot->SetHorizontalAlignment(HAlign_Center);
+		LeadSlot->SetPadding(FMargin(0.f, 4.f, 0.f, 12.f));
+	}
+
+	// Three horizontal clues stacked as the clue panel shows them, the middle one selected
+	const TArray<UObject*> IconSets = GetIconSets();
+	UVerticalBox* Stack = NewObject<UVerticalBox>(this);
+	int32 Index = 0;
+	UClue* SelectedClue = nullptr;
+	for (const ECampaignLesson Lesson : { ECampaignLesson::NextTo, ECampaignLesson::LeftOf, ECampaignLesson::Span })
+	{
+		UPuzzle* Puzzle = nullptr;
+		UClue* Clue = nullptr;
+		UUserWidget* ClueWidget = FindExampleClue(Lesson, Puzzle, Clue) && IconSets.Num() >= Puzzle->m_iSize
+			? MakeClueWidget(*Clue, *Puzzle, IconSets) : nullptr;
+		if (!ClueWidget)
+		{
+			continue;
+		}
+		if (Index++ == 1)
+		{
+			SelectedClue = Clue;
+			CallBlueprintFunction(ClueWidget, TEXT("SetSelected"), [](FProperty* Property, uint8* Params)
+			{
+				if (const FBoolProperty* Bool = CastField<FBoolProperty>(Property))
+				{
+					Bool->SetPropertyValue_InContainer(Params, true);
+				}
+			});
+		}
+		ClueWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
+		// Flush and full width, as the panel's ScrollList holds them
+		if (UVerticalBoxSlot* ClueSlot = Stack->AddChildToVerticalBox(ClueWidget))
+		{
+			ClueSlot->SetHorizontalAlignment(HAlign_Fill);
+		}
+	}
+	// At the panel's width (WBP_Happiness's HorizontalCluePanel), then enlarged as one picture
+	USizeBox* PanelWidth = NewObject<USizeBox>(this);
+	PanelWidth->SetWidthOverride(HorizontalCluePanelWidth);
+	PanelWidth->SetContent(Stack);
+	UScaleBox* StackFit = NewObject<UScaleBox>(this);
+	StackFit->SetStretch(EStretch::ScaleToFitX);
+	StackFit->AddChild(PanelWidth);
+	USizeBox* StackSize = NewObject<USizeBox>(this);
+	StackSize->SetWidthOverride(ClueSelectMockWidth);
+	StackSize->SetContent(StackFit);
+	if (UVerticalBoxSlot* StackSlot = Cast<UVerticalBoxSlot>(IllustrationBox->AddChild(StackSize)))
+	{
+		StackSlot->SetHorizontalAlignment(HAlign_Center);
+		StackSlot->SetPadding(FMargin(0.f, 0.f, 0.f, 16.f));
+	}
+
+	UTextBlock* InfoLead = NewObject<UTextBlock>(this);
+	InfoLead->SetText(LOCTEXT("ClueSelectInfo", "A selected clue is described in the clue info at the top of the screen"));
+	InfoLead->SetFont(FSlateFontInfo(Serif, 26));
+	InfoLead->SetColorAndOpacity(FSlateColor(RulesInk));
+	InfoLead->SetJustification(ETextJustify::Center);
+	InfoLead->SetAutoWrapText(true);
+	if (UVerticalBoxSlot* InfoLeadSlot = Cast<UVerticalBoxSlot>(IllustrationBox->AddChild(InfoLead)))
+	{
+		InfoLeadSlot->SetHorizontalAlignment(HAlign_Center);
+		InfoLeadSlot->SetPadding(FMargin(0.f, 4.f, 0.f, 12.f));
+	}
+
+	// The clue info (WBP_Happiness's HelpPanel) as selecting that clue fills it (SetFromClue), at the clues' scale
+	UClass* InfoClass = SelectedClue ? LoadClass<UUserWidget>(nullptr, TEXT("/Game/Happiness/UI/WBP_HelpPanel.WBP_HelpPanel_C")) : nullptr;
+	UUserWidget* Info = InfoClass ? CreateWidget<UUserWidget>(this, InfoClass) : nullptr;
+	if (!Info)
+	{
+		return;
+	}
+	Info->TakeWidget();
+	CallBlueprintFunction(Info, TEXT("SetFromClue"), [&](FProperty* Property, uint8* Params)
+	{
+		if (const FObjectPropertyBase* Object = CastField<FObjectPropertyBase>(Property); Object && Object->PropertyClass && SelectedClue->IsA(Object->PropertyClass))
+		{
+			Object->SetObjectPropertyValue_InContainer(Params, SelectedClue);
+		}
+		else if (const FArrayProperty* Array = CastField<FArrayProperty>(Property))
+		{
+			const FObjectPropertyBase* Element = CastField<FObjectPropertyBase>(Array->Inner);
+			FScriptArrayHelper Sets(Array, Array->ContainerPtrToValuePtr<void>(Params));
+			Sets.Resize(IconSets.Num());
+			for (int32 Set = 0; Element && Set < IconSets.Num(); Set++)
+			{
+				Element->SetObjectPropertyValue(Sets.GetRawPtr(Set), IconSets[Set]);
+			}
+		}
+	});
+	Info->SetVisibility(ESlateVisibility::HitTestInvisible);
+	USizeBox* InfoHeight = NewObject<USizeBox>(this);
+	InfoHeight->SetHeightOverride(HelpPanelHeight);
+	InfoHeight->SetContent(Info);
+	UScaleBox* InfoFit = NewObject<UScaleBox>(this);
+	InfoFit->SetStretch(EStretch::ScaleToFit);
+	InfoFit->AddChild(InfoHeight);
+	// As tall as the clues' scale makes it, narrower only if the page is too narrow for it
+	USizeBox* InfoSize = NewObject<USizeBox>(this);
+	InfoSize->SetHeightOverride(HelpPanelHeight * ClueSelectMockWidth / HorizontalCluePanelWidth);
+	InfoSize->SetMaxDesiredWidth(ClueInfoMockMaxWidth);
+	InfoSize->SetContent(InfoFit);
+	if (UVerticalBoxSlot* InfoSlot = Cast<UVerticalBoxSlot>(IllustrationBox->AddChild(InfoSize)))
+	{
+		InfoSlot->SetHorizontalAlignment(HAlign_Center);
+		InfoSlot->SetPadding(FMargin(0.f, 0.f, 0.f, 16.f));
+	}
+}
+
+void UGameRulesWidget::AddHintMock()
+{
+	// A hint as the puzzle screen shows it: one that rules an icon out (red), from a clue of the examples on its
+	// example board
+	const TArray<UObject*> IconSets = GetIconSets();
+	UPuzzle* Puzzle = nullptr;
+	UClue* Clue = nullptr;
+	UHint* Hint = nullptr;
+	for (const ECampaignLesson Lesson : { ECampaignLesson::NextTo, ECampaignLesson::LeftOf, ECampaignLesson::Span,
+		ECampaignLesson::Gap, ECampaignLesson::NotNextTo, ECampaignLesson::VerticalTwo })
+	{
+		if (FindExampleClue(Lesson, Puzzle, Clue) && IconSets.Num() >= Puzzle->m_iSize)
+		{
+			// In its puzzle, as the puzzle makes its hints: GetExplanation reads the board from it
+			UHint* Candidate = NewObject<UHint>(Puzzle);
+			if (Candidate->Init(*Puzzle, *Clue, false) && Candidate->IsElimination() && IconSets.IsValidIndex(Candidate->Row))
+			{
+				Hint = Candidate;
+				break;
+			}
+		}
+	}
+	// The cell where another of the clue's icons is set on that board (what rules the red icon out), if there is one
+	int32 PlacedRow = INDEX_NONE;
+	int32 PlacedCol = INDEX_NONE;
+	if (Hint)
+	{
+		TArray<int> Rows, Icons;
+		Clue->GetRows(Rows);
+		Clue->GetIcons(Puzzle, Icons);
+		for (int32 Piece = 0; Piece < Rows.Num() && Piece < Icons.Num() && PlacedRow == INDEX_NONE; Piece++)
+		{
+			if (Rows[Piece] < 0 || (Rows[Piece] == Hint->Row && Icons[Piece] == Hint->Icon) || !IconSets.IsValidIndex(Rows[Piece]))
+			{
+				continue;
+			}
+			for (int32 Col = 0; Col < Puzzle->m_iSize; Col++)
+			{
+				if (Col != Hint->Col && Puzzle->GetCell(Rows[Piece], Col).m_iFinalIcon == Icons[Piece])
+				{
+					PlacedRow = Rows[Piece];
+					PlacedCol = Col;
+					break;
+				}
+			}
+		}
+	}
+	UUserWidget* ClueWidget = Hint ? MakeClueWidget(*Clue, *Puzzle, IconSets) : nullptr;
+	UClass* InfoClass = Hint ? LoadClass<UUserWidget>(nullptr, TEXT("/Game/Happiness/UI/WBP_HintInfo.WBP_HintInfo_C")) : nullptr;
+	UHintInfoWidget* Info = InfoClass ? CreateWidget<UHintInfoWidget>(this, InfoClass) : nullptr;
+	UUserWidget* CellMock = Hint ? MakeGridCellMock(Puzzle->GetCell(Hint->Row, Hint->Col), IconSets[Hint->Row]) : nullptr;
+	UUserWidget* PlacedMock = PlacedRow != INDEX_NONE ? MakeGridCellMock(Puzzle->GetCell(PlacedRow, PlacedCol), IconSets[PlacedRow]) : nullptr;
+	if (!ClueWidget || !Info || !CellMock)
+	{
+		return;
+	}
+
+	// The hint window: its box across the whole of it (on the puzzle screen it takes the part clear of the clue)
+	Info->BoxWidthFraction = 1.f;
+	Info->SetVisibility(ESlateVisibility::HitTestInvisible);
+	USizeBox* InfoBox = NewObject<USizeBox>(this);
+	InfoBox->SetWidthOverride(HintInfoMockSize.X);
+	InfoBox->SetHeightOverride(HintInfoMockSize.Y);
+	InfoBox->SetContent(Info);
+	UScaleBox* InfoFit = NewObject<UScaleBox>(this);
+	InfoFit->SetStretch(EStretch::ScaleToFit);
+	InfoFit->AddChild(InfoBox);
+	USizeBox* InfoSize = NewObject<USizeBox>(this);
+	InfoSize->SetWidthOverride(HintInfoMockWidth);
+	InfoSize->SetHeightOverride(HintInfoMockWidth * HintInfoMockSize.Y / HintInfoMockSize.X);
+	InfoSize->SetContent(InfoFit);
+
+	// The hinted clue with its sparkles (the clue's ShowHInt), at the Clues page's scale
+	CallBlueprintFunction(ClueWidget, TEXT("ShowHInt"), [](FProperty*, uint8*) {});
+	ClueWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
+	USizeBox* PanelWidth = NewObject<USizeBox>(this);
+	PanelWidth->SetWidthOverride(HorizontalCluePanelWidth);
+	PanelWidth->SetContent(ClueWidget);
+	UScaleBox* ClueFit = NewObject<UScaleBox>(this);
+	ClueFit->SetStretch(EStretch::ScaleToFitX);
+	ClueFit->AddChild(PanelWidth);
+	USizeBox* ClueSize = NewObject<USizeBox>(this);
+	ClueSize->SetWidthOverride(ClueSelectMockWidth);
+	ClueSize->SetContent(ClueFit);
+
+	// The cell it points at, its icon ruled out
+	MarkCellRuledOut(CellMock, Hint->Icon);
+	auto FitCell = [this](UWidget* Cell)
+	{
+		USizeBox* CellBox = NewObject<USizeBox>(this);
+		CellBox->SetWidthOverride(GridCellSize.X);
+		CellBox->SetHeightOverride(GridCellSize.Y);
+		CellBox->SetContent(Cell);
+		UScaleBox* CellFit = NewObject<UScaleBox>(this);
+		CellFit->SetStretch(EStretch::ScaleToFit);
+		CellFit->AddChild(CellBox);
+		USizeBox* CellSize = NewObject<USizeBox>(this);
+		CellSize->SetWidthOverride(HintCellMockSize.X);
+		CellSize->SetHeightOverride(HintCellMockSize.Y);
+		CellSize->SetContent(CellFit);
+		return CellSize;
+	};
+	// The set icon's cell right of the hinted one
+	UHorizontalBox* Cells = NewObject<UHorizontalBox>(this);
+	for (UWidget* Cell : { static_cast<UWidget*>(CellMock), static_cast<UWidget*>(PlacedMock) })
+	{
+		UHorizontalBoxSlot* CellSlot = Cell ? Cells->AddChildToHorizontalBox(FitCell(Cell)) : nullptr;
+		if (CellSlot && Cells->GetChildrenCount() > 1)
+		{
+			CellSlot->SetPadding(FMargin(HintMockGap * .25f, 0.f, 0.f, 0.f));
+		}
+	}
+
+	// Side by side, the cells left of the clue
+	UHorizontalBox* Row = NewObject<UHorizontalBox>(this);
+	for (UWidget* Part : { static_cast<UWidget*>(Cells), static_cast<UWidget*>(ClueSize) })
+	{
+		if (UHorizontalBoxSlot* PartSlot = Row->AddChildToHorizontalBox(Part))
+		{
+			PartSlot->SetPadding(FMargin(Row->GetChildrenCount() > 1 ? HintMockGap : 0.f, 0.f, 0.f, 0.f));
+			PartSlot->SetVerticalAlignment(VAlign_Center);
+		}
+	}
+	if (UVerticalBoxSlot* RowSlot = Cast<UVerticalBoxSlot>(IllustrationBox->AddChild(Row)))
+	{
+		RowSlot->SetHorizontalAlignment(HAlign_Center);
+		RowSlot->SetPadding(FMargin(0.f, 16.f, 0.f, 8.f));
+	}
+
+	// Below them, the hint window
+	if (UVerticalBoxSlot* InfoSlot = Cast<UVerticalBoxSlot>(IllustrationBox->AddChild(InfoSize)))
+	{
+		InfoSlot->SetHorizontalAlignment(HAlign_Center);
+		InfoSlot->SetPadding(FMargin(0.f, 8.f, 0.f, 24.f));
+	}
+	// Once it's on the page: building it runs its construct, which hides the hint (if the page isn't up yet, the
+	// rules' construct selects the subject again and this runs again)
+	Info->ShowHint(Hint, IconSets, nullptr);
 }
 
 TArray<UObject*> UGameRulesWidget::GetIconSets() const
@@ -667,17 +1001,43 @@ TArray<UObject*> UGameRulesWidget::GetIconSets() const
 			Result.Add(Element->GetObjectPropertyValue(Array.GetRawPtr(Set)));
 		}
 	}
+	// Only sets of the basic icons (Icons/Basic), not the legacy or extra ones: each other set is swapped for a basic
+	// one not in use, in its place; four of them if the player controller has none
+	auto IsBasic = [](const UObject* Set)
+	{
+		const UTexture2D* Icon = GetRulesIconTexture(const_cast<UObject*>(Set), 0);
+		return Icon && Icon->GetPathName().StartsWith(TEXT("/Game/Happiness/IconSets/Icons/Basic/"));
+	};
 	if (Result.Num() == 0)
 	{
-		for (const TCHAR* Path : {
-			TEXT("/Game/Happiness/IconSets/IS_Flowers.IS_Flowers"),
-			TEXT("/Game/Happiness/IconSets/IS_Fruits.IS_Fruits"),
-			TEXT("/Game/Happiness/IconSets/IS_Balls.IS_Balls"),
-			TEXT("/Game/Happiness/IconSets/IS_Toys.IS_Toys") })
+		Result.SetNum(4);
+	}
+	int32 Next = 0;
+	static const TCHAR* const BasicSets[] = {
+		TEXT("/Game/Happiness/IconSets/IS_Fruits.IS_Fruits"),
+		TEXT("/Game/Happiness/IconSets/IS_GardenVisitors.IS_GardenVisitors"),
+		TEXT("/Game/Happiness/IconSets/IS_Balls.IS_Balls"),
+		TEXT("/Game/Happiness/IconSets/IS_Toys.IS_Toys"),
+		TEXT("/Game/Happiness/IconSets/IS_Flowers2.IS_Flowers2"),
+		TEXT("/Game/Happiness/IconSets/IS_Hats.IS_Hats"),
+		TEXT("/Game/Happiness/IconSets/IS_Instruments.IS_Instruments"),
+		TEXT("/Game/Happiness/IconSets/IS_MythicalCreatures.IS_MythicalCreatures"),
+		TEXT("/Game/Happiness/IconSets/IS_Deserts.IS_Deserts"),
+		TEXT("/Game/Happiness/IconSets/IS_Weapons.IS_Weapons") };
+	for (UObject*& Set : Result)
+	{
+		if (Set && IsBasic(Set))
 		{
-			Result.Add(LoadObject<UObject>(nullptr, Path));
+			continue;
+		}
+		Set = nullptr;
+		while (!Set && Next < UE_ARRAY_COUNT(BasicSets))
+		{
+			UObject* Basic = LoadObject<UObject>(nullptr, BasicSets[Next++]);
+			Set = Basic && !Result.Contains(Basic) && IsBasic(Basic) ? Basic : nullptr;
 		}
 	}
+	Result.Remove(nullptr);
 	return Result;
 }
 
@@ -688,31 +1048,641 @@ void UGameRulesWidget::AddBoards(const UPuzzle& Puzzle, const UClue& Clue, const
 	{
 		return;
 	}
-	UHorizontalBox* Row = NewObject<UHorizontalBox>(this);
-	auto AddBoard = [this, Row](UWidget* Board)
+	// Each on its own row
+	auto AddBoard = [this](UWidget* Board)
 	{
-		if (UHorizontalBoxSlot* BoardSlot = Row->AddChildToHorizontalBox(Board))
+		if (UVerticalBoxSlot* BoardSlot = Cast<UVerticalBoxSlot>(IllustrationBox->AddChild(Board)))
 		{
-			BoardSlot->SetPadding(FMargin(0.f, 0.f, 24.f, 0.f));
-			BoardSlot->SetVerticalAlignment(VAlign_Top);
+			BoardSlot->SetHorizontalAlignment(HAlign_Center);
+			BoardSlot->SetPadding(FMargin(0.f, 12.f, 0.f, 0.f));
 		}
 	};
+	const FLinearColor BoardBreaksColor(0.34f, 0.025f, 0.015f, 1.f);
+	// Same Column: blocks of board cells instead, the duck following the peach into its column, and out of a column the
+	// peach can't be in
+	if (Clue.GetCampaignLesson() == ECampaignLesson::VerticalTwo)
+	{
+		float WorksHeight = 0.f;
+		float BreaksHeight = 0.f;
+		UWidget* Works = MakeSameColumnBlock(Example, IconSets, WorksHeight, false);
+		UWidget* Breaks = Works ? MakeSameColumnBlock(Example, IconSets, BreaksHeight, true) : nullptr;
+		if (Works && Breaks)
+		{
+			const TArray<int32> Columns = Example.SolutionColumns();
+			AddBoard(MakeBoard(Example, Columns, INDEX_NONE, IconSets, FText::GetEmpty(), RulesSage, Works, WorksHeight));
+			AddBoard(MakeBoard(Example, Columns, 0, IconSets, FText::GetEmpty(), BoardBreaksColor, Breaks, BreaksHeight));
+			return;
+		}
+		StopBlockAnimation();
+	}
+	else
+	{
+		// The other clues: a card for each thing the clue tells you, as blocks of board cells
+		TArray<UWidget*> CardBoards;
+		const TArray<FRulesCard> Cards = MakeRulesCards(Clue, Example);
+		for (const FRulesCard& Card : Cards)
+		{
+			float Height = 0.f;
+			UWidget* Block = MakeRulesBlock(Example, Card, IconSets, Height);
+			if (Block && Card.SecondOps.Num() > 0)
+			{
+				// A second mock beside the first, set apart so it reads as another puzzle
+				FRulesCard Second = Card;
+				Second.Ops = Card.SecondOps;
+				float SecondHeight = 0.f;
+				UWidget* SecondBlock = MakeRulesBlock(Example, Second, IconSets, SecondHeight);
+				UHorizontalBox* Pair = SecondBlock ? NewObject<UHorizontalBox>(this) : nullptr;
+				if (Pair)
+				{
+					Pair->AddChildToHorizontalBox(Block);
+					if (UHorizontalBoxSlot* PairSlot = Pair->AddChildToHorizontalBox(SecondBlock))
+					{
+						PairSlot->SetPadding(FMargin(48.f, 0.f, 0.f, 0.f));
+					}
+					Height = FMath::Max(Height, SecondHeight);
+				}
+				Block = Pair;
+			}
+			if (!Block)
+			{
+				CardBoards.Reset();
+				break;
+			}
+			CardBoards.Add(MakeBoard(Example, Example.SolutionColumns(), Card.bRuleOut ? 0 : INDEX_NONE, IconSets, FText::GetEmpty(),
+				Card.bRuleOut ? BoardBreaksColor : RulesSage, Block, Height, Card.Note));
+		}
+		if (CardBoards.Num() > 0)
+		{
+			for (UWidget* Board : CardBoards)
+			{
+				AddBoard(Board);
+			}
+			StartBlockAnimation();
+			return;
+		}
+		StopBlockAnimation();
+	}
 	AddBoard(MakeBoard(Example, Example.SolutionColumns(), INDEX_NONE, IconSets, LOCTEXT("Fits", "Works"), RulesSage));
 	TArray<int32> Broken;
 	int32 Moved = INDEX_NONE;
 	if (Example.FindBroken(Broken, Moved))
 	{
-		AddBoard(MakeBoard(Example, Broken, Moved, IconSets, LOCTEXT("Breaks", "Does not work"), FLinearColor(0.34f, 0.025f, 0.015f, 1.f)));
-	}
-	if (UVerticalBoxSlot* RowSlot = Cast<UVerticalBoxSlot>(IllustrationBox->AddChild(Row)))
-	{
-		RowSlot->SetHorizontalAlignment(HAlign_Center);
-		RowSlot->SetPadding(FMargin(0.f, 12.f, 0.f, 12.f));
+		AddBoard(MakeBoard(Example, Broken, Moved, IconSets, LOCTEXT("Breaks", "Does not work"), BoardBreaksColor));
 	}
 }
 
+TArray<FRulesCard> UGameRulesWidget::MakeRulesCards(const UClue& Clue, const FClueExample& Example)
+{
+	// Every way the clue is used (what the puzzle's solver gets from it, UClue::Analyze...), one card each; a way
+	// and its mirror image (left and right, or the clue's icons swapped) are one card
+	TArray<FRulesCard> Cards;
+	const int32 Count = Example.Pieces.Num();
+	if (Example.Size < 4)
+	{
+		return Cards;
+	}
+	using Op = ERulesBlockOp;
+	// SecondOps: another mock beside the first, separate from it
+	auto Card = [&Cards](bool bRuleOut, int32 Columns, const FText& Note, std::initializer_list<FRulesBlockOp> Ops,
+		std::initializer_list<FRulesBlockOp> SecondOps = {})
+	{
+		FRulesCard& New = Cards.AddDefaulted_GetRef();
+		New.bRuleOut = bRuleOut;
+		New.Columns = Columns;
+		New.Note = Note;
+		New.Ops = Ops;
+		New.SecondOps = SecondOps;
+	};
+	// The crossed-out (or decoy) piece, if any
+	int32 Crossed = INDEX_NONE;
+	for (int32 Piece = 0; Piece < Count; Piece++)
+	{
+		if (Example.Pieces[Piece].bCrossed)
+		{
+			Crossed = Piece;
+		}
+	}
+	const int32 Wide = Example.Size;
+	const int32 Last = Example.Size - 1;
+	switch (Clue.GetCampaignLesson())
+	{
+		case ECampaignLesson::VerticalThree:
+			if (Count < 3) break;
+			Card(false, 1, LOCTEXT("ThreeWorks", "If you know which column 1 of the icons is in, the other two must be in the same column"),
+				{ { Op::Set, 0, 0 }, { Op::Anim, 1, 0 }, { Op::Anim, 2, 0 } });
+			Card(true, 1, LOCTEXT("ThreeBreaks", "If 1 of the icons can't be in a column, neither can the other two"),
+				{ { Op::Other, 0, 0 }, { Op::Red, 1, 0 }, { Op::Red, 2, 0 } });
+			break;
+
+		case ECampaignLesson::TwoNot:
+			if (Count < 2) break;
+			Card(true, 1, LOCTEXT("TwoNotBreaks", "If you know where one icon is, the other cant be in that column"),
+				{ { Op::Set, 0, 0 }, { Op::Red, 1, 0 } }, { { Op::Set, 1, 0 }, { Op::Red, 0, 0 } });
+			break;
+
+		case ECampaignLesson::ThreeNot:
+		{
+			if (Count < 3 || Crossed == INDEX_NONE) break;
+			const int32 First = Crossed == 0 ? 1 : 0;
+			const int32 Second = Crossed == 2 ? 1 : 2;
+			Card(false, 1, LOCTEXT("ThreeNotWorks", "If you know which column 1 of the icons that aren't crossed out is in, the other must be in it too, and the crossed-out icon can't be"),
+				{ { Op::Set, First, 0 }, { Op::Anim, Second, 0 }, { Op::Red, Crossed, 0 } });
+			Card(true, 1, LOCTEXT("ThreeNotBreaks2", "If you know which column the crossed-out icon is in, neither of the others can be in it"),
+				{ { Op::Set, Crossed, 0 }, { Op::Red, First, 0 }, { Op::Red, Second, 0 } });
+			Card(true, 1, LOCTEXT("ThreeNotBreaks3", "If 1 of the icons that aren't crossed out can't be in a column, the other can't be in it either"),
+				{ { Op::Other, First, 0 }, { Op::Red, Second, 0 } });
+			break;
+		}
+
+		case ECampaignLesson::EitherOr:
+			if (Count < 3) break;
+			Card(false, 1, LOCTEXT("EitherOrWorks", "If one of the icons below can't be in the top icon's column, the other one must be in it"),
+				{ { Op::Set, 0, 0 }, { Op::Out, 1, 0 }, { Op::Anim, 2, 0 } });
+			Card(true, 1, LOCTEXT("EitherOrBreaks", "The two icons below are never in the same column: where one is, the other can't be"),
+				{ { Op::Set, 1, 0 }, { Op::Red, 2, 0 } });
+			Card(true, 1, LOCTEXT("EitherOrBreaks2", "If neither icon below can be in a column, the top icon can't be in it either"),
+				{ { Op::Other, 1, 0 }, { Op::Other, 2, 0 }, { Op::Red, 0, 0 } });
+			Card(true, Wide, LOCTEXT("EitherOrBreaks3", "Once you know where both icons below are, the top icon must be in one of their columns"),
+				{ { Op::Set, 1, 0 }, { Op::Set, 2, 1 }, { Op::Red, 0, 2 }, { Op::Red, 0, 3 } });
+			break;
+
+		case ECampaignLesson::NextTo:
+			if (Count < 2) break;
+			Card(false, Wide, LOCTEXT("NextToWorks", "If one of the icons is on the edge of the puzzle, the other must be right next to it"),
+				{ { Op::Set, 0, 0 }, { Op::Anim, 1, 1 } });
+			Card(true, Wide, LOCTEXT("NextToBreaks", "With 1 of the icons known, the other can only be on either side of it"),
+				{ { Op::Set, 0, 1 }, { Op::Red, 1, 3 } });
+			Card(true, Wide, LOCTEXT("NextToBreaks2", "If neither column beside a column can have the other icon, this one can't be in it"),
+				{ { Op::Out, 1, 0 }, { Op::Out, 1, 2 }, { Op::Red, 0, 1 } });
+			break;
+
+		case ECampaignLesson::NotNextTo:
+			if (Count < 2) break;
+			Card(true, Wide, LOCTEXT("NotNextToBreaks", "If you know which column 1 of the icons is in, the other can't be next to it"),
+				{ { Op::Set, 0, 1 }, { Op::Red, 1, 0 }, { Op::Red, 1, 2 } });
+			break;
+
+		case ECampaignLesson::DirectlyLeftOf:
+			if (Count < 2) break;
+			Card(false, Wide, LOCTEXT("DirectlyLeftOfWorks", "If you know which column the first icon is in, the second is in the column just right of it"),
+				{ { Op::Set, 0, 1 }, { Op::Anim, 1, 2 } });
+			Card(true, Wide, LOCTEXT("DirectlyLeftOfBreaks", "The first icon can't be in the last column, and the second can't be in the first"),
+				{ { Op::Red, 0, Last }, { Op::Red, 1, 0 } });
+			Card(true, Wide, LOCTEXT("DirectlyLeftOfBreaks2", "If the second icon can't be just right of a column, the first can't be in it"),
+				{ { Op::Out, 1, 2 }, { Op::Red, 0, 1 } });
+			break;
+
+		case ECampaignLesson::LeftOf:
+			if (Count < 2) break;
+			Card(false, Wide, LOCTEXT("LeftOfWorks", "If the second icon is in the second column, the first must be in the first"),
+				{ { Op::Set, 1, 1 }, { Op::Anim, 0, 0 } });
+			Card(false, Wide, LOCTEXT("LeftOfWorks2", "If the first icon can't be any further left, and the second can't be any further right, with no room between them, that's where they are"),
+				{ { Op::Out, 0, 0 }, { Op::Out, 1, Last }, { Op::Anim, 0, 1 }, { Op::Anim, 1, 2 } });
+			Card(true, Wide, LOCTEXT("LeftOfBreaks", "The first icon can't be in the last column, and the second can't be in the first"),
+				{ { Op::Red, 0, Last }, { Op::Red, 1, 0 } });
+			Card(true, Wide, LOCTEXT("LeftOfBreaks2", "If the first icon can't be in the first column, the second can't be in the first two"),
+				{ { Op::Out, 0, 0 }, { Op::Red, 1, 0 }, { Op::Red, 1, 1 } });
+			Card(true, Wide, LOCTEXT("LeftOfBreaks3", "If the second icon can't be in the last column, the first can't be in the last two"),
+				{ { Op::Out, 1, Last }, { Op::Red, 0, Last - 1 }, { Op::Red, 0, Last } });
+			break;
+
+		case ECampaignLesson::NotLeftOf:
+			if (Count < 2) break;
+			Card(true, Wide, LOCTEXT("NotLeftOfBreaks", "The first icon is never left of the second, so the second can't be right of it"),
+				{ { Op::Set, 0, 1 }, { Op::Red, 1, 2 }, { Op::Red, 1, 3 } });
+			Card(true, Wide, LOCTEXT("NotLeftOfBreaks2", "And the first icon can't be left of the second"),
+				{ { Op::Set, 1, 2 }, { Op::Red, 0, 0 }, { Op::Red, 0, 1 } });
+			if (Example.Pieces[0].Row == Example.Pieces[1].Row)
+			{
+				Card(true, Wide, LOCTEXT("NotLeftOfBreaks3", "In one row they can't share a column, so the first icon can't be in the first column, and the second can't be in the last"),
+					{ { Op::Red, 0, 0 }, { Op::Red, 1, Last } });
+			}
+			break;
+
+		case ECampaignLesson::Edge:
+			if (Count < 1) break;
+			if (Clue.m_HorizontalType == eHorizontalType::NotEdge)
+			{
+				Card(true, Wide, LOCTEXT("NotEdgeBreaks", "The icon can't be in the first or last column"),
+					{ { Op::Red, 0, 0 }, { Op::Red, 0, Last } });
+				Card(false, Wide, LOCTEXT("NotEdgeWorks", "If the icon can't be in one middle column, it must be in the other"),
+					{ { Op::Other, 0, 1 }, { Op::Out, 0, 0 }, { Op::Out, 0, Last }, { Op::Anim, 0, 2 } });
+			}
+			else
+			{
+				Card(true, Wide, LOCTEXT("EdgeBreaks", "The icon can't be in a middle column"),
+					{ { Op::Red, 0, 1 }, { Op::Red, 0, 2 } });
+				Card(false, Wide, LOCTEXT("EdgeWorks", "The icon is at one end: if it can't be in the first column, it must be in the last"),
+					{ { Op::Other, 0, 0 }, { Op::Out, 0, 1 }, { Op::Out, 0, 2 }, { Op::Anim, 0, Last } });
+			}
+			break;
+
+		case ECampaignLesson::Span:
+			if (Count < 3) break;
+			Card(true, Wide, LOCTEXT("SpanBreaks", "The middle icon can't be in the first or last column"),
+				{ { Op::Red, 1, 0 }, { Op::Red, 1, Last } });
+			Card(false, Wide, LOCTEXT("SpanWorks", "With an outer icon in the first column, the middle icon must be in the second and the other outer icon in the third"),
+				{ { Op::Set, 0, 0 }, { Op::Anim, 1, 1 }, { Op::Anim, 2, 2 } });
+			Card(true, Wide, LOCTEXT("SpanBreaks2", "With the middle icon known, the outer icons must be right beside it"),
+				{ { Op::Set, 1, 1 }, { Op::Red, 0, 1 }, { Op::Red, 0, 3 }, { Op::Red, 2, 1 }, { Op::Red, 2, 3 } });
+			Card(true, Wide, LOCTEXT("SpanBreaks3", "The outer icons are two columns apart: if one can't be in the first column, the other can't be in the third"),
+				{ { Op::Out, 0, 0 }, { Op::Red, 2, 2 } });
+			break;
+
+		case ECampaignLesson::SpanNotSide:
+		{
+			if (Count < 3 || Crossed == INDEX_NONE || Crossed == 1) break;
+			const int32 Beside = Crossed == 0 ? 2 : 0;
+			Card(false, Wide, LOCTEXT("SpanNotSideWorks", "The middle icon has the other icon right beside it: with one of them at an end, the other is next to it"),
+				{ { Op::Set, Beside, 0 }, { Op::Anim, 1, 1 } });
+			Card(true, Wide, LOCTEXT("SpanNotSideBreaks", "The crossed-out icon can't be on the middle icon's other side"),
+				{ { Op::Set, 1, 1 }, { Op::Set, Beside, 2 }, { Op::Red, Crossed, 0 } });
+			Card(true, Wide, LOCTEXT("SpanNotSideBreaks2", "If the other icon can't be beside a column, the middle icon can't be in it"),
+				{ { Op::Out, Beside, 0 }, { Op::Out, Beside, 2 }, { Op::Red, 1, 1 } });
+			break;
+		}
+
+		case ECampaignLesson::Gap:
+			if (Count < 2) break;
+			Card(false, Wide, LOCTEXT("GapWorks", "With 1 of the icons known, the other must be two columns over"),
+				{ { Op::Set, 0, 0 }, { Op::Anim, 1, 2 } });
+			Card(true, Wide, LOCTEXT("GapBreaks", "If 1 of the icons can't be in a column, the other can't be two columns from it"),
+				{ { Op::Out, 0, 0 }, { Op::Red, 1, 2 } });
+			break;
+
+		case ECampaignLesson::SpanNotMid:
+			if (Count < 3) break;
+			Card(false, Wide, LOCTEXT("SpanNotMidWorks", "With 1 of the outer icons known, the other must be two columns over"),
+				{ { Op::Set, 0, 0 }, { Op::Anim, 2, 2 } });
+			Card(true, Wide, LOCTEXT("SpanNotMidBreaks", "The crossed-out icon can't be in the column between them"),
+				{ { Op::Set, 0, 0 }, { Op::Set, 2, 2 }, { Op::Red, 1, 1 } });
+			Card(true, Wide, LOCTEXT("SpanNotMidBreaks2", "If 1 of the outer icons can't be in a column, the other can't be two columns from it"),
+				{ { Op::Out, 0, 0 }, { Op::Red, 2, 2 } });
+			break;
+
+		case ECampaignLesson::Between:
+			if (Count < 3) break;
+			Card(true, Wide, LOCTEXT("BetweenBreaks", "The middle icon can't be in the first or last column"),
+				{ { Op::Red, 1, 0 }, { Op::Red, 1, Last } });
+			Card(false, Wide, LOCTEXT("BetweenWorks", "With the outer icons in the first and third columns, the middle icon must be in the second"),
+				{ { Op::Set, 0, 0 }, { Op::Set, 2, 2 }, { Op::Anim, 1, 1 } });
+			Card(true, Wide, LOCTEXT("BetweenBreaks2", "The outer icons need a column between them for the middle icon, so they can't be side by side"),
+				{ { Op::Set, 0, 0 }, { Op::Red, 2, 0 }, { Op::Red, 2, 1 } });
+			Card(false, Wide, LOCTEXT("BetweenWorks2", "The outer icons are on opposite sides of the middle one: if one can't be on the left, the other must be"),
+				{ { Op::Set, 1, 1 }, { Op::Out, 0, 0 }, { Op::Anim, 2, 0 } });
+			break;
+
+		case ECampaignLesson::Chain:
+			if (Count < 3) break;
+			Card(true, Wide, LOCTEXT("ChainBreaks", "The first icon can't be in the last two columns, the middle one can't be at either end, and the last can't be in the first two"),
+				{ { Op::Red, 0, Last - 1 }, { Op::Red, 0, Last }, { Op::Red, 1, 0 }, { Op::Red, 1, Last }, { Op::Red, 2, 0 }, { Op::Red, 2, 1 } });
+			Card(false, Wide, LOCTEXT("ChainWorks", "With the middle icon in the second column, the first icon must be in the first"),
+				{ { Op::Set, 1, 1 }, { Op::Anim, 0, 0 } });
+			Card(true, Wide, LOCTEXT("ChainBreaks2", "If the first icon can't be in the first column, the others move right too: the middle can't be in the second, the last can't be in the third"),
+				{ { Op::Out, 0, 0 }, { Op::Red, 1, 1 }, { Op::Red, 2, 2 } });
+			break;
+
+		case ECampaignLesson::NextToEitherOr:
+			if (Count < 3) break;
+			Card(false, Wide, LOCTEXT("NextToEitherOrWorks", "With the middle icon at an end, if one of the others can't be beside it, the other must be"),
+				{ { Op::Set, 1, 0 }, { Op::Other, 0, 1 }, { Op::Anim, 2, 1 } });
+			Card(true, Wide, LOCTEXT("NextToEitherOrBreaks", "The middle icon is next to only 1 of the others, so the other can't be beside it too"),
+				{ { Op::Set, 1, 1 }, { Op::Set, 0, 0 }, { Op::Red, 2, 0 }, { Op::Red, 2, 2 } });
+			Card(true, Wide, LOCTEXT("NextToEitherOrBreaks2", "If neither of the others can be beside a column, the middle icon can't be in it"),
+				{ { Op::Out, 0, 0 }, { Op::Out, 0, 2 }, { Op::Out, 2, 0 }, { Op::Out, 2, 2 }, { Op::Red, 1, 1 } });
+			break;
+
+		case ECampaignLesson::AllApart:
+			if (Count < 3) break;
+			Card(true, Wide, LOCTEXT("AllApartBreaks", "If you know which column 1 of the icons is in, the other two can't be in it"),
+				{ { Op::Set, 0, 0 }, { Op::Red, 1, 0 }, { Op::Red, 2, 0 } });
+			Card(true, Wide, LOCTEXT("AllApartBreaks2", "If two of the icons can only be in the same two columns, they take both, so the third can't be in either"),
+				{ { Op::Out, 1, 0 }, { Op::Out, 1, 1 }, { Op::Out, 2, 0 }, { Op::Out, 2, 1 }, { Op::Red, 0, 2 }, { Op::Red, 0, 3 } });
+			break;
+
+		default:
+			break;
+	}
+	return Cards;
+}
+
+UWidget* UGameRulesWidget::MakeRulesBlock(const FClueExample& Example, const FRulesCard& Card, const TArray<UObject*>& IconSets,
+	float& OutHeight)
+{
+	// The clue's rows, in the clue's order, each Card.Columns cells of the board, every icon of the row a candidate to
+	// begin with
+	TArray<int32> Rows;
+	for (const FClueExamplePiece& Piece : Example.Pieces)
+	{
+		Rows.AddUnique(Piece.Row);
+	}
+	const int32 Columns = FMath::Min(Card.Columns, Example.Size);
+	TArray<FPuzzleCell> Cells;
+	Cells.Init(FPuzzleCell(Example.Size), Rows.Num() * Columns);
+	TArray<TPair<int32, int32>> Reds;	// cell, icon
+	TArray<TPair<int32, int32>> Anims;
+	for (const int32 Row : Rows)
+	{
+		if (!IconSets.IsValidIndex(Row))
+		{
+			return nullptr;
+		}
+	}
+	auto Place = [&](int32 RowIndex, int32 Column, int32 Icon)
+	{
+		for (int32 Other = 0; Other < Columns; Other++)
+		{
+			FPuzzleCell& Cell = Cells[RowIndex * Columns + Other];
+			if (Other == Column)
+			{
+				Cell.m_iFinalIcon = Icon;
+			}
+			else
+			{
+				Cell.m_bValues[Icon] = false;
+			}
+		}
+	};
+	for (const FRulesBlockOp& Step : Card.Ops)
+	{
+		if (!Example.Pieces.IsValidIndex(Step.Piece) || Step.Column < 0 || Step.Column >= Columns)
+		{
+			return nullptr;
+		}
+		const FClueExamplePiece& Piece = Example.Pieces[Step.Piece];
+		const int32 RowIndex = Rows.IndexOfByKey(Piece.Row);
+		const int32 Index = RowIndex * Columns + Step.Column;
+		switch (Step.Op)
+		{
+			case ERulesBlockOp::Set:
+				Place(RowIndex, Step.Column, Piece.Icon);
+				break;
+			case ERulesBlockOp::Other:
+			{
+				// An icon of the row the clue doesn't show
+				int32 Other = INDEX_NONE;
+				for (int32 Icon = 0; Icon < Example.Size && Other == INDEX_NONE; Icon++)
+				{
+					bool bShown = false;
+					for (const FClueExamplePiece& Shown : Example.Pieces)
+					{
+						bShown |= Shown.Row == Piece.Row && Shown.Icon == Icon;
+					}
+					Other = bShown ? INDEX_NONE : Icon;
+				}
+				if (Other == INDEX_NONE)
+				{
+					return nullptr;
+				}
+				Place(RowIndex, Step.Column, Other);
+				break;
+			}
+			case ERulesBlockOp::Out:
+				Cells[Index].m_bValues[Piece.Icon] = false;
+				break;
+			case ERulesBlockOp::Red:
+				// Not where the row's icon is placed already: nothing there to rule out
+				if (Cells[Index].m_iFinalIcon < 0)
+				{
+					Cells[Index].m_bValues[Piece.Icon] = true;
+					Reds.Add({ Index, Piece.Icon });
+				}
+				break;
+			case ERulesBlockOp::Anim:
+				if (Cells[Index].m_iFinalIcon < 0)
+				{
+					Cells[Index].m_bValues[Piece.Icon] = true;
+					Anims.Add({ Index, Piece.Icon });
+				}
+				break;
+		}
+	}
+
+	// Sized to fit the card (its 540 less its padding and frame), as Same Column's cells at most
+	const float CellWidth = FMath::Min(SameColumnCellSize.X, 486.f / Columns - 6.f);
+	const float CellHeight = CellWidth * SameColumnCellSize.Y / FMath::Max(SameColumnCellSize.X, 1.f);
+	UUniformGridPanel* Grid = NewObject<UUniformGridPanel>(this);
+	Grid->SetSlotPadding(FMargin(3.f));
+	for (int32 RowIndex = 0; RowIndex < Rows.Num(); RowIndex++)
+	{
+		for (int32 Column = 0; Column < Columns; Column++)
+		{
+			const int32 Index = RowIndex * Columns + Column;
+			UUserWidget* Cell = MakeGridCellMock(Cells[Index], IconSets[Rows[RowIndex]]);
+			if (!Cell)
+			{
+				return nullptr;
+			}
+			for (const TPair<int32, int32>& Red : Reds)
+			{
+				if (Red.Key == Index)
+				{
+					MarkCellRuledOut(Cell, Red.Value);
+				}
+			}
+			// Animated: the icon set here, and as setting it does, out of the rest of its row
+			FPuzzleCell Animated = Cells[Index];
+			bool bAnimated = false;
+			for (const TPair<int32, int32>& Anim : Anims)
+			{
+				if (Anim.Key == Index)
+				{
+					Animated = FPuzzleCell(Example.Size);
+					Animated.m_iFinalIcon = Anim.Value;
+					bAnimated = true;
+					break;
+				}
+				if (Anim.Key / Columns == RowIndex && Animated.m_iFinalIcon < 0 && Animated.m_bValues[Anim.Value])
+				{
+					Animated.m_bValues[Anim.Value] = false;
+					bAnimated = true;
+				}
+			}
+			if (bAnimated)
+			{
+				AddBlockAnimation(Cell, Cells[Index], Animated);
+			}
+			USizeBox* CellBox = NewObject<USizeBox>(this);
+			CellBox->SetWidthOverride(GridCellSize.X);
+			CellBox->SetHeightOverride(GridCellSize.Y);
+			CellBox->SetContent(Cell);
+			UScaleBox* CellFit = NewObject<UScaleBox>(this);
+			CellFit->SetStretch(EStretch::ScaleToFit);
+			CellFit->AddChild(CellBox);
+			USizeBox* CellSize = NewObject<USizeBox>(this);
+			CellSize->SetWidthOverride(CellWidth);
+			CellSize->SetHeightOverride(CellHeight);
+			CellSize->SetContent(CellFit);
+			Grid->AddChildToUniformGrid(CellSize, RowIndex, Column);
+		}
+	}
+	OutHeight = Rows.Num() * (CellHeight + 6.f);
+	return Grid;
+}
+
+void UGameRulesWidget::MarkCellRuledOut(UUserWidget* Cell, int32 Icon)
+{
+	// The board's hint effect on the icon (WBP_Cell's ShowHint), tinted red to rule it out as WBP_GamePanel's ShowHint does
+	CallBlueprintFunction(Cell, TEXT("ShowHint"), [&](FProperty* Property, uint8* Params)
+	{
+		if (const FIntProperty* Int = CastField<FIntProperty>(Property))
+		{
+			Int->SetPropertyValue_InContainer(Params, Icon);
+		}
+	});
+	const FArrayProperty* IconsProperty = FindFProperty<FArrayProperty>(Cell->GetClass(), TEXT("AllIcons"));
+	const FObjectPropertyBase* IconElement = IconsProperty ? CastField<FObjectPropertyBase>(IconsProperty->Inner) : nullptr;
+	if (IconElement)
+	{
+		FScriptArrayHelper Icons(IconsProperty, IconsProperty->ContainerPtrToValuePtr<void>(Cell));
+		UObject* IconWidget = Icons.IsValidIndex(Icon) ? IconElement->GetObjectPropertyValue(Icons.GetRawPtr(Icon)) : nullptr;
+		const FStructProperty* Color = IconWidget ? FindFProperty<FStructProperty>(IconWidget->GetClass(), TEXT("IconColor")) : nullptr;
+		if (Color && Color->Struct == TBaseStructure<FLinearColor>::Get())
+		{
+			*Color->ContainerPtrToValuePtr<FLinearColor>(IconWidget) = FLinearColor::Red;
+		}
+	}
+}
+
+UWidget* UGameRulesWidget::MakeSameColumnBlock(const FClueExample& Example, const TArray<UObject*>& IconSets, float& OutHeight,
+	bool bBreaks)
+{
+	// The clue's column, two rows of the board: the clue's first icon set at the top, the second still a candidate
+	// below it. bBreaks: another icon (the apple) set at the top instead, so the first can't be in that column, and
+	// the second is ruled out of it (red)
+	if (Example.Pieces.Num() < 2 || Example.Size < 2)
+	{
+		return nullptr;
+	}
+	const FClueExamplePiece& Top = Example.Pieces[0];
+	const FClueExamplePiece& Bottom = Example.Pieces[1];
+	if (!IconSets.IsValidIndex(Top.Row) || !IconSets.IsValidIndex(Bottom.Row))
+	{
+		return nullptr;
+	}
+	FPuzzleCell TopSet(Example.Size);
+	TopSet.m_iFinalIcon = Top.Icon;
+	// A candidate among a few: the duck and one other left
+	FPuzzleCell BottomUnder(Example.Size);
+	for (int32 Icon = 0, Left = 0; Icon < Example.Size; Icon++)
+	{
+		if (Icon != Bottom.Icon && Left++ > 0)
+		{
+			BottomUnder.m_bValues[Icon] = false;
+		}
+	}
+	if (bBreaks)
+	{
+		// The apple if the first's set has one, else its first other icon
+		int32 Other = INDEX_NONE;
+		for (int32 Icon = 0; Icon < Example.Size; Icon++)
+		{
+			const UTexture2D* Texture = Icon != Top.Icon ? GetRulesIconTexture(IconSets[Top.Row], Icon) : nullptr;
+			if (Texture && (Other == INDEX_NONE || Texture->GetName() == TEXT("Apple")))
+			{
+				Other = Icon;
+			}
+			if (Texture && Texture->GetName() == TEXT("Apple"))
+			{
+				break;
+			}
+		}
+		if (Other == INDEX_NONE)
+		{
+			Other = (Top.Icon + 1) % Example.Size;
+		}
+		TopSet = FPuzzleCell(Example.Size);
+		TopSet.m_iFinalIcon = Other;
+	}
+
+	UUniformGridPanel* Grid = NewObject<UUniformGridPanel>(this);
+	Grid->SetSlotPadding(FMargin(3.f));
+	const FPuzzleCell* Cells[2] = { &TopSet, &BottomUnder };
+	UUserWidget* AnimCell = nullptr;
+	for (int32 Row = 0; Row < 2; Row++)
+	{
+		UUserWidget* Cell = MakeGridCellMock(*Cells[Row], IconSets[Row == 0 ? Top.Row : Bottom.Row]);
+		if (!Cell)
+		{
+			return nullptr;
+		}
+		USizeBox* CellBox = NewObject<USizeBox>(this);
+		CellBox->SetWidthOverride(GridCellSize.X);
+		CellBox->SetHeightOverride(GridCellSize.Y);
+		CellBox->SetContent(Cell);
+		UScaleBox* CellFit = NewObject<UScaleBox>(this);
+		CellFit->SetStretch(EStretch::ScaleToFit);
+		CellFit->AddChild(CellBox);
+		USizeBox* CellSize = NewObject<USizeBox>(this);
+		CellSize->SetWidthOverride(SameColumnCellSize.X);
+		CellSize->SetHeightOverride(SameColumnCellSize.Y);
+		CellSize->SetContent(CellFit);
+		Grid->AddChildToUniformGrid(CellSize, Row, 0);
+		if (Row == 1)
+		{
+			if (bBreaks)
+			{
+				MarkCellRuledOut(Cell, Bottom.Icon);
+			}
+			else
+			{
+				AnimCell = Cell;
+			}
+		}
+	}
+	OutHeight = 2.f * (SameColumnCellSize.Y + 6.f);
+	if (bBreaks)
+	{
+		return Grid;
+	}
+	// The duck's cell, in a loop: the duck set, then back to its candidates
+	FPuzzleCell DuckSet(Example.Size);
+	DuckSet.m_iFinalIcon = Bottom.Icon;
+	AddBlockAnimation(AnimCell, BottomUnder, DuckSet);
+	StartBlockAnimation();
+	return Grid;
+}
+
+void UGameRulesWidget::AddBlockAnimation(UUserWidget* Cell, const FPuzzleCell& From, const FPuzzleCell& To)
+{
+	if (Cell)
+	{
+		BlockAnimCells.Add(Cell);
+		BlockAnimStates.Add(From);
+		BlockAnimStates.Add(To);
+	}
+}
+
+void UGameRulesWidget::StartBlockAnimation()
+{
+	UWorld* World = GetWorld();
+	if (World && BlockAnimCells.Num() > 0)
+	{
+		BlockAnimState = 0;
+		World->GetTimerManager().SetTimer(BlockAnimTimer, FTimerDelegate::CreateUObject(this, &UGameRulesWidget::StepBlockAnimation),
+			BlockAnimInterval, true);
+	}
+}
+
+void UGameRulesWidget::StopBlockAnimation()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(BlockAnimTimer);
+	}
+	BlockAnimCells.Reset();
+	BlockAnimStates.Reset();
+}
+
+void UGameRulesWidget::NativeDestruct()
+{
+	StopBlockAnimation();
+	Super::NativeDestruct();
+}
+
 UWidget* UGameRulesWidget::MakeBoard(const FClueExample& Example, const TArray<int32>& Columns, int32 Highlight,
-	const TArray<UObject*>& IconSets, const FText& Caption, const FLinearColor& Color)
+	const TArray<UObject*>& IconSets, const FText& Caption, const FLinearColor& Color, UWidget* GridOverride, float GridHeight,
+	const FText& NoteOverride)
 {
 	UVerticalBox* Board = NewObject<UVerticalBox>(this);
 	const UFont* Serif = LoadObject<UFont>(nullptr, TEXT("/Game/Happiness/UI/Fonts/LessonsSerif_Font.LessonsSerif_Font"));
@@ -760,7 +1730,8 @@ UWidget* UGameRulesWidget::MakeBoard(const FClueExample& Example, const TArray<i
 		LabelSlot->SetPadding(FMargin(14.f, 0.f, 0.f, 0.f));
 		LabelSlot->SetVerticalAlignment(VAlign_Center);
 	}
-	if (UVerticalBoxSlot* HeadingSlot = Board->AddChildToVerticalBox(Heading))
+	// Over a block (Same Column), no heading: the card's color says which it is
+	if (UVerticalBoxSlot* HeadingSlot = GridOverride ? nullptr : Board->AddChildToVerticalBox(Heading))
 	{
 		HeadingSlot->SetPadding(FMargin(10.f, 4.f, 0.f, 12.f));
 	}
@@ -777,7 +1748,7 @@ UWidget* UGameRulesWidget::MakeBoard(const FClueExample& Example, const TArray<i
 	Frame->SetPadding(FMargin(7.f));
 	UUniformGridPanel* Grid = NewObject<UUniformGridPanel>(this);
 	Grid->SetSlotPadding(FMargin(3.f));
-	for (int32 RowIndex = 0; RowIndex < Rows.Num(); RowIndex++)
+	for (int32 RowIndex = 0; RowIndex < Rows.Num() && !GridOverride; RowIndex++)
 	{
 		for (int32 Column = 0; Column < Example.Size; Column++)
 		{
@@ -813,15 +1784,22 @@ UWidget* UGameRulesWidget::MakeBoard(const FClueExample& Example, const TArray<i
 			Grid->AddChildToUniformGrid(CellSize, RowIndex, Column);
 		}
 	}
-	Frame->SetContent(Grid);
+	Frame->SetContent(GridOverride ? GridOverride : static_cast<UWidget*>(Grid));
 	if (UVerticalBoxSlot* GridSlot = Board->AddChildToVerticalBox(Frame))
 	{
 		GridSlot->SetHorizontalAlignment(HAlign_Center);
 	}
 	UTextBlock* Note = NewObject<UTextBlock>(this);
-	Note->SetText(Highlight == INDEX_NONE
+	// Same Column's block: what it shows, on two lines
+	Note->SetText(!NoteOverride.IsEmpty() ? NoteOverride
+		: GridOverride
+		? (Highlight == INDEX_NONE
+			? LOCTEXT("SameColumnWorksNote", "If you know which column 1 of the icons is in, the other must be in the same column")
+			: LOCTEXT("SameColumnBreaksNote", "If 1 of the icons can't be in a column, neither can the other"))
+		: Highlight == INDEX_NONE
 		? LOCTEXT("ExampleWorksNote", "These positions follow the clue.")
 		: LOCTEXT("ExampleBreaksNote", "These positions contradict the clue."));
+	Note->SetAutoWrapText(GridOverride != nullptr);
 	Note->SetFont(FSlateFontInfo(Serif, 18));
 	Note->SetColorAndOpacity(FSlateColor(RulesInk));
 	Note->SetJustification(ETextJustify::Center);
@@ -831,7 +1809,11 @@ UWidget* UGameRulesWidget::MakeBoard(const FClueExample& Example, const TArray<i
 	}
 	USizeBox* CardSize = NewObject<USizeBox>(this);
 	CardSize->SetWidthOverride(540.f);
-	CardSize->SetHeightOverride(140.f + Rows.Num() * FMath::Max(BoardCellSize, 78.f));
+	// A block's card: as tall as its block and note (which may wrap to several lines)
+	if (!GridOverride)
+	{
+		CardSize->SetHeightOverride(140.f + Rows.Num() * FMath::Max(BoardCellSize, 78.f));
+	}
 	UBorder* Card = NewObject<UBorder>(this);
 	Card->SetBrush(MakeRulesSurface(Highlight == INDEX_NONE
 		? FLinearColor(0.94f, 0.97f, 0.87f, 1.f)
@@ -847,11 +1829,14 @@ void UGameRulesWidget::AddPicture(const FRulesSubject& Subject)
 	USizeBox* PictureSize = NewObject<USizeBox>(this);
 	PictureSize->SetWidthOverride(760.f);
 	PictureSize->SetHeightOverride(300.f);
-	// Controls: the cell dialog itself (touch), scaled to the picture's width, or a grid cell (mouse), enlarged to
-	// the picture's height
+	// Controls: the cell dialog itself (touch), scaled to the picture's width, or two grid cells (mouse), side by side
 	const bool bTouchMock = Subject.bControls && IsTouchInput();
-	UWidget* ControlsMock = !Subject.bControls ? nullptr : bTouchMock ? MakeCellDialogMock() : MakeGridCellMock();
-	if (ControlsMock)
+	UWidget* ControlsMock = !Subject.bControls ? nullptr : bTouchMock ? MakeCellDialogMock() : MakeMouseControlsMock();
+	if (ControlsMock && !bTouchMock)
+	{
+		PictureSize->SetContent(ControlsMock);
+	}
+	else if (ControlsMock)
 	{
 		const FVector2D MockSize = bTouchMock ? CellDialogSize : GridCellSize;
 		if (bTouchMock)
@@ -1248,12 +2233,15 @@ void UGameRulesWidget::AddButtonLegend()
 	IllustrationBox->AddChild(Legend);
 }
 
-bool UGameRulesWidget::FindExampleClue(ECampaignLesson Lesson, UPuzzle*& OutPuzzle, UClue*& OutClue)
+bool UGameRulesWidget::FindExampleClue(ECampaignLesson Lesson, UPuzzle*& OutPuzzle, UClue*& OutClue, bool bNotEdge)
 {
-	if (TObjectPtr<UClue>* Cached = ExampleClues.Find(Lesson))
+	// The Edge lesson has two pages: its Edge clues (outer edges) and its NotEdge clues (inner edges)
+	bNotEdge = bNotEdge && Lesson == ECampaignLesson::Edge;
+	const int32 Key = static_cast<int32>(Lesson) * 2 + (bNotEdge ? 1 : 0);
+	if (TObjectPtr<UClue>* Cached = ExampleClues.Find(Key))
 	{
 		OutClue = *Cached;
-		OutPuzzle = ExamplePuzzles.FindRef(Lesson);
+		OutPuzzle = ExamplePuzzles.FindRef(Key);
 		return OutClue && OutPuzzle;
 	}
 
@@ -1269,10 +2257,11 @@ bool UGameRulesWidget::FindExampleClue(ECampaignLesson Lesson, UPuzzle*& OutPuzz
 		{
 			for (UClue* Clue : *Clues)
 			{
-				if (Clue && Clue->GetCampaignLesson() == Lesson)
+				if (Clue && Clue->GetCampaignLesson() == Lesson
+					&& (Lesson != ECampaignLesson::Edge || (Clue->m_HorizontalType == eHorizontalType::NotEdge) == bNotEdge))
 				{
-					ExamplePuzzles.Add(Lesson, Puzzle);
-					ExampleClues.Add(Lesson, Clue);
+					ExamplePuzzles.Add(Key, Puzzle);
+					ExampleClues.Add(Key, Clue);
 					OutPuzzle = Puzzle;
 					OutClue = Clue;
 					return true;
@@ -1280,15 +2269,15 @@ bool UGameRulesWidget::FindExampleClue(ECampaignLesson Lesson, UPuzzle*& OutPuzz
 			}
 		}
 	}
-	ExampleClues.Add(Lesson, nullptr);
+	ExampleClues.Add(Key, nullptr);
 	return false;
 }
 
-UWidget* UGameRulesWidget::MakeExample(ECampaignLesson Lesson)
+UWidget* UGameRulesWidget::MakeExample(ECampaignLesson Lesson, bool bNotEdge)
 {
 	UPuzzle* Puzzle = nullptr;
 	UClue* Clue = nullptr;
-	if (!FindExampleClue(Lesson, Puzzle, Clue))
+	if (!FindExampleClue(Lesson, Puzzle, Clue, bNotEdge))
 	{
 		return nullptr;
 	}
@@ -1361,7 +2350,13 @@ UWidget* UGameRulesWidget::MakeExample(ECampaignLesson Lesson)
 		}
 		return Strip;
 	}
+	return MakeClueWidget(*Clue, *Puzzle, IconSets);
+}
 
+UUserWidget* UGameRulesWidget::MakeClueWidget(UClue& ClueRef, UPuzzle& PuzzleRef, const TArray<UObject*>& IconSets)
+{
+	UClue* Clue = &ClueRef;
+	UPuzzle* Puzzle = &PuzzleRef;
 	UClass* WidgetClass = (Clue->m_Type == eClueType::Vertical ? VerticalClueClass : HorizontalClueClass).LoadSynchronous();
 	UUserWidget* Widget = WidgetClass ? CreateWidget<UUserWidget>(this, WidgetClass) : nullptr;
 	UFunction* Populate = Widget ? Widget->FindFunction(TEXT("Populate")) : nullptr;
@@ -1403,39 +2398,6 @@ UWidget* UGameRulesWidget::MakeExample(ECampaignLesson Lesson)
 	return Widget;
 }
 
-namespace
-{
-	/** Calls a Blueprint function on Target, Fill giving each parameter its value (left at its default otherwise) */
-	bool CallBlueprintFunction(UObject* Target, const TCHAR* Name, TFunctionRef<void(FProperty*, uint8*)> Fill)
-	{
-		UFunction* Function = Target ? Target->FindFunction(Name) : nullptr;
-		if (!Function)
-		{
-			return false;
-		}
-		uint8* Params = static_cast<uint8*>(FMemory_Alloca(Function->ParmsSize));
-		FMemory::Memzero(Params, Function->ParmsSize);
-		for (TFieldIterator<FProperty> It(Function); It && It->HasAnyPropertyFlags(CPF_Parm); ++It)
-		{
-			It->InitializeValue_InContainer(Params);
-			Fill(*It, Params);
-		}
-		Target->ProcessEvent(Function, Params);
-		for (TFieldIterator<FProperty> It(Function); It && It->HasAnyPropertyFlags(CPF_Parm); ++It)
-		{
-			It->DestroyValue_InContainer(Params);
-		}
-		return true;
-	}
-
-	void SetCellParam(FProperty* Property, uint8* Params, const FPuzzleCell& Cell)
-	{
-		if (const FStructProperty* Struct = CastField<FStructProperty>(Property); Struct && Struct->Struct == FPuzzleCell::StaticStruct())
-		{
-			*Struct->ContainerPtrToValuePtr<FPuzzleCell>(Params) = Cell;
-		}
-	}
-}
 
 UWidget* UGameRulesWidget::MakeCellDialogMock()
 {
@@ -1498,19 +2460,102 @@ UWidget* UGameRulesWidget::MakeCellDialogMock()
 	return Dialog;
 }
 
-UWidget* UGameRulesWidget::MakeGridCellMock()
+UWidget* UGameRulesWidget::MakeMouseControlsMock()
 {
-	UObject* IconSet = LoadObject<UObject>(nullptr, TEXT("/Game/Happiness/IconSets/IS_Balls.IS_Balls"));
+	// Six Balls: the same one eliminated, then placed
+	constexpr int32 IconCount = 6;
+	constexpr int32 ShownIcon = 3;
+	FPuzzleCell Eliminated(IconCount);
+	Eliminated.m_bValues[ShownIcon] = false;
+	FPuzzleCell Placed(IconCount);
+	Placed.m_iFinalIcon = ShownIcon;
+	const FPuzzleCell* Cells[2] = { &Eliminated, &Placed };
+	const FText Captions[2] = {
+		LOCTEXT("ControlsMouseEliminate", "Right-click: eliminate"),
+		LOCTEXT("ControlsMousePlace", "Left-click: place")
+	};
+	const UFont* Serif = LoadObject<UFont>(nullptr, TEXT("/Game/Happiness/UI/Fonts/LessonsSerif_Font.LessonsSerif_Font"));
+	UHorizontalBox* Row = NewObject<UHorizontalBox>(this);
+	for (int32 Index = 0; Index < 2; ++Index)
+	{
+		UWidget* CellMock = MakeGridCellMock(*Cells[Index]);
+		if (!CellMock)
+		{
+			return nullptr;
+		}
+		// The cell at its own size, scaled to the card
+		USizeBox* MockBox = NewObject<USizeBox>(this);
+		MockBox->SetWidthOverride(GridCellSize.X);
+		MockBox->SetHeightOverride(GridCellSize.Y);
+		MockBox->SetContent(CellMock);
+		UScaleBox* MockFit = NewObject<UScaleBox>(this);
+		MockFit->SetStretch(EStretch::ScaleToFit);
+		MockFit->AddChild(MockBox);
+
+		UVerticalBox* Card = NewObject<UVerticalBox>(this);
+		if (UVerticalBoxSlot* MockSlot = Card->AddChildToVerticalBox(MockFit))
+		{
+			MockSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+			MockSlot->SetHorizontalAlignment(HAlign_Center);
+		}
+		UTextBlock* Label = NewObject<UTextBlock>(this);
+		Label->SetText(Captions[Index]);
+		Label->SetFont(FSlateFontInfo(Serif, 22));
+		Label->SetColorAndOpacity(FSlateColor(RulesInk));
+		Label->SetJustification(ETextJustify::Center);
+		if (UVerticalBoxSlot* LabelSlot = Card->AddChildToVerticalBox(Label))
+		{
+			LabelSlot->SetHorizontalAlignment(HAlign_Center);
+			LabelSlot->SetPadding(FMargin(0.f, 10.f, 0.f, 0.f));
+		}
+		if (UHorizontalBoxSlot* CardSlot = Row->AddChildToHorizontalBox(Card))
+		{
+			CardSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+			CardSlot->SetPadding(FMargin(12.f, 0.f));
+		}
+	}
+	return Row;
+}
+
+void UGameRulesWidget::StepBlockAnimation()
+{
+	if (BlockAnimCells.Num() == 0 || BlockAnimStates.Num() != 2 * BlockAnimCells.Num())
+	{
+		StopBlockAnimation();
+		return;
+	}
+	BlockAnimState = 1 - BlockAnimState;
+	for (int32 Index = 0; Index < BlockAnimCells.Num(); Index++)
+	{
+		const FPuzzleCell& Cell = BlockAnimStates[2 * Index + BlockAnimState];
+		if (BlockAnimCells[Index])
+		{
+			CallBlueprintFunction(BlockAnimCells[Index], TEXT("ApplyPuzzleCell"), [&](FProperty* Property, uint8* Params)
+			{
+				SetCellParam(Property, Params, Cell);
+			});
+			// The cell's icons are drawn from its retainer, which doesn't always see a candidate hidden
+			if (UGameCellWidget* GameCell = Cast<UGameCellWidget>(BlockAnimCells[Index]))
+			{
+				GameCell->RefreshIcons();
+			}
+		}
+	}
+}
+
+UUserWidget* UGameRulesWidget::MakeGridCellMock(const FPuzzleCell& Cell, UObject* IconSet)
+{
+	if (!IconSet)
+	{
+		IconSet = LoadObject<UObject>(nullptr, TEXT("/Game/Happiness/IconSets/IS_Balls.IS_Balls"));
+	}
 	UClass* CellClass = GridCellClass.LoadSynchronous();
 	UUserWidget* CellWidget = CellClass && IconSet ? CreateWidget<UUserWidget>(this, CellClass) : nullptr;
 	if (!CellWidget)
 	{
 		return nullptr;
 	}
-	// The touch page's sample: six Balls, two ruled out
-	constexpr int32 IconCount = 6;
-	FPuzzleCell Cell;
-	Cell.m_bValues = { true, false, true, true, false, true };
+	const int32 IconCount = Cell.m_bValues.Num();
 	CellWidget->TakeWidget();
 	// SetupCell(PuzzleSize, IconSet, CellSize, Row, Col), then ApplyPuzzleCell(PuzzleCell, Puzzle) as the board does;
 	// no puzzle, so no wrong-icon marks

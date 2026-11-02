@@ -56,7 +56,7 @@ FText UCampaignTree::GetLessonDisplayName(ECampaignLesson Lesson)
 		case ECampaignLesson::Span:				return LOCTEXT("Span", "Span");
 		case ECampaignLesson::Edge:				return LOCTEXT("Edge", "Edges");
 		case ECampaignLesson::TwoNot:			return LOCTEXT("TwoNot", "Not Same Column");
-		case ECampaignLesson::ThreeNot:			return LOCTEXT("ThreeNot", "Two Together, One Not");
+		case ECampaignLesson::ThreeNot:			return LOCTEXT("ThreeNot", "Not in Stack");
 		case ECampaignLesson::NotNextTo:		return LOCTEXT("NotNextTo", "Not Next To");
 		case ECampaignLesson::SpanNotSide:		return LOCTEXT("SpanNotSide", "Span With a Not");
 		case ECampaignLesson::Gap:				return LOCTEXT("Gap", "Gap");
@@ -67,7 +67,7 @@ FText UCampaignTree::GetLessonDisplayName(ECampaignLesson Lesson)
 		case ECampaignLesson::Chain:			return LOCTEXT("Chain", "Chain");
 		case ECampaignLesson::AllApart:			return LOCTEXT("AllApart", "All Apart");
 		case ECampaignLesson::EitherOr:			return LOCTEXT("EitherOr", "Either Or");
-		case ECampaignLesson::NextToEitherOr:	return LOCTEXT("NextToEitherOr", "Next To Either");
+		case ECampaignLesson::NextToEitherOr:	return LOCTEXT("NextToEitherOr", "Either Neighbor");
 		default:								return FText::GetEmpty();
 	}
 }
@@ -90,11 +90,11 @@ FText UCampaignTree::GetLessonDescription(ECampaignLesson Lesson)
 		case ECampaignLesson::VerticalThree:
 			return LOCTEXT("VerticalThreeDesc", "Three icons stacked means all three are in the same column. Find where any one of them goes and you know where the other two go.");
 		case ECampaignLesson::NextTo:
-			return LOCTEXT("NextToDesc", "Two icons side by side are next to each other: directly left or directly right. An icon on the edge only has one neighbor, which can settle it.");
+			return LOCTEXT("NextToDesc", "Two icons directly next to each other with no columns in between them.");
 		case ECampaignLesson::DirectlyLeftOf:
-			return LOCTEXT("DirectlyLeftOfDesc", "Joined by a bracket, the first icon is directly to the left of the second. Unlike Next To, the order is fixed.");
+			return LOCTEXT("DirectlyLeftOfDesc", "The first icon is directly to the left of the second icon.");
 		case ECampaignLesson::Span:
-			return LOCTEXT("SpanDesc", "Three icons in a row under an arrow: the middle one is between the other two, each directly beside it. The outer two can be either way round.");
+			return LOCTEXT("SpanDesc", "Three icons in a sequence. This sequence can go either direction but is always exactly 3 columns");
 		case ECampaignLesson::Edge:
 			return LOCTEXT("EdgeDesc", "An icon marked as on the edge is in the first or last column. One marked as not on the edge is never in either end column.");
 		case ECampaignLesson::TwoNot:
@@ -120,9 +120,9 @@ FText UCampaignTree::GetLessonDescription(ECampaignLesson Lesson)
 		case ECampaignLesson::AllApart:
 			return LOCTEXT("AllApartDesc", "The three icons are all in different columns. No two of them ever share a column.");
 		case ECampaignLesson::EitherOr:
-			return LOCTEXT("EitherOrDesc", "The top icon is in the column of one of the two icons below it, but not both. One of those two is a decoy.");
+			return LOCTEXT("EitherOrDesc", "The top icon is in the column of one of the two icons below it, but not both.");
 		case ECampaignLesson::NextToEitherOr:
-			return LOCTEXT("NextToEitherOrDesc", "The middle icon is next to one of the two outer icons, but not both. One of them is a decoy.");
+			return LOCTEXT("NextToEitherOrDesc", "The middle icon is next to one of the two outer icons, but not both.");
 		default:
 			return FText::GetEmpty();
 	}

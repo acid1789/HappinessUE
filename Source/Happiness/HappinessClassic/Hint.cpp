@@ -26,7 +26,7 @@ namespace
 	}
 
 	// The slots of a clue that must all be in the same column (Same Column, Three in a Column, and the pair of the
-	// "Two Together, One Not" clues); empty for other clues
+	// "Not in Stack" clues); empty for other clues
 	TArray<int> GetTogetherSlots(const UClue& Clue)
 	{
 		if (Clue.m_Type != eClueType::Vertical)

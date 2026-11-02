@@ -92,7 +92,17 @@ void UHintSparkleIconWidget::NativeTick(const FGeometry& MyGeometry, float InDel
 	HideOldOutline();
 	// A clue's first icon runs from TickClue; its other icons show nothing
 	if (ClueTicker.IsValid() || FindClue()) return;
-	UpdateSparkles(InDeltaTime, MyGeometry, false);
+	// A board icon in a scroll box (the rules' pictures): its sparkles stay in the box's area as it scrolls
+	// (up through the widgets this one is in: past a widget's root, the user widget whose tree it is)
+	const UScrollBox* Scroll = nullptr;
+	for (const UWidget* Widget = this; Widget && !Scroll; Scroll = Cast<UScrollBox>(Widget))
+	{
+		const UWidget* Parent = Widget->GetParent();
+		const UWidgetTree* Tree = Parent ? nullptr : Cast<UWidgetTree>(Widget->GetOuter());
+		Widget = Parent ? Parent : Tree ? Cast<UWidget>(Tree->GetOuter()) : nullptr;
+	}
+	const FGeometry ScrollGeometry = Scroll ? Scroll->GetCachedGeometry() : FGeometry();
+	UpdateSparkles(InDeltaTime, MyGeometry, false, Scroll ? &ScrollGeometry : nullptr);
 	KeepHintTint();
 	LastTickFrame = GFrameCounter;
 	if (!BoardWatch.IsValid())
@@ -237,9 +247,10 @@ void UHintSparkleIconWidget::UpdateSparkles(float InDeltaTime, const FGeometry& 
 	FVector2D ClipTopLeft, ClipBottomRight;
 	if (Scroll && ToSparkleSpace(*Scroll, ClipTopLeft, ClipBottomRight))
 	{
-		// The scroll box's area, widened by the orbit's overhang so that a clue in full view keeps its whole ring
+		// The scroll box's area, widened by the orbit's overhang so that a clue in full view keeps its whole ring; a
+		// board icon's, not (only the sparkles' own half size)
 		FVector2D ClueTopLeft, ClueBottomRight;
-		const FVector2D Overhang = ToSparkleSpace(Geometry, ClueTopLeft, ClueBottomRight)
+		const FVector2D Overhang = !bWholeClue ? FVector2D::ZeroVector : ToSparkleSpace(Geometry, ClueTopLeft, ClueBottomRight)
 			? (SparkleRect.GetSize() - (ClueBottomRight - ClueTopLeft)) * .5f + FVector2D(SpriteSize * .5f)
 			: FVector2D(SpriteSize);
 		SparkleClip = FBox2D(ClipTopLeft - Overhang, ClipBottomRight + Overhang);

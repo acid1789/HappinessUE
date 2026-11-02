@@ -15,15 +15,11 @@ Usage Analytics
 --- Design Tasks ---
 Campaign
 Game Rules
-Options
 
---- Dev tasks ---
-Restart Puzzle - Unhide all, Reset Timer
-Notification press while open
+--- Claude tasks ---
+Cell Dialog - Accidental Set
 
---- Art Tasks ---
-Options Menu Visuals
-
+--- Codex Tasks ---
 
 --- Store Product IDs (create in Play Console and App Store Connect) ---
 Remove Ads (non-consumable):	remove_ads
@@ -62,5 +58,4 @@ Icon Sets (non-consumable):
 	iconset_winterholidays
 
 
---- Category Ides ---
-
+--- Category Ideas ---

@@ -70,7 +70,6 @@ namespace
 			FSlateDrawElement::MakeBox(E, Layer, G.ToPaintGeometry(), &Art, ESlateDrawEffect::None, Tint);
 			const FLinearColor Ink = M->bLocked ? FLinearColor(.20f, .15f, .095f) : FLinearColor(.105f, .047f, .018f);
 			FSlateFontInfo Font = M->LabelFont;
-            if (M->Lesson == ECampaignLesson::ThreeNot) Font.Size=18;
 			const auto Measure = FSlateApplication::Get().GetRenderer()->GetFontMeasureService();
 			TArray<FString> Words, Lines;
 			UCampaignTree::GetLessonDisplayName(M->Lesson).ToString().ParseIntoArrayWS(Words);
@@ -88,10 +87,6 @@ namespace
 			}
 			if (!Current.IsEmpty())
 				Lines.Add(Current);
-			if (M->Lesson == ECampaignLesson::ThreeNot)
-            {
-                Lines = {TEXT("Two Together,"), TEXT("One Not")};
-            }
             const float LineHeight = 20.f;
             const float FontHeight = Measure->Measure(TEXT("Ag"), Font).Y;
 			for (int32 I = 0; I < Lines.Num(); ++I)
