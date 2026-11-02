@@ -129,14 +129,24 @@ private:
 	/** A board icon with sparkles: its watch ticker, and the frame it last ticked */
 	FTSTicker::FDelegateHandle BoardWatch;
 	uint64 LastTickFrame = 0;
-	/** Its clue has been scrolled into view for this hint */
+	/** Its clue has been scrolled into view for this hint; the scroll has finished (the sparkles may start) */
 	bool bClueScrolled = false;
+	bool bClueReady = false;
+	/** While the clue scrolls into view: how long it has been waiting, and the scroll offset last frame */
+	float ClueWait = 0.f;
+	float LastScrollOffset = -1.f;
+	/** Longest the sparkles wait for the clue's scroll to finish */
+	static constexpr float MaxClueWait = 1.f;
 	/** The hint button the stream comes from; how long it has been streaming; whether this hint has streamed */
 	TWeakObjectPtr<UWidget> HintButton;
 	float StreamTime = StreamSeconds;
 	bool bStreamed = false;
 	/** The clue icon whose sparkles are showing, for the board icon's stream to come from */
 	static TWeakObjectPtr<UHintSparkleIconWidget> ShownClue;
+	/** The clue icon waiting for its clue to be in view before its sparkles start: the board icon's wait for it too */
+	static TWeakObjectPtr<UHintSparkleIconWidget> WaitingClue;
+	/** A hinted clue is still scrolling into view, so no sparkles yet */
+	static bool IsClueWaiting();
 	float OrbitTime = 0.f;
 	float SpawnClock = 0.f;
 	float SpriteSize = 20.f;
