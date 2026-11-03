@@ -515,6 +515,10 @@ UCampaignTreeWidget::UCampaignTreeWidget(const FObjectInitializer& ObjectInitial
 	GroupBadgeTexture = Badge.Object;
 	StatusPlaqueTexture = Plaque.Object;
 	ViewportFrameTexture = Frame.Object;
+	static ConstructorHelpers::FObjectFinder<UTexture2D> CampaignHeading(
+		TEXT("/Game/General/Textures/T_CampaignHeading.T_CampaignHeading"));
+	CampaignHeadingTexture = CampaignHeading.Object;
+
 	static ConstructorHelpers::FObjectFinder<USoundBase> Check(TEXT("/Game/General/Audio/Cues/Happiness.Happiness"));
 	CheckSound = Check.Object;
 	// Retain the public style properties for existing Blueprint references.
@@ -524,9 +528,32 @@ UCampaignTreeWidget::UCampaignTreeWidget(const FObjectInitializer& ObjectInitial
 	NodeFont = FCoreStyle::GetDefaultFontStyle("Bold", 13);
 }
 
+void UCampaignTreeWidget::RefreshHeading()
+{
+	UImage* Heading = Cast<UImage>(GetWidgetFromName(TEXT("LessonsHeading")));
+	if (!Heading) return;
+	if (!bHeadingBrushCached)
+	{
+		LessonsHeadingBrush = Heading->GetBrush();
+		bHeadingBrushCached = true;
+	}
+	bool bCampaign = UCampaignSubsystem::GetMode() == ECampaignMode::Campaign;
+#if WITH_EDITOR
+	if (PreviewTreeMode >= 0) bCampaign = PreviewTreeMode == 1;
+#endif
+	FSlateBrush Brush = LessonsHeadingBrush;
+	if (bCampaign && CampaignHeadingTexture)
+	{
+		Brush.SetResourceObject(CampaignHeadingTexture);
+		Brush.SetUVRegion(FBox2f(FVector2f(0, 0), FVector2f(1, 1)));
+	}
+	Heading->SetBrush(Brush);
+}
+
 void UCampaignTreeWidget::NativePreConstruct()
 {
 	Super::NativePreConstruct();
+	RefreshHeading();
 	if (OverallProgress)
 		OverallProgress->SetVisibility(ESlateVisibility::Collapsed);
 
@@ -644,6 +671,7 @@ void UCampaignTreeWidget::HandleProgressChanged()
 
 void UCampaignTreeWidget::LoadProgress()
 {
+	RefreshHeading();
 	if (const UCampaignSubsystem* Campaign =
 			GetGameInstance() ? GetGameInstance()->GetSubsystem<UCampaignSubsystem>() : nullptr)
 	{
@@ -663,6 +691,7 @@ void UCampaignTreeWidget::SetVisibility(ESlateVisibility InVisibility)
 		bCenterCurrentColumn = true;
 	}
 	Super::SetVisibility(InVisibility);
+	if (InVisibility == ESlateVisibility::Visible || InVisibility == ESlateVisibility::SelfHitTestInvisible) RefreshHeading();
 	// A press from before it was shown or hidden isn't a pan of the tree
 	bPanCandidate = false;
 	bDraggingTree = false;

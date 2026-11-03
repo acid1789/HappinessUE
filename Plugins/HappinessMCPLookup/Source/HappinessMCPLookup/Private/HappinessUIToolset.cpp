@@ -80,7 +80,7 @@ namespace
 	}
 }
 
-FString UHappinessUIToolset::RenderWidget(const FString& WidgetBlueprintPath, int32 Width, int32 Height, const FString& OutputFile, int32 PreviewPuzzleSize, bool bPreviewHint, bool bPreviewPuzzleFailed, bool bPreviewMasterRewards, int32 PreviewRulesSubject, int32 PreviewIconSetIndex, bool bPreviewRemoveAds, int32 PreviewStreakSaverState)
+FString UHappinessUIToolset::RenderWidget(const FString& WidgetBlueprintPath, int32 Width, int32 Height, const FString& OutputFile, int32 PreviewPuzzleSize, bool bPreviewHint, bool bPreviewPuzzleFailed, bool bPreviewMasterRewards, int32 PreviewRulesSubject, int32 PreviewIconSetIndex, bool bPreviewRemoveAds, int32 PreviewStreakSaverState, int32 PreviewTreeMode)
 {
 	if (!GEditor)
 	{
@@ -146,7 +146,19 @@ FString UHappinessUIToolset::RenderWidget(const FString& WidgetBlueprintPath, in
 			Preview->SetPropertyValue_InContainer(Widget, PreviewStreakSaverState);
 		Widget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	}
+	if (PreviewTreeMode >= 0)
+	{
+		if (FIntProperty* Preview = FindFProperty<FIntProperty>(Widget->GetClass(), TEXT("PreviewTreeMode")))
+			Preview->SetPropertyValue_InContainer(Widget, PreviewTreeMode);
+		Widget->SetVisibility(ESlateVisibility::Visible);
+	}
 	TSharedRef<SWidget> SlateWidget = Widget->TakeWidget();
+	if (PreviewTreeMode >= 0)
+	{
+		for (const FName Name : {FName(TEXT("ConfirmDialog")), FName(TEXT("LessonPopup")), FName(TEXT("CompleteLessons"))})
+			if (UWidget* Popup = Widget->GetWidgetFromName(Name)) Popup->SetVisibility(ESlateVisibility::Collapsed);
+	}
+
 	if (bPreviewRemoveAds)
 	{
 		if (UWidget* Dialog = Widget->GetWidgetFromName(TEXT("AdsPurchaseDialog")))
