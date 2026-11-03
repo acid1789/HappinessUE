@@ -123,6 +123,12 @@ class HAPPINESS_API UCampaignTreeWidget : public UUserWidget
 public:
 	UCampaignTreeWidget(const FObjectInitializer& ObjectInitializer);
 
+#if WITH_EDITORONLY_DATA
+	/** Offscreen renderer only: -1 uses the real mode, 0 Lessons, 1 Campaign. */
+	UPROPERTY(Transient) int32 PreviewTreeMode = -1;
+#endif
+
+
 	/** Canvas the lesson nodes are placed in; the tree spans its full area */
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UCanvasPanel> TreeCanvas;
@@ -156,6 +162,12 @@ public:
 
 	UPROPERTY()
 	TObjectPtr<UTexture2D> ViewportFrameTexture;
+
+	UPROPERTY() TObjectPtr<UTexture2D> CampaignHeadingTexture;
+	UPROPERTY() FSlateBrush LessonsHeadingBrush;
+	bool bHeadingBrushCached = false;
+	void RefreshHeading();
+
 
 	UPROPERTY()
 	TObjectPtr<UFont> LessonSerifFont;
