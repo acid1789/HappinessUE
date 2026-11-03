@@ -22,6 +22,13 @@
 #include "Widgets/SCanvas.h"
 
 TWeakObjectPtr<UHintSparkleIconWidget> UHintSparkleIconWidget::ShownClue;
+TWeakObjectPtr<UHintSparkleIconWidget> UHintSparkleIconWidget::WaitingClue;
+
+bool UHintSparkleIconWidget::IsClueWaiting()
+{
+	const UHintSparkleIconWidget* Clue = WaitingClue.Get();
+	return Clue && Clue->IsShowingHint() && Clue->ClueTicker.IsValid();
+}
 
 UHintSparkleIconWidget::UHintSparkleIconWidget(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -102,6 +109,8 @@ void UHintSparkleIconWidget::NativeTick(const FGeometry& MyGeometry, float InDel
 		Widget = Parent ? Parent : Tree ? Cast<UWidget>(Tree->GetOuter()) : nullptr;
 	}
 	const FGeometry ScrollGeometry = Scroll ? Scroll->GetCachedGeometry() : FGeometry();
+	// The hint's clue first: its board icon starts once the clue is in view and sparkling
+	if (IsClueWaiting()) return;
 	UpdateSparkles(InDeltaTime, MyGeometry, false, Scroll ? &ScrollGeometry : nullptr);
 	KeepHintTint();
 	LastTickFrame = GFrameCounter;
@@ -122,7 +131,7 @@ void UHintSparkleIconWidget::KeepHintTint()
 
 void UHintSparkleIconWidget::TickHintOver(const FGeometry& Over, float DeltaTime)
 {
-	if (!IsShowingHint() || Over.GetLocalSize().IsNearlyZero()) return;
+	if (!IsShowingHint() || Over.GetLocalSize().IsNearlyZero() || IsClueWaiting()) return;
 	UpdateSparkles(DeltaTime, Over, false);
 	KeepHintTint();
 	LastTickFrame = GFrameCounter;
@@ -178,8 +187,18 @@ bool UHintSparkleIconWidget::TickClue(float DeltaTime)
 	{
 		if (!IsShowingHint()) bStreamed = false;
 		bClueScrolled = false;
+		bClueReady = false;
+		ClueWait = 0.f;
+		if (WaitingClue.Get() == this) WaitingClue = nullptr;
 		StopSparkles();
 		return true;
+	}
+	// The hint is starting: no sparkles (here or on the board) until the clue has its place on screen; the board
+	// stops waiting soon whatever happens
+	if (!bClueReady)
+	{
+		ClueWait += DeltaTime;
+		WaitingClue = ClueWait < MaxClueWait ? this : nullptr;
 	}
 
 	// The clue's place in its scroll box, from the scroll box's own geometry: it's up to date even while the clue is
@@ -190,19 +209,41 @@ bool UHintSparkleIconWidget::TickClue(float DeltaTime)
 	const TSharedPtr<SWidget> ScrollSlate = Scroll ? Scroll->GetCachedWidget() : nullptr;
 	if (!ScrollSlate)
 	{
+		if (Clue->GetCachedGeometry().GetLocalSize().IsNearlyZero()) return true;
+		bClueReady = true;
+		if (WaitingClue.Get() == this) WaitingClue = nullptr;
 		UpdateSparkles(DeltaTime, Clue->GetCachedGeometry(), true);
 		return true;
 	}
 	const FGeometry ScrollGeometry = Scroll->GetCachedGeometry();
 	if (ScrollGeometry.GetLocalSize().IsNearlyZero()) return true;
 	FGeometry ClueGeometry;
-	if (!FindDescendantGeometry(ScrollSlate.ToSharedRef(), ScrollGeometry, ClueSlate.ToSharedRef(), ClueGeometry)) return true;
+	// A clue just unhidden (made again) has no place in its panel until it has been laid out
+	if (!FindDescendantGeometry(ScrollSlate.ToSharedRef(), ScrollGeometry, ClueSlate.ToSharedRef(), ClueGeometry)
+		|| ClueGeometry.GetLocalSize().IsNearlyZero()) return true;
 
 	if (!bClueScrolled)
 	{
 		// The hint is starting: bring its clue into view, with room for the sparkles around it
 		Scroll->ScrollWidgetIntoView(Clue, true, EDescendantScrollDestination::IntoView, 16.f);
 		bClueScrolled = true;
+		LastScrollOffset = -1.f;
+	}
+	if (!bClueReady)
+	{
+		// The sparkles start once the scroll has brought the clue into view and stopped (or, failing that, soon)
+		const FVector2D ScrollTopLeft = ScrollGeometry.GetAbsolutePosition();
+		const FVector2D ScrollBottomRight = ScrollTopLeft + ScrollGeometry.GetAbsoluteSize();
+		const FVector2D ClueTopLeft = ClueGeometry.GetAbsolutePosition();
+		const FVector2D ClueBottomRight = ClueTopLeft + ClueGeometry.GetAbsoluteSize();
+		const bool bInView = ClueTopLeft.X >= ScrollTopLeft.X - 1.f && ClueTopLeft.Y >= ScrollTopLeft.Y - 1.f
+			&& ClueBottomRight.X <= ScrollBottomRight.X + 1.f && ClueBottomRight.Y <= ScrollBottomRight.Y + 1.f;
+		const float Offset = Scroll->GetScrollOffset();
+		const bool bStill = FMath::IsNearlyEqual(Offset, LastScrollOffset, .5f);
+		LastScrollOffset = Offset;
+		if (!(bInView && bStill) && ClueWait < MaxClueWait) return true;
+		bClueReady = true;
+		if (WaitingClue.Get() == this) WaitingClue = nullptr;
 	}
 	UpdateSparkles(DeltaTime, ClueGeometry, true, &ScrollGeometry);
 	return true;

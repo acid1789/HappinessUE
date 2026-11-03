@@ -310,6 +310,12 @@ void UPauseMenuWidget::Show(APlayerController* PlayerController)
 	SetVisibility(ESlateVisibility::Visible);
 }
 
+void UPauseMenuWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+{
+	Super::NativeTick(MyGeometry, InDeltaTime);
+	UpdateTime();
+}
+
 void UPauseMenuWidget::UpdateTime()
 {
 	// The puzzle screen (WBP_Happiness) this menu is part of: its puzzle and the time it saved when pausing
