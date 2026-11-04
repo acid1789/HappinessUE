@@ -434,7 +434,8 @@ the same flush texture so the outer cells do not protrude into the old frame's
 transparent gutter. Clue frames retain their existing textures.
 
 `WBP_Cell` inherits `UGameCellWidget`, which wraps candidate and resolved icon
-containers in a runtime Retainer Box. `M_CellRoundedMask` uses a rounded rectangle
+containers in a runtime Retainer Box. `M_IconRoundedMask` (standard material nodes only; it replaced
+`M_CellRoundedMask`, whose Custom HLSL node drew garbage on an Adreno 619 with an old Vulkan driver) uses a rounded rectangle
 with a 6-layout-pixel radius and the cell's current dimensions, preserving square
 icons while clipping the corners. The sandstone frame draws above the masked
 content. Retainers redraw on invalidation and size changes, rather than on every
