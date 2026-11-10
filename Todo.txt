@@ -20,9 +20,9 @@ IPad: 2256 x 1488
 --- Design Tasks ---
 
 --- Claude tasks ---
+Restart failed puzzle
 
 --- Codex Tasks ---
-Grid Icon Resolution
 
 --- Store Product IDs (create in Play Console and App Store Connect) ---
 Remove Ads (non-consumable):	remove_ads
