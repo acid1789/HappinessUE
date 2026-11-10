@@ -20,8 +20,6 @@ IPad: 2256 x 1488
 --- Design Tasks ---
 
 --- Claude tasks ---
-Hint Anim Busted on Mobile
-Banner ads dont work on iOS
 ios Splash
 
 --- Codex Tasks ---
