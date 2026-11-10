@@ -13,14 +13,19 @@ Steam
 
 Usage Analytics
 
-
+OnePlus 10T: 2407x1080
+IPad: 2256 x 1488
 
 
 --- Design Tasks ---
 
 --- Claude tasks ---
+Hint Anim Busted on Mobile
+Banner ads dont work on iOS
+ios Splash
 
 --- Codex Tasks ---
+Grid Icon Resolution
 
 --- Store Product IDs (create in Play Console and App Store Connect) ---
 Remove Ads (non-consumable):	remove_ads
