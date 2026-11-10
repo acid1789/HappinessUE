@@ -201,6 +201,9 @@ void UGamePanelWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 		const float AllocatedCellWidth = GridWidth / Columns - ColumnGap;
 		const float ContentWidth = FMath::Max(0.f, AllocatedCellWidth - FrameInset * 2.f);
 		const float IconWidth = FMath::Min(IconHeight, ContentWidth / IconsPerRow);
+		// Icons stay square. Where the width limits them (wider screens, like iPads), the grid gets shorter instead of
+		// leaving spare height in every cell, so the icons still fill their cells top to bottom.
+		const float GridHeight = FMath::Min(static_cast<float>(Available.Y), (IconWidth * 2.f + FrameInset * 2.f) * Rows);
 		for (UWidget* Cell : Grid->GetAllChildren())
 		{
 			if (UGridSlot* CellSlot = Cast<UGridSlot>(Cell->Slot))
@@ -265,9 +268,10 @@ void UGamePanelWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 			}
 		}
 
-		const FAnchors Anchors(0.5f, 0.f, 0.5f, 1.f);
-		const FVector2D Alignment(0.5f, 0.f);
-		const FMargin Offsets(0.f, 0.f, GridWidth, 0.f);
+		// Centred in the area: a grid shorter than the area gets equal space above and below
+		const FAnchors Anchors(0.5f, 0.5f, 0.5f, 0.5f);
+		const FVector2D Alignment(0.5f, 0.5f);
+		const FMargin Offsets(0.f, 0.f, GridWidth, GridHeight);
 		if (CanvasSlot->GetAnchors() != Anchors || CanvasSlot->GetAlignment() != Alignment || CanvasSlot->GetOffsets() != Offsets)
 		{
 			CanvasSlot->SetAnchors(Anchors);
@@ -275,7 +279,7 @@ void UGamePanelWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 			CanvasSlot->SetOffsets(Offsets);
 		}
 		// The outer column padding is only for spacing between cells, not a second border gutter.
-		const FMargin SurfaceOffsets(0.f, 0.f, FMath::Max(0.f, GridWidth - ColumnGap), 0.f);
+		const FMargin SurfaceOffsets(0.f, 0.f, FMath::Max(0.f, GridWidth - ColumnGap), GridHeight);
 		for (const FName SurfaceName : {FName(TEXT("PanelSurface")), FName(TEXT("PanelFrame"))})
 		{
 			UWidget* Surface = GetWidgetFromName(SurfaceName);
