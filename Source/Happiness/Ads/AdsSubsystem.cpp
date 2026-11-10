@@ -21,6 +21,11 @@
 #include "Android/AndroidJNI.h"
 #endif
 
+#if PLATFORM_IOS
+#include "IOS/IOSAppDelegate.h"
+#include "IOS/IOSView.h"
+#endif
+
 DEFINE_LOG_CATEGORY_STATIC(LogHappinessAds, Log, All);
 
 TWeakObjectPtr<UAdsSubsystem> UAdsSubsystem::Instance;
@@ -404,9 +409,18 @@ void UAdsSubsystem::RequestBanner(const FVector2D& ViewportPixel)
 	}
 	bBannerShown = true;
 	BannerShownAt = At;
+	FIntPoint Offset = At;
+#if PLATFORM_IOS
+	// On iOS the plugin measures from the safe area's corner, not the view's
+	if (UIView* View = [IOSAppDelegate GetDelegate].IOSController.view)
+	{
+		const UIEdgeInsets Safe = View.safeAreaInsets;
+		Offset -= FIntPoint(FMath::RoundToInt(Safe.left), FMath::RoundToInt(Safe.top));
+	}
+#endif
 	// The plugin sets the top margin to minus OffsetY for the top gravities
 	TWeakObjectPtr<UAdsSubsystem> WeakThis(this);
-	UAdMobCPPLibrary::ShowBanner(EBannerGravity::TopLeft, At.X, -At.Y, FOnBannerShownNative(),
+	UAdMobCPPLibrary::ShowBanner(EBannerGravity::TopLeft, Offset.X, -Offset.Y, FOnBannerShownNative(),
 		FOnBannerShowFailedNative::CreateLambda([WeakThis](EAdErrorCode, const FString& Message)
 		{
 			UE_LOG(LogHappinessAds, Warning, TEXT("Ads: banner failed to show: %s"), *Message);
@@ -543,6 +557,18 @@ bool UAdsSubsystem::GetScreenMetrics(FVector2D& OutScreenPixels, float& OutDensi
 	CachedForViewport = ViewportSize;
 	OutScreenPixels = CachedScreenPixels;
 	OutDensity = CachedDensity;
+	return true;
+#elif PLATFORM_IOS
+	// The plugin adds the banner to the root view controller's view and places it in points, which are the banner's
+	// dp too (a 320x50 banner is 320x50 points)
+	UIView* View = [IOSAppDelegate GetDelegate].IOSController.view;
+	const CGSize Size = View ? View.bounds.size : CGSizeZero;
+	if (Size.width <= 0.0 || Size.height <= 0.0)
+	{
+		return false;
+	}
+	OutScreenPixels = FVector2D(Size.width, Size.height);
+	OutDensity = 1.f;
 	return true;
 #else
 	return false;

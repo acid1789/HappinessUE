@@ -110,7 +110,8 @@ private:
 	bool Tick(float DeltaTime);
 	/** Run the waiting action once (from the ad closing, failing, or timing out) */
 	void FinishShow();
-	/** The size of the view the banner is placed in, in pixels, and pixels per dp; false where there isn't one */
+	/** The size of the view the banner is placed in, in its units (pixels on Android, points on iOS), and those units
+	 *  per dp; false where there isn't one */
 	bool GetScreenMetrics(FVector2D& OutScreenPixels, float& OutDensity) const;
 
 	static TWeakObjectPtr<UAdsSubsystem> Instance;
