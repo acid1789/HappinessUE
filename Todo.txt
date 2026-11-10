@@ -20,7 +20,6 @@ IPad: 2256 x 1488
 --- Design Tasks ---
 
 --- Claude tasks ---
-Restart failed puzzle
 
 --- Codex Tasks ---
 
