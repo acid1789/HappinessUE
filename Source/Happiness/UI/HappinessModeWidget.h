@@ -164,6 +164,8 @@ private:
 
 	UFUNCTION()
 	void HandleClassicClicked();
+	/** Free Play, past the lessons warning: asks about a puzzle in progress, then plays */
+	void ContinueToFreePlay();
 
 	UFUNCTION()
 	void HandleLessonsClicked();

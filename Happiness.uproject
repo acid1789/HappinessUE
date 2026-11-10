@@ -51,7 +51,11 @@
 		},
 		{
 			"Name": "OnlineSubsystemGooglePlay",
-			"Enabled": true
+			"Enabled": true,
+			"PlatformAllowList": [
+				"Android",
+				"Win64"
+			]
 		},
 		{
 			"Name": "NiagaraToolsets",

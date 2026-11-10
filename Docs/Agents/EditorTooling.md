@@ -381,3 +381,25 @@ This resolved the legacy 8ball package without raw filesystem edits to a uasset.
 - Remove Ads preview: render `WBP_HappinessMode` with `bPreviewRemoveAds: true`. Only the render instance opens the dialog and shows its normal purchase face; the editor has no phone store. Runtime purchase availability is unchanged.
 
 - Streak Saver shop render: use `/Script/Happiness.StreakSaverPanel` with `previewStreakSaverState` 0 (normal), 1 (broken streak), 2 (pending payment), or 3 (store unavailable). The flag opens only the render instance and supplies sample text with no purchases or save changes.
+
+## iOS builds (Mac mini remote build)
+
+`bash Tools/ios_package.sh [Development|Shipping]` builds, cooks and packages `Saved/IOSPackage/Happiness.ipa`. The PC
+cooks; the Mac mini (`ronohara@192.168.2.129`, key in `%APPDATA%\Unreal Engine\UnrealBuildTool\SSHKeys\192.168.2.129\ronohara`)
+compiles and signs through Unreal's remote build. Settings: `Config/DefaultEngine.ini` `[/Script/IOSRuntimeSettings.IOSRuntimeSettings]`.
+To install on the iPad (plugged into the Mac): `scp` the .ipa to the Mac, then
+`xcrun devicectl device install app --device 00008110-0009504A2650401E <ipa>` and
+`xcrun devicectl device process launch --device 00008110-0009504A2650401E com.ronsgames.happiness`.
+
+What it needs, each learned the hard way:
+- UE 5.8.4 or later: 5.8.3's ".app finalize" step fails on macOS 27 ("Touch UBT generated tiles", no error text; UE-396802).
+  5.8.4 also uses the UIScene lifecycle, without which builds don't run on iOS 27.
+- iTunes on the PC (the Microsoft Store one is fine). Without it the cook fails: "Failed to SetupSDK for platform 'IOS'".
+- A manually managed provisioning profile from developer.apple.com (Development: "Happiness Development") in
+  `%LOCALAPPDATA%\Apple Computer\MobileDevice\Provisioning Profiles`, and the Apple Development certificate with an
+  exportable private key in the PC's CurrentUser\My store. Unreal on Windows always signs manually; Xcode-managed profiles fail.
+- The Xcode app closed on the Mac during builds (the script quits it): it regenerates profiles when the build swaps the
+  keychain list. The Mac builds with Xcode 26.1.1 (`xcode-select`).
+- `MarketplaceRules.dll`/`.pdb` (the Fab plugins' build rules) copied from `%LOCALAPPDATA%\UnrealEngine\Intermediate\Build\BuildRules`
+  to the Mac's `~/Library/Application Support/Epic/UnrealEngine/Intermediate/Build/BuildRules` after each engine update.
+- `OnlineSubsystemGooglePlay` is allowed only on Android/Win64 in `Happiness.uproject` (its engine folder isn't sent to the Mac).
