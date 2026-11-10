@@ -1187,14 +1187,34 @@ FClueHelp UHint::GetExplanation()
 				}
 			}
 
-			auto Neither = [&](const FString& Place)
+			// Every way the clue fits with the subject here needs one of the other two at Place (Spot: that column, or
+			// -1 for a side), and neither can be there. Say both halves: why one is needed there, then that neither fits.
+			auto Neither = [&](const FString& Place, int Spot)
 			{
-				// "Neither [Rocking Horse] nor [Star Flower] can be directly right of this column, so [Dagger] can't be here"
-				Help.AddText(TEXT("Neither"));
-				Help.AddIcon(SlotRows[A], SlotIcons[A]);
-				Help.AddText(TEXT("nor"));
-				Help.AddIcon(SlotRows[B], SlotIcons[B]);
-				Help.AddText(FString::Printf(TEXT("can be %s, so"), *Place));
+				const bool bNextToFar = TheClue->m_Type == eClueType::Horizontal && TheClue->m_HorizontalType == eHorizontalType::NextToEitherOr
+					&& Spot >= 0 && FMath::Abs(Spot - Col) > 1;
+				if (bNextToFar)
+				{
+					// "If [Drum] were here, it would be next to one of [Horn] and [Harp], and the other would have to be two
+					// columns right of this one. Neither can be there, so [Drum] can't be here"
+					Help.AddText(TEXT("If"));
+					Help.AddIcon(Row, Icon);
+					Help.AddText(TEXT("were here, it would be next to one of"));
+					Help.AddIcon(SlotRows[A], SlotIcons[A]);
+					Help.AddText(TEXT("and"));
+					Help.AddIcon(SlotRows[B], SlotIcons[B]);
+					Help.AddText(FString::Printf(TEXT(", and the other would have to be %s. Neither can be there, so"), *Place));
+				}
+				else
+				{
+					// "One of [Rocking Horse] and [Star Flower] would have to be directly right of this column, but neither
+					// can be, so [Dagger] can't be here"
+					Help.AddText(TEXT("One of"));
+					Help.AddIcon(SlotRows[A], SlotIcons[A]);
+					Help.AddText(TEXT("and"));
+					Help.AddIcon(SlotRows[B], SlotIcons[B]);
+					Help.AddText(FString::Printf(TEXT("would have to be %s, but neither can be, so"), *Place));
+				}
 				Help.AddIcon(Row, Icon);
 				Help.AddText(TEXT("can't be here"));
 				bExplained = true;
@@ -1281,7 +1301,7 @@ FClueHelp UHint::GetExplanation()
 						bBFits |= Arrangement.Value == Spot;
 					}
 					if (bAlwaysFilled && !(bAFits && CanA.Contains(Spot)) && !(bBFits && CanB.Contains(Spot)))
-						Neither(DescribeColumn(Spot, Col));
+						Neither(DescribeColumn(Spot, Col), Spot);
 				}
 
 				// A side every arrangement puts one of them on, that neither of them can be on
@@ -1298,7 +1318,7 @@ FClueHelp UHint::GetExplanation()
 						bAny |= (OnSide(Arrangement.Key) && CanA.Contains(Arrangement.Key)) || (OnSide(Arrangement.Value) && CanB.Contains(Arrangement.Value));
 					}
 					if (bAlwaysUsed && !bAny)
-						Neither(Side < 0 ? TEXT("left of this column") : TEXT("right of this column"));
+						Neither(Side < 0 ? TEXT("left of this column") : TEXT("right of this column"), -1);
 				}
 
 				// One of them has a single spot that fits, and the other can't go where that spot needs it

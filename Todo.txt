@@ -1,3 +1,7 @@
+Discord: https://discord.gg/nfYQT3ar
+Android Alpha Link: https://play.google.com/store/apps/details?id=com.ronsgames.happiness
+
+
 --- Beta ---
 Ad mediation: set up AppLovin, Chartboost, ironSource, Meta and/or Unity Ads in AdMob (accounts, ad units, mediation groups), then turn each one back on in DefaultGame.ini (bEnable<Network>; all off since v11 to save ~15 MB of download)
 
@@ -13,11 +17,8 @@ Usage Analytics
 
 
 --- Design Tasks ---
-Campaign
-Game Rules
 
 --- Claude tasks ---
-Cell Dialog - Accidental Set
 
 --- Codex Tasks ---
 

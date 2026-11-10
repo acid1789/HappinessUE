@@ -662,6 +662,29 @@ void UHappinessModeWidget::PlayDaily(bool bResume)
 
 void UHappinessModeWidget::HandleClassicClicked()
 {
+	// Until every lesson is done, suggest finishing them first; the player may go on to Free Play anyway
+	const UCampaignSubsystem* Campaign = UCampaignSubsystem::Get(this);
+	UConfirmDialogWidget* Dialog = Campaign && !Campaign->IsCampaignModeUnlocked() ? GetConfirmDialog() : nullptr;
+	if (!Dialog)
+	{
+		ContinueToFreePlay();
+		return;
+	}
+	TWeakObjectPtr<UHappinessModeWidget> WeakThis(this);
+	Dialog->Ask(LOCTEXT("FreePlayLessonsQuestion", "Finish the lessons first?"),
+		LOCTEXT("FreePlayLessonsDescription", "The lessons teach every clue step by step. We recommend finishing them before playing Free Play.").ToString(),
+		[WeakThis]()
+		{
+			if (WeakThis.IsValid())
+			{
+				WeakThis->ContinueToFreePlay();
+			}
+		},
+		nullptr, LOCTEXT("FreePlayAnyway", "Play Anyway"), LOCTEXT("FreePlayBack", "Back"));
+}
+
+void UHappinessModeWidget::ContinueToFreePlay()
+{
 	// Abandoned, the slot has no puzzle in progress, so Free Play opens its settings
 	if (!AskResumeOrAbandon(EPuzzleSlot::FreePlay, [this]() { PlayFreePlay(); }, [this]() { PlayFreePlay(); }))
 	{

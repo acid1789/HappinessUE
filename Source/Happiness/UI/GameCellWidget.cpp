@@ -35,7 +35,7 @@ UGameCellIconRetainer::UGameCellIconRetainer(const FObjectInitializer& ObjectIni
 UGameCellWidget::UGameCellWidget(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Mask(TEXT("/Game/Happiness/UI/Materials/M_CellRoundedMask.M_CellRoundedMask"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Mask(TEXT("/Game/Happiness/UI/Materials/M_IconRoundedMask.M_IconRoundedMask"));
 	IconMaskMaterial = Mask.Object;
 	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> Pulse(TEXT("/Game/Happiness/UI/Effects/NS_IconPulse.NS_IconPulse"));
 	PulseSystem = Pulse.Object;

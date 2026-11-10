@@ -80,6 +80,11 @@ Keep it true: when you learn something that would have saved you time, add it he
   C++, `LoadObject`/`LoadSynchronous` of a path): the cooker can't see it, so it works in the editor and silently
   loads nothing on the phone. Add such assets to `/Game/Happiness/UI/PAL_LoadedByCode` (a PrimaryAssetLabel that
   `DefaultGame.ini` always cooks). Check a cook with `grep -a -c <package path> Saved/Cooked/Android_ASTC/Happiness/AssetRegistry.bin`.
+- **Build materials from standard nodes, not Custom (HLSL) nodes.** A Custom node sampling a texture
+  (`M_CellRoundedMask`, the icon mask) drew garbage on an Adreno 619 phone with an old Vulkan driver, while the same
+  maths in standard nodes (`M_IconRoundedMask`) is what the engine tests on every platform. Also: Epic's
+  `MaterialTools.delete_expression` / `delete_unused_expressions` crashed the editor (`!IsRooted()` assert) on that
+  material; making a new material avoided deleting nodes.
 - **Don't identify runtime-created objects by name** (`GetName().EndsWith(TEXT("_0"))`). The editor numbers them
   `WBP_Icon_C_0`, `_1`, ... per outer, but cooked builds (phones) use fast unique-name generation with arbitrary
   large numbers, so such a check works in PIE and never matches on device. Use the widget's place (child index),

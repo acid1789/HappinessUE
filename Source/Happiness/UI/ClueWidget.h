@@ -9,7 +9,7 @@ class UGameCellIconRetainer;
 /**
  * Parent of WBP_ClueBase (WBP_HorizontalClue, WBP_VerticalClue). Clips the clue's icons to the rounded corners of
  * its frame, as UGameCellWidget does for the grid cells: the icon box (the parent of "HorizontalBox" or
- * "VerticalBox") goes into a retainer masked by M_CellRoundedMask, in the box's place in the layout.
+ * "VerticalBox") goes into a retainer masked by M_IconRoundedMask, in the box's place in the layout.
  * Also turns the "not" mark (Overlay_Not) slowly, all clues' marks together.
  */
 UCLASS(Abstract)
