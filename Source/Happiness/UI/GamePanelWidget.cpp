@@ -10,6 +10,7 @@
 #include "Components/HorizontalBox.h"
 #include "Components/HorizontalBoxSlot.h"
 #include "Components/ScaleBox.h"
+#include "Components/ScaleBoxSlot.h"
 #include "Components/VerticalBoxSlot.h"
 
 bool UGamePanelWidget::PlaySolvedFireworks(UPuzzle* Puzzle)
@@ -241,6 +242,14 @@ void UGamePanelWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 									{
 										IconScale->SetStretch(EStretch::ScaleToFit);
 									}
+									// Width-limited icons meet at the cell center; spare height stays outside both rows.
+									UWidget* Content = IconScale->GetContent();
+									if (UScaleBoxSlot* ContentSlot = Content ? Cast<UScaleBoxSlot>(Content->Slot) : nullptr)
+									{
+										const EVerticalAlignment Align = RowName == TEXT("TopRowIcons") ? VAlign_Bottom : VAlign_Top;
+										if (ContentSlot->GetVerticalAlignment() != Align) ContentSlot->SetVerticalAlignment(Align);
+									}
+
 								}
 							}
 							if (UHorizontalBoxSlot* IconSlot = Cast<UHorizontalBoxSlot>(Icon->Slot))
