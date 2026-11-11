@@ -272,7 +272,7 @@ void UIconSetStoreSubsystem::CheckStore(bool bRestore)
 	}
 	bChecking = true;
 	TWeakObjectPtr<UIconSetStoreSubsystem> WeakThis(this);
-	Purchase->QueryReceipts(*UserId, bRestore, FOnQueryReceiptsComplete::CreateLambda([WeakThis](const FOnlineError& Result)
+	Purchase->QueryReceipts(*UserId, bRestore, FOnQueryReceiptsComplete::CreateLambda([WeakThis, bRestore](const FOnlineError& Result)
 	{
 		UIconSetStoreSubsystem* This = WeakThis.Get();
 		if (!This)
@@ -291,9 +291,12 @@ void UIconSetStoreSubsystem::CheckStore(bool bRestore)
 		This->bStoreReached = true;
 		const TSet<FString> Listed = This->HandleReceipts();
 		This->Unconfirmed.Reset();
+		// Only a list of everything owned can show a purchase is gone. On iOS a normal query lists just the
+		// transactions not finished yet (a set is finished once bought); only a restore lists what's owned.
+		const bool bFullList = !PLATFORM_IOS || bRestore;
 		for (const TPair<FString, FString>& Purchase : This->Owned)
 		{
-			if (!Listed.Contains(Purchase.Key))
+			if (bFullList && !Listed.Contains(Purchase.Key))
 			{
 				This->Unconfirmed.Add(Purchase.Key);
 			}

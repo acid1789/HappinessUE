@@ -215,7 +215,7 @@ void UAdRemovalSubsystem::CheckStore(bool bRestore)
 	}
 	bChecking = true;
 	TWeakObjectPtr<UAdRemovalSubsystem> WeakThis(this);
-	Purchase->QueryReceipts(*UserId, bRestore, FOnQueryReceiptsComplete::CreateLambda([WeakThis](const FOnlineError& Result)
+	Purchase->QueryReceipts(*UserId, bRestore, FOnQueryReceiptsComplete::CreateLambda([WeakThis, bRestore](const FOnlineError& Result)
 	{
 		UAdRemovalSubsystem* This = WeakThis.Get();
 		if (!This)
@@ -234,7 +234,10 @@ void UAdRemovalSubsystem::CheckStore(bool bRestore)
 		}
 		This->bStoreReached = true;
 		const bool bListed = This->HandleReceipts();
-		This->bRevokeIfConfirmed = This->bHasToken && !bListed;
+		// Only a list of everything owned can show the purchase is gone. On iOS a normal query lists just the
+		// transactions not finished yet (Remove Ads is finished once bought); only a restore lists what's owned.
+		const bool bFullList = !PLATFORM_IOS || bRestore;
+		This->bRevokeIfConfirmed = This->bHasToken && !bListed && bFullList;
 		This->bRestoring = false;
 		// Also the server check: removing a token waits for it
 		This->QueryPrice();

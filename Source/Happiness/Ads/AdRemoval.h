@@ -27,7 +27,8 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnRemoveAdsChanged);
  * - Token: when the store's servers can be reached, check again; if the product isn't owned any more (refunded),
  *   delete the token and ads come back. Only a check that really reached the servers can remove it (the phone is
  *   online and the product's details came back from the store): Google Play answers "nothing owned" from its offline
- *   cache too, so that answer alone could take the purchase away from an offline player.
+ *   cache too, so that answer alone could take the purchase away from an offline player. On iOS only Restore
+ *   Purchases can remove it: StoreKit's normal query lists just transactions not finished yet, not what's owned.
  *
  * Store: Unreal's online purchase interface (Google Play Billing on Android, StoreKit on iOS). The Google Play
  * purchase is acknowledged, never consumed (consuming would make it look unowned), so the engine's own

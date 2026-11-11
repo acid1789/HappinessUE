@@ -17,6 +17,7 @@
  *   app didn't get to finish); one in the file but not in the store's list is removed (refunded), but only when the
  *   store's servers were really reached (the phone is online and the products' details came back): Google Play
  *   answers "nothing owned" from its offline cache too, which alone could take a set away from an offline player.
+ *   On iOS only Restore Purchases can remove one: StoreKit's normal query lists just unfinished transactions.
  *
  * Purchases are acknowledged, never consumed (see UAdRemovalSubsystem). Only phones have a store (UsesStore): on PC
  * the Purchase sets are simply unlocked. Development builds can pretend to have one (Happiness.IconSets.SimulateStore
