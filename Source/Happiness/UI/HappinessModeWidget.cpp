@@ -272,7 +272,8 @@ void UHappinessModeWidget::MoveBadgeToMenu()
 {
 	// The menu (WBP_GameSelect's MainCanvas) holds this screen, the campaign tree, the Free Play settings and the
 	// puzzle screen over its backdrop. At Z 0 the badge goes over the backdrop and under this screen (Z 5), the tree
-	// (Z 10) and the settings (added later, also at Z 0). Not done while constructing: the menu is still adding its
+	// (Z 10) and the Free Play settings (Z 6, WBP_GameSelect.ShowHappinessConfig: at the badge's Z its pieces drew
+	// over them). Not done while constructing: the menu is still adding its
 	// children then.
 	UCanvasPanel* Menu = Cast<UCanvasPanel>(GetParent());
 	if (!PlayerLevelBadge || !Menu || PlayerLevelBadge->GetParent() == Menu)

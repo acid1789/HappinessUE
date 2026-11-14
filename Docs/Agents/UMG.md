@@ -89,7 +89,7 @@ python Tools/umg.py reorder_widget_tree '{"root": "Content", "tree": "[\"TitleTe
 - **Draw order in a CanvasPanel:** children with the same `Slot.ZOrder` share a starting layer, so deeply nested
   content (text) of an earlier child can draw over a later overlay. Overlays and popups need a higher
   `Slot.ZOrder`. Current values in `WBP_Happiness`: `HintInfo` 10, end screens 20. In `WBP_GameSelect`:
-  `HappinessMode` 5, `CampaignTree` 10.
+  `HappinessMode` 5, the Free Play settings (`WBP_HappinessConfig`, added by `ShowHappinessConfig`) 6, `CampaignTree` 10. The level badge is at 0 there, so a screen over it needs a higher Z: at the same Z its pieces drew over the Free Play settings.
   It bites code-built layouts too: in `UPlayerInfoPanel` a translucent tray placed before the reward row at the
   same ZOrder drew over the rewards and washed them out; the tray is Z 1, the row Z 2.
 - **Rotating a widget at runtime:** Slate rounds every corner of a drawn image to a whole pixel after the render
