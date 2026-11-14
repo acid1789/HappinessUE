@@ -155,6 +155,14 @@ public:
 	/** Fired when a set is turned on or off */
 	FSimpleMulticastDelegate OnEnabledChanged;
 
+	/**
+	 * Sets from DA_IconSetUnlocks (by Id) to have in the player's collection even while locked, so a puzzle can show
+	 * them (the tutorial's, UCampaignSubsystem::StartTutorial); empty to stop. They don't count as unlocked anywhere
+	 * else: the icon sets screen, GetNumEnabled. A borrowed set is in no new random puzzle while that puzzle uses
+	 * fixed icons, and the tutorial drops them before any other puzzle starts.
+	 */
+	void SetBorrowedSets(const TArray<FName>& Ids);
+
 private:
 	/** Rebuild the player's collection's sets: the default ones, then the unlocked ones */
 	UFUNCTION()
@@ -179,6 +187,10 @@ private:
 	TObjectPtr<UIconSetUnlocks> Unlocks;
 
 	FIconSetSaveData Data;
+
+	/** SetBorrowedSets' Ids, and those of them Refresh added to the player's collection only for that */
+	TArray<FName> BorrowedSets;
+	TArray<FName> BorrowedOnly;
 
 	static TWeakObjectPtr<UIconSetSubsystem> Instance;
 };

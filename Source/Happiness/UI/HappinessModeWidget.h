@@ -58,6 +58,9 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Happiness Mode")
 	FOnHappinessModeEvent OnClassicChosen;
 
+	/** The Lessons tree with Lesson's popup open, as if the player had picked it (Back still leads here) */
+	void ShowLessonsAt(ECampaignLesson Lesson);
+
 	/** Lessons or Campaign chosen; the campaign subsystem's mode says which. Both open the lesson tree. */
 	UPROPERTY(BlueprintAssignable, Category = "Happiness Mode")
 	FOnHappinessModeEvent OnLessonsChosen;
@@ -199,6 +202,16 @@ private:
 
 	/** A new player's first start (no save at all): straight to the Lessons tree with Game Basics open */
 	void StartNewPlayer();
+
+	/**
+	 * Once, on the game's first ticks with this screen shown: if the tutorial isn't completed
+	 * (UCampaignSubsystem::IsTutorialCompleted), asks whether to learn how to play. Yes plays the tutorial puzzle (as
+	 * the Lessons screen's Tutorial button); No just closes the question and marks the tutorial completed, so it isn't
+	 * asked again. Asking replaces StartNewPlayer's jump to the Lessons tree (the tutorial ends there anyway). True if
+	 * it asked.
+	 */
+	bool OfferTutorial();
+	bool bTutorialOffered = false;
 
 	/** Make the Streak Saver button if the layout has none */
 	void MakeStreakSaverButton();

@@ -151,7 +151,12 @@ void UPuzzleSlotSubsystem::NotePuzzleStarted(const UObject* WorldContextObject)
 	const UCampaignSubsystem* Campaign = UCampaignSubsystem::Get(WorldContextObject);
 	const UDailySubsystem* Daily = UDailySubsystem::Get(WorldContextObject);
 	FDailyPuzzleSpec Spec;
-	if (Campaign && Campaign->IsInLessonSession())
+	// The tutorial puzzle (UCampaignSubsystem::StartTutorial) is kept in no slot
+	if (UCampaignSubsystem::IsPlayingTutorial(WorldContextObject))
+	{
+		Slots->PlayingSlot = EPuzzleSlot::None;
+	}
+	else if (Campaign && Campaign->IsInLessonSession())
 	{
 		Slots->PlayingSlot = UCampaignSubsystem::GetMode() == ECampaignMode::Campaign ? EPuzzleSlot::Campaign : EPuzzleSlot::Lessons;
 	}

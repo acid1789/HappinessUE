@@ -38,9 +38,9 @@ void UButtonPanelWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTi
 	const double Idle = Slate.GetCurrentTime() - FMath::Max(Slate.GetLastUserInteractionTime(), ShownTime);
 
 	// A wiggle at every IdleSeconds of idle time: left, right, back to straight. Off when the player turned
-	// "Animate Hint Button" off in the options.
+	// "Animate Hint Button" off in the options, and in the tutorial puzzle.
 	float Angle = 0.f;
-	if (bHintsAllowed && Idle >= IdleSeconds && IsAnimationEnabled())
+	if (bHintsAllowed && Idle >= IdleSeconds && IsAnimationEnabled() && !UCampaignSubsystem::IsPlayingTutorial(this))
 	{
 		const double Into = FMath::Fmod(Idle, (double)IdleSeconds);
 		if (Into < WiggleSeconds)

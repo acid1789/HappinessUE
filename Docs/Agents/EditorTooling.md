@@ -285,6 +285,12 @@ python Tools/mcp_call.py $A StopPIE '{}'
   `Happiness.DailyDate`, `Happiness.ResetDaily`, `Happiness.StreakSaver.Set`, `Happiness.Reminder.Test`, `Happiness.PreviewAdLayout`, `Happiness.Ads`,
   `Happiness.LargeBanner`, `Happiness.RemoveAdsToken`, `Happiness.TestAd`. Find them all with
   `grep -rhn 'TEXT("Happiness\.' Source/Happiness`.
+- **Taps can stop working in an editor session**: the button gets the press and release (Slate debugger) but
+  nothing happens, in every new PIE too, after `LogSlate: Error: SlateUser [0] notified of a touch starting for pointer
+  [0] without finding out it ever ended`. Restarting the editor fixes it.
+- **`CaptureEditorImage` can return a stale picture** of PIE (seen when the editor window isn't in front: the game
+  had moved on to another screen, the capture still showed the old one). `ExecPIECommand` `shot showui` always shows
+  the current frame (`Saved/Screenshots/WindowsEditor/`).
 - **`CaptureEditorImage` is for screens, not motion.** Each capture takes long enough that an animation or effect
   lasting under a second or so is over before it's taken: a 0.5 s Niagara pulse never showed in any capture. Check
   short effects in the logs, or ask the user to look.

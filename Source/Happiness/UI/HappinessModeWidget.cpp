@@ -198,13 +198,70 @@ void UHappinessModeWidget::StartNewPlayer()
 	{
 		return;
 	}
+	ShowLessonsAt(ECampaignLesson::VerticalTwo);	// Game Basics
+}
+
+bool UHappinessModeWidget::OfferTutorial()
+{
+	if (bTutorialOffered || !IsVisible())
+	{
+		return false;
+	}
+	bTutorialOffered = true;
+	UCampaignSubsystem* Campaign = UCampaignSubsystem::Get(this);
+	UConfirmDialogWidget* Dialog = Campaign && !Campaign->IsTutorialCompleted() ? GetConfirmDialog() : nullptr;
+	if (!Dialog)
+	{
+		return false;
+	}
+	// The new player's jump to the Lessons tree is replaced by the question
+	Campaign->ConsumeNewPlayerStart();
+	TWeakObjectPtr<UHappinessModeWidget> WeakThis(this);
+	Dialog->Ask(LOCTEXT("TutorialQuestion", "Would you like to learn how to play?"),
+		LOCTEXT("TutorialDescription", "A short tutorial puzzle shows you how the game works.").ToString(),
+		[WeakThis]()
+		{
+			UCanvasPanel* Menu = WeakThis.IsValid() ? Cast<UCanvasPanel>(WeakThis->GetParent()) : nullptr;
+			if (!Menu)
+			{
+				return;
+			}
+			// As the Lessons screen's Tutorial button: the tree plays it (WBP_GameSelect's OnLessonStageChosen)
+			for (UWidget* Child : Menu->GetAllChildren())
+			{
+				if (UCampaignTreeWidget* Tree = Cast<UCampaignTreeWidget>(Child))
+				{
+					WeakThis->Hide();
+					Tree->PlayTutorial();
+					break;
+				}
+			}
+		},
+		[WeakThis]()
+		{
+			if (UCampaignSubsystem* Campaign = WeakThis.IsValid() ? UCampaignSubsystem::Get(WeakThis.Get()) : nullptr)
+			{
+				Campaign->SetTutorialCompleted();
+			}
+		},
+		LOCTEXT("TutorialYes", "Yes"), LOCTEXT("TutorialNo", "No"));
+	return true;
+}
+
+void UHappinessModeWidget::ShowLessonsAt(ECampaignLesson Lesson)
+{
+	UCanvasPanel* Menu = Cast<UCanvasPanel>(GetParent());
+	if (!Menu)
+	{
+		return;
+	}
 	ShowTree(ECampaignMode::Lessons);
 	for (UWidget* Child : Menu->GetAllChildren())
 	{
 		if (UCampaignTreeWidget* Tree = Cast<UCampaignTreeWidget>(Child))
 		{
 			// As if the player had picked it: its popup opens, and Back still leads here
-			Tree->NotifyNodeClicked(ECampaignLesson::VerticalTwo);	// Game Basics
+			Tree->NotifyNodeClicked(Lesson);
 		}
 	}
 }
@@ -408,7 +465,10 @@ void UHappinessModeWidget::NativeTick(const FGeometry& MyGeometry, float InDelta
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
 	MoveBadgeToMenu();
-	StartNewPlayer();
+	if (!OfferTutorial())
+	{
+		StartNewPlayer();
+	}
 	UpdateUnlockCelebration(InDeltaTime);
 }
 

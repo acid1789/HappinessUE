@@ -217,7 +217,8 @@ int32 UIconSetSubsystem::GetNumEnabled() const
 	int32 Count = 0;
 	for (const UObject* Set : GetSets(PlayerCollection))
 	{
-		Count += IsSetOn(GetSetId(Set)) ? 1 : 0;
+		const FName Id = GetSetId(Set);
+		Count += !BorrowedOnly.Contains(Id) && IsSetOn(Id) ? 1 : 0;
 	}
 	return Count;
 }
@@ -340,6 +341,15 @@ FText UIconSetSubsystem::GetSetName(const UObject* IconSet) const
 	return FText::FromString(Spaced);
 }
 
+void UIconSetSubsystem::SetBorrowedSets(const TArray<FName>& Ids)
+{
+	if (BorrowedSets != Ids)
+	{
+		BorrowedSets = Ids;
+		Refresh();
+	}
+}
+
 void UIconSetSubsystem::Refresh()
 {
 	if (!PlayerCollection || !DefaultCollection)
@@ -353,8 +363,9 @@ void UIconSetSubsystem::Refresh()
 		return;
 	}
 
-	// The default sets, then the unlocked ones (in DA_IconSetUnlocks' order)
+	// The default sets, then the unlocked ones (in DA_IconSetUnlocks' order), and any borrowed ones
 	Sets->CopyCompleteValue_InContainer(PlayerCollection, DefaultCollection);
+	BorrowedOnly.Reset();
 	const UIconSetUnlocks* AllUnlocks = GetUnlocks();
 	if (!AllUnlocks)
 	{
@@ -363,9 +374,14 @@ void UIconSetSubsystem::Refresh()
 	FScriptArrayHelper Array(Sets, Sets->ContainerPtrToValuePtr<void>(PlayerCollection));
 	for (const FIconSetUnlock& Unlock : AllUnlocks->IconSets)
 	{
-		if (!Unlock.IconSet || !Unlock.IconSet->IsA(SetElement->PropertyClass) || !IsUnlocked(Unlock))
+		const bool bBorrowed = Unlock.IconSet && BorrowedSets.Contains(GetSetId(Unlock.IconSet));
+		if (!Unlock.IconSet || !Unlock.IconSet->IsA(SetElement->PropertyClass) || !(IsUnlocked(Unlock) || bBorrowed))
 		{
 			continue;
+		}
+		if (!IsUnlocked(Unlock))
+		{
+			BorrowedOnly.AddUnique(GetSetId(Unlock.IconSet));
 		}
 		bool bPresent = false;
 		for (int32 Index = 0; Index < Array.Num() && !bPresent; Index++)

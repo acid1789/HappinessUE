@@ -1,6 +1,7 @@
 #include "Ads/AdBannerSlot.h"
 
 #include "Ads/AdsSubsystem.h"
+#include "HappinessClassic/CampaignProgress.h"
 #include "Blueprint/SlateBlueprintLibrary.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
@@ -34,7 +35,8 @@ void UAdBannerSlot::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 	Super::NativeTick(MyGeometry, InDeltaTime);
 
 	UAdsSubsystem* Ads = UAdsSubsystem::Get(this);
-	const bool bAdsOn = Ads && Ads->AreAdsEnabled();
+	// No banner in the tutorial puzzle: the board gets the space, as with ads off
+	const bool bAdsOn = Ads && Ads->AreAdsEnabled() && !UCampaignSubsystem::IsPlayingTutorial(this);
 	const float UnitsPerDp = Ads ? Ads->GetUnitsPerDp(MyGeometry) : DesignUnitsPerDp;
 	const FVector2D BannerSizeDp = Ads ? Ads->GetBannerSizeDp() : GetDefault<UAdsSubsystem>()->GetBannerSizeDp();
 	if (!bLaidOut || bAdsOn != bLaidOutWithAds || !FMath::IsNearlyEqual(UnitsPerDp, LaidOutUnitsPerDp, 0.01f) ||

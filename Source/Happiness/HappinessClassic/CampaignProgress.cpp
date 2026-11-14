@@ -5,6 +5,7 @@
 #include "FreePlaySettings.h"
 #include "DailyPuzzle.h"
 #include "PuzzleSlots.h"
+#include "IconSets.h"
 
 #include "Blueprint/UserWidget.h"
 #include "Engine/GameInstance.h"
@@ -411,6 +412,7 @@ void UCampaignSubsystem::RequestLessonPuzzle(ECampaignLesson Lesson, int32 Stage
 
 	// Lessons and the daily puzzle don't mix
 	UDailySubsystem::StopDaily(this);
+	ForgetTutorialIcons();
 
 	// A different lesson or stage abandons the open puzzle; the same one resumes it
 	if (!Data.bInSession || Data.SessionLesson != Lesson || Data.SessionStage != Stage)
@@ -799,6 +801,22 @@ void UCampaignSubsystem::InitPuzzleForPlay(const UObject* WorldContextObject, UP
 	}
 
 	UCampaignSubsystem* Campaign = Get(WorldContextObject);
+	// The tutorial puzzle, once: any other puzzle set up after it ends the tutorial
+	if (Campaign)
+	{
+		Campaign->bPlayingTutorial = Campaign->bTutorialPending;
+		Campaign->bTutorialPending = false;
+	}
+	if (Campaign && Campaign->bPlayingTutorial)
+	{
+		Campaign->TutorialStarts++;
+		Puzzle->m_ExcludedClues = ~((1 << int32(ECampaignLesson::VerticalTwo)) | (1 << int32(ECampaignLesson::TwoNot)) |
+			(1 << int32(ECampaignLesson::Span)) | (1 << int32(ECampaignLesson::Given)));
+		Puzzle->Init(TutorialSeed, TutorialSize, TutorialDifficulty);
+		Puzzle->GetRating();
+		UPuzzleSlotSubsystem::NotePuzzleStarted(WorldContextObject);
+		return;
+	}
 	if (Campaign && Campaign->IsInLessonSession())
 	{
 		if (Campaign->StartLessonPuzzle(Campaign->GetSessionLesson(), Campaign->GetSessionStage(), Puzzle))
@@ -837,6 +855,11 @@ void UCampaignSubsystem::InitPuzzleForPlay(const UObject* WorldContextObject, UP
 bool UCampaignSubsystem::HandlePuzzleFinished(const UObject* WorldContextObject, UPuzzle* Puzzle)
 {
 	UCampaignSubsystem* Campaign = Get(WorldContextObject);
+	// The tutorial puzzle is no Free Play puzzle: the puzzle number stays
+	if (Campaign && Campaign->bPlayingTutorial)
+	{
+		return true;
+	}
 	if (!Campaign || !Campaign->IsInLessonSession())
 	{
 		return false;
@@ -855,10 +878,119 @@ bool UCampaignSubsystem::IsPlayingLesson(const UObject* WorldContextObject)
 	return Campaign && Campaign->IsInLessonSession();
 }
 
+namespace
+{
+	/** The tutorial's icons, a row each: sets from Icons/Basic by Id (whether or not the player has unlocked them),
+	 *  then TutorialSize of their icons by Id */
+	struct FTutorialIconRow
+	{
+		const TCHAR* Set;
+		const TCHAR* Icons[UCampaignSubsystem::TutorialSize];
+	};
+	const FTutorialIconRow TutorialIcons[UCampaignSubsystem::TutorialSize] = {
+		{ TEXT("MasterRewardGems"), { TEXT("Heart"), TEXT("Triangle"), TEXT("Star") } },
+		{ TEXT("MythicalCreatures"), { TEXT("Dragon"), TEXT("Unicorn"), TEXT("Phoenix") } },
+		{ TEXT("GardenVisitors"), { TEXT("Butterfly"), TEXT("Bee"), TEXT("Ladybug") } },
+	};
+
+	/** Fills one of PC_Happiness's string (or name) arrays */
+	void SetStringArray(UObject* Object, const TCHAR* PropertyName, const TArray<FString>& Values)
+	{
+		const FArrayProperty* Property = Object ? FindFProperty<FArrayProperty>(Object->GetClass(), PropertyName) : nullptr;
+		if (!Property)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Tutorial: the player controller has no %s"), PropertyName);
+			return;
+		}
+		FScriptArrayHelper Array(Property, Property->ContainerPtrToValuePtr<void>(Object));
+		Array.Resize(Values.Num());
+		for (int32 i = 0; i < Values.Num(); i++)
+		{
+			if (const FStrProperty* Str = CastField<FStrProperty>(Property->Inner))
+			{
+				Str->SetPropertyValue(Array.GetRawPtr(i), Values[i]);
+			}
+			else if (const FNameProperty* Name = CastField<FNameProperty>(Property->Inner))
+			{
+				Name->SetPropertyValue(Array.GetRawPtr(i), FName(*Values[i]));
+			}
+		}
+	}
+}
+
+void UCampaignSubsystem::StartTutorial()
+{
+	UDailySubsystem::StopDaily(this);
+	EndLessonSession();
+	bTutorialPending = true;
+	SetPuzzleIcons(true);
+}
+
+void UCampaignSubsystem::SetTutorialCompleted()
+{
+	if (!Data.bTutorialCompleted)
+	{
+		Data.bTutorialCompleted = true;
+		Save();
+	}
+}
+
+void UCampaignSubsystem::SetPuzzleIcons(bool bTutorial) const
+{
+	UObject* PC = GetGameInstance() ? UGameplayStatics::GetPlayerController(GetGameInstance()->GetWorld(), 0) : nullptr;
+	TArray<FString> Sets, Icons;
+	if (bTutorial)
+	{
+		for (const FTutorialIconRow& Row : TutorialIcons)
+		{
+			Sets.Add(Row.Set);
+			for (const TCHAR* Icon : Row.Icons)
+			{
+				Icons.Add(Icon);
+			}
+		}
+	}
+	SetStringArray(PC, TEXT("HappinessIconSets"), Sets);
+	SetStringArray(PC, TEXT("HappinessIcons"), Icons);
+	// The tutorial's sets may still be locked: the player's collection, where the puzzle finds them, has them meanwhile
+	if (UIconSetSubsystem* IconSets = GetGameInstance() ? GetGameInstance()->GetSubsystem<UIconSetSubsystem>() : nullptr)
+	{
+		TArray<FName> Ids;
+		for (const FString& Set : Sets)
+		{
+			Ids.Add(FName(*Set));
+		}
+		IconSets->SetBorrowedSets(Ids);
+	}
+}
+
+void UCampaignSubsystem::ForgetTutorialIcons()
+{
+	if (bPlayingTutorial || bTutorialPending)
+	{
+		bTutorialPending = false;
+		bPlayingTutorial = false;
+		SetPuzzleIcons(false);
+	}
+}
+
+bool UCampaignSubsystem::IsPlayingTutorial(const UObject* WorldContextObject)
+{
+	const UCampaignSubsystem* Campaign = Get(WorldContextObject);
+	return Campaign && Campaign->bPlayingTutorial;
+}
+
+int32 UCampaignSubsystem::GetTutorialStarts(const UObject* WorldContextObject)
+{
+	const UCampaignSubsystem* Campaign = Get(WorldContextObject);
+	return Campaign ? Campaign->TutorialStarts : 0;
+}
+
 void UCampaignSubsystem::StopPlayingLesson(const UObject* WorldContextObject)
 {
 	if (UCampaignSubsystem* Campaign = Get(WorldContextObject))
 	{
+		Campaign->ForgetTutorialIcons();
 		Campaign->EndLessonSession();
 	}
 }

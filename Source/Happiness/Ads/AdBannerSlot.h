@@ -11,7 +11,7 @@
  * While ads are on it makes room: the panels in MakeRoomLeft end left of the banner, and the panels in MakeRoomAbove
  * end above it (each with a gap). With ads off they get their designed layout back. The banner itself is a native
  * view drawn over the game (UAdsSubsystem::RequestBanner): it shows while this slot is on screen and none of the
- * overlays in CoveredBy is up.
+ * overlays in CoveredBy is up. The tutorial puzzle (UCampaignSubsystem::IsPlayingTutorial) counts as ads off.
  */
 UCLASS()
 class HAPPINESS_API UAdBannerSlot : public UUserWidget

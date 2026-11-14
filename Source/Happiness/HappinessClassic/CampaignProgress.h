@@ -145,6 +145,11 @@ struct FCampaignSaveData
 
 	UPROPERTY(SaveGame)
 	int32 OpenSeed = 0;
+
+	/** The tutorial puzzle was played to the end, or the player said No to it on the mode screen (it isn't offered
+	 *  again at start) */
+	UPROPERTY(SaveGame)
+	bool bTutorialCompleted = false;
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCampaignProgressChanged);
@@ -449,7 +454,38 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Campaign", meta = (WorldContext = "WorldContextObject"))
 	static bool AreAssistsAllowed(const UObject* WorldContextObject);
 
-	/** Ends any lesson session; call when a classic game is started */
+	/**
+	 * The Lessons screen's Tutorial button (UTutorialPanel): the next puzzle set up (InitPuzzleForPlay) is the tutorial
+	 * puzzle, always the same 3x3 one with only Same Column, Not Same Column and Span clues (besides the starting clues
+	 * every puzzle needs), and
+	 * always the same icons (TutorialIcons, set as PC_Happiness's puzzle icons, which its SelectRandomIconSets then
+	 * uses instead of choosing). Ends any lesson session and the daily puzzle. Not saved: the tutorial puzzle isn't
+	 * kept in any puzzle slot.
+	 */
+	void StartTutorial();
+
+	/** The tutorial was completed, or turned down when the mode screen offered it (saved) */
+	bool IsTutorialCompleted() const { return Data.bTutorialCompleted; }
+	/** Marks the tutorial completed (or turned down) and saves */
+	void SetTutorialCompleted();
+
+	/** The puzzle being played is the tutorial puzzle (StartTutorial); any other puzzle set up ends it */
+	UFUNCTION(BlueprintPure, Category = "Campaign", meta = (WorldContext = "WorldContextObject"))
+	static bool IsPlayingTutorial(const UObject* WorldContextObject);
+
+	/** How many times the tutorial puzzle has been set up this session: a new number is a new start of it */
+	static int32 GetTutorialStarts(const UObject* WorldContextObject);
+
+	/** The tutorial puzzle: Init(TutorialSeed, TutorialSize, TutorialDifficulty) with every clue type but Same Column,
+	 *  Not Same Column (TwoNot) and Span excluded. Seed 129 has two Same Column clues, one Not Same Column, one Span and
+	 *  one icon given, and its last move is an elimination (Tools/puzzle.sh -seed=129 -size=3 -diff=0
+	 *  -only=VerticalTwo,Span,TwoNot -mode=trace). The tutorial's steps (UGamePanelWidget) follow its solve. */
+	static constexpr int32 TutorialSeed = 129;
+	static constexpr int32 TutorialSize = 3;
+	static constexpr int32 TutorialDifficulty = 0;
+
+	/** Ends any lesson session; call when a classic game is started. Also drops the tutorial's icons
+	 *  (ForgetTutorialIcons), as the next puzzle isn't the tutorial */
 	UFUNCTION(BlueprintCallable, Category = "Campaign", meta = (WorldContext = "WorldContextObject"))
 	static void StopPlayingLesson(const UObject* WorldContextObject);
 
@@ -487,5 +523,16 @@ private:
 	bool bLessonsCompletionPending = false;
 	bool bCampaignCompletionPending = false;
 	bool bNewPlayerStart = false;
+	/** StartTutorial was called: the next puzzle set up is the tutorial one */
+	bool bTutorialPending = false;
+	bool bPlayingTutorial = false;
+	int32 TutorialStarts = 0;
+
+	/** Puts the tutorial's icons (or, bTutorial false, none) in PC_Happiness's puzzle icons (HappinessIconSets, set
+	 *  Ids; HappinessIcons, TutorialSize icon Ids per set), which PlayHappiness's SelectRandomIconSets uses when set */
+	void SetPuzzleIcons(bool bTutorial) const;
+
+	/** After the tutorial puzzle, before another puzzle is set up: its icons mustn't carry over into that one */
+	void ForgetTutorialIcons();
 	static TWeakObjectPtr<UCampaignSubsystem> Instance;
 };

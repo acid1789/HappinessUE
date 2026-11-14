@@ -65,6 +65,8 @@ Keep it true: when you learn something that would have saved you time, add it he
   break. Check string literals after scripted edits.
 - Python on Windows writes `\n` as CRLF in text mode (`open(p, 'w')`). For scripted edits read and write bytes
   (`'rb'`/`'wb'`) or pass `newline=''`, so an LF file stays LF.
+- `sed -i` in Git Bash on Windows rewrites a CRLF file with LF endings throughout. Edit CRLF files with the Edit tool
+  or a bytes-mode Python script, and check for LF-only lines afterwards.
 - The unity build compiles several `.cpp` files together, so file-local constants (even in an anonymous namespace)
   can clash with names in another file: a local `IconSize` hiding one is warning C4459, an error here. Which
   files share a unit changes as files are added, so prefix such constants per file (`SetsIconSize`, `InfoWindowSize`).

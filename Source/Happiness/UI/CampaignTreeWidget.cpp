@@ -2,6 +2,7 @@
 
 #include "HappinessClassic/CampaignProgress.h"
 #include "UI/CompleteLessonsPanel.h"
+#include "UI/TutorialPanel.h"
 #include "HappinessClassic/CampaignTree.h"
 #include "UI/GameRulesWidget.h"
 #include "UI/LessonPopupWidget.h"
@@ -576,6 +577,11 @@ void UCampaignTreeWidget::NativeConstruct()
 		LessonPopup->OnLearnMoreRequested.AddUniqueDynamic(this, &UCampaignTreeWidget::HandleLearnMore);
 	}
 
+	if (Tutorial)
+	{
+		Tutorial->OnTutorialRequested.AddUniqueDynamic(this, &UCampaignTreeWidget::HandleTutorialRequested);
+	}
+
 	if (UCampaignSubsystem* Campaign =
 			GetGameInstance() ? GetGameInstance()->GetSubsystem<UCampaignSubsystem>() : nullptr)
 	{
@@ -587,6 +593,25 @@ void UCampaignTreeWidget::NativeConstruct()
 void UCampaignTreeWidget::HandlePopupStageChosen(ECampaignLesson Lesson, int32 Stage)
 {
 	OnLessonStageChosen.Broadcast(Lesson, Stage);
+}
+
+void UCampaignTreeWidget::HandleTutorialRequested()
+{
+	PlayTutorial();
+}
+
+void UCampaignTreeWidget::PlayTutorial()
+{
+	UCampaignSubsystem* Campaign = GetGameInstance() ? GetGameInstance()->GetSubsystem<UCampaignSubsystem>() : nullptr;
+	if (!Campaign || IsCelebrating() || bCloseAfterCelebration || CloseCountdown >= 0.f)
+	{
+		return;
+	}
+	Campaign->StartTutorial();
+	// WBP_GameSelect plays a stage the way it plays a lesson's: the tree goes and PlayHappiness gets the stage's size
+	// and difficulty. Lessons' first stage is 3x3 Easy, the tutorial puzzle's size; the puzzle itself is the
+	// tutorial's (UCampaignSubsystem::InitPuzzleForPlay)
+	OnLessonStageChosen.Broadcast(ECampaignLesson::VerticalTwo, 0);
 }
 
 void UCampaignTreeWidget::HandleLearnMore(ECampaignLesson Lesson)
@@ -699,6 +724,10 @@ void UCampaignTreeWidget::SetVisibility(ESlateVisibility InVisibility)
 	{
 		CompleteLessons->Refresh();
 	}
+	if (Tutorial)
+	{
+		Tutorial->Refresh();
+	}
 	if (InVisibility == ESlateVisibility::Collapsed || InVisibility == ESlateVisibility::Hidden)
 	{
 		bCloseAfterCelebration = false;
@@ -809,6 +838,14 @@ void UCampaignTreeWidget::RebuildTree()
 	Lines = WidgetTree->ConstructWidget<UCampaignTreeLines>();
 	Lines->Tree = this;
 	Lines->SetVisibility(ESlateVisibility::HitTestInvisible);
+	if (Tutorial)
+	{
+		// Top left of the content, above the first column's group badge; adding it takes it out of its old parent
+		UCanvasPanelSlot* TutorialSlot = NodeCanvas->AddChildToCanvas(Tutorial);
+		TutorialSlot->SetPosition(FVector2D(15.f, 24.f));
+		TutorialSlot->SetSize(FVector2D(290.f, 80.f));
+		TutorialSlot->SetZOrder(3000);
+	}
 	UCanvasPanelSlot* LinesSlot=NodeCanvas->AddChildToCanvas(Lines);
 	FillCanvas(LinesSlot);
 	LinesSlot->SetZOrder(0);

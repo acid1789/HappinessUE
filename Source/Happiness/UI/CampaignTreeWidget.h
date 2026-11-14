@@ -12,6 +12,7 @@ class UBorder;
 class UCanvasPanel;
 class UCampaignTreeWidget;
 class UCompleteLessonsPanel;
+class UTutorialPanel;
 class ULessonPopupWidget;
 class UScrollBox;
 class USizeBox;
@@ -148,6 +149,11 @@ public:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UCompleteLessonsPanel> CompleteLessons;
 
+	/** Optional. WBP_Tutorial, shown in Lessons mode. Wherever the designer puts it, RebuildTree moves it into the
+	 *  scrolling content, above the first column, so it scrolls with the tree */
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UTutorialPanel> Tutorial;
+
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UProgressBar> OverallProgress;
 
@@ -249,6 +255,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Campaign Tree")
 	void ShowForLessonSession();
 
+	/** Plays the tutorial puzzle, as the Tutorial button does (also from the mode screen's offer at start) */
+	void PlayTutorial();
+
 	/** Fired after the screen hides itself via BackButton or Close() */
 	UPROPERTY(BlueprintAssignable, Category = "Campaign Tree")
 	FOnCampaignTreeClosed OnClosed;
@@ -299,6 +308,10 @@ private:
 
 	UFUNCTION()
 	void HandlePopupStageChosen(ECampaignLesson Lesson, int32 Stage);
+
+	/** The Tutorial button: plays the tutorial puzzle (UCampaignSubsystem::StartTutorial) */
+	UFUNCTION()
+	void HandleTutorialRequested();
 
 	/** Learn More: the rules, open at the lesson's clue */
 	UFUNCTION()
@@ -376,6 +389,10 @@ private:
 	bool bCenterCurrentColumn = true;
 	bool bPanCandidate = false;
 	bool bDraggingTree = false;
+public:
+	/** The current press is panning the tree, so it isn't a click on what's under it */
+	bool IsDraggingTree() const { return bDraggingTree; }
+private:
 	/** The pointer that pressed (a finger, or the mouse cursor): touches don't move the cursor */
 	int32 PanUserIndex = 0;
 	uint32 PanPointerIndex = 0;
