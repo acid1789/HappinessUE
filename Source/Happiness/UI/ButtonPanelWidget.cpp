@@ -1,9 +1,15 @@
 #include "ButtonPanelWidget.h"
 
+#include "Components/CanvasPanelSlot.h"
+#include "Components/PanelWidget.h"
 #include "Components/Widget.h"
 #include "Framework/Application/SlateApplication.h"
 #include "GameFramework/PlayerController.h"
 #include "HappinessClassic/CampaignProgress.h"
+
+#if PLATFORM_IOS && !PLATFORM_TVOS
+#include "IOS/IOSApplication.h"
+#endif
 
 void UButtonPanelWidget::NativeConstruct()
 {
@@ -14,6 +20,7 @@ void UButtonPanelWidget::NativeConstruct()
 void UButtonPanelWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
+	UpdateNotchShift(MyGeometry.Scale);
 	if (!Button_H || !FSlateApplication::IsInitialized())
 	{
 		return;
@@ -61,4 +68,61 @@ bool UButtonPanelWidget::IsAnimationEnabled() const
 	const APlayerController* PC = GetOwningPlayer();
 	const FBoolProperty* Option = PC ? FindFProperty<FBoolProperty>(PC->GetClass(), TEXT("Happiness_HintAnimation")) : nullptr;
 	return !Option || Option->GetPropertyValue_InContainer(PC);
+}
+
+float UButtonPanelWidget::GetLeftNotchInset(float Scale) const
+{
+	if (!FSlateApplication::IsInitialized() || Scale <= 0.f)
+	{
+		return 0.f;
+	}
+	FMargin SafeZone;
+	FSlateApplication::Get().GetSafeZoneSize(SafeZone, FVector2D::ZeroVector);
+	float Left = SafeZone.Left;
+#if PLATFORM_IOS && !PLATFORM_TVOS
+	// iOS keeps landscape's safe area the same on both sides, whichever side the notch is on. The notch is at the
+	// phone's top, opposite where the home button would be: on the left with the "home button" on the right.
+	if (FIOSApplication::CachedOrientation != UIInterfaceOrientationLandscapeRight)
+	{
+		Left = 0.f;
+	}
+#endif
+	// Pixels to widget units
+	return FMath::RoundToFloat(FMath::Max(0.f, Left) / Scale);
+}
+
+void UButtonPanelWidget::UpdateNotchShift(float Scale)
+{
+	const float Inset = GetLeftNotchInset(Scale);
+	if (Inset == AppliedNotchInset)
+	{
+		return;
+	}
+	AppliedNotchInset = Inset;
+
+	// This panel and the panels right of it (stretched, Left the margin from the canvas's left edge) move right by
+	// the inset; the panels right of it keep their right edges, so they lose that much width
+	auto Shift = [this, Inset](UWidget* Widget)
+	{
+		UCanvasPanelSlot* CanvasSlot = Widget ? Cast<UCanvasPanelSlot>(Widget->Slot) : nullptr;
+		if (!CanvasSlot)
+		{
+			return;
+		}
+		FMargin Offsets = CanvasSlot->GetOffsets();
+		const float Designed = DesignedLeftOffsets.FindOrAdd(Widget->GetFName(), Offsets.Left);
+		Offsets.Left = Designed + Inset;
+		CanvasSlot->SetOffsets(Offsets);
+	};
+	Shift(this);
+	if (const UPanelWidget* Parent = GetParent())
+	{
+		for (UWidget* Sibling : Parent->GetAllChildren())
+		{
+			if (Sibling && NotchMakeRoom.Contains(Sibling->GetFName()))
+			{
+				Shift(Sibling);
+			}
+		}
+	}
 }
