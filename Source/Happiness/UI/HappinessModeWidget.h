@@ -113,6 +113,10 @@ protected:
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UButton> ClosePurchaseButton;
 
+	/** Tips, under the tiles right of the Streak Saver button (made in the Daily button's canvas) */
+	UPROPERTY(Transient)
+	TObjectPtr<class UMenuTipsWidget> MenuTips;
+
 	/** Opens the streak saver shop. Made in the Daily button's canvas, just below it, unless the layout has one. */
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UButton> StreakSaverButton;
@@ -181,6 +185,9 @@ private:
 
 	UFUNCTION()
 	void RefreshStreak();
+
+	/** Make the tips, under the tiles */
+	void MakeMenuTips();
 
 	/** Make the level badge if the layout has none */
 	void MakePlayerLevelBadge();

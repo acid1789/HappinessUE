@@ -22,7 +22,9 @@ IPad: 2256 x 1488
 --- Claude tasks ---
 Tips
 Mistake hint targets a misleading clue
-Scale Back Exp
+Fix Puzzle Revamp
+Error Blows Up Puzzle
+Player level shows up on top of Free Play dialog
 
 --- Codex Tasks ---
 

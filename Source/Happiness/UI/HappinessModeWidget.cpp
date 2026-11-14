@@ -21,6 +21,7 @@
 #include "UI/PlayerInfoPanel.h"
 #include "UI/PlayerLevelBadge.h"
 #include "UI/StreakSaverPanel.h"
+#include "UI/MenuTipsWidget.h"
 #include "UObject/ConstructorHelpers.h"
 
 #define LOCTEXT_NAMESPACE "HappinessMode"
@@ -69,6 +70,7 @@ void UHappinessModeWidget::NativeConstruct()
 	}
 	MakePlayerLevelBadge();
 	MakeStreakSaverButton();
+	MakeMenuTips();
 	if (StreakSaverButton)
 	{
 		StreakSaverButton->OnClicked.AddUniqueDynamic(this, &UHappinessModeWidget::HandleStreakSaverClicked);
@@ -417,6 +419,29 @@ void UHappinessModeWidget::MakeStreakSaverButton()
 		ButtonSlot->SetPosition(TileOrigin + FVector2D(0.f, TileHeight + 10.f));
 		ButtonSlot->SetSize(SaverButtonSize);
 		ButtonSlot->SetZOrder(DailySlot ? DailySlot->GetZOrder() + 1 : 1);
+	}
+}
+
+void UHappinessModeWidget::MakeMenuTips()
+{
+	UCanvasPanel* Tiles = DailyButton ? Cast<UCanvasPanel>(DailyButton->GetParent()) : nullptr;
+	if (MenuTips || !Tiles)
+	{
+		return;
+	}
+	MenuTips = CreateWidget<UMenuTipsWidget>(this, UMenuTipsWidget::StaticClass());
+	// Under the tiles, in the row the Streak Saver button (300 wide, under the Daily tile) starts, to the grid's right
+	// edge
+	const UCanvasPanelSlot* DailySlot = Cast<UCanvasPanelSlot>(DailyButton->Slot);
+	const UCanvasPanelSlot* ClassicSlot = ClassicButton ? Cast<UCanvasPanelSlot>(ClassicButton->Slot) : nullptr;
+	const FVector2D TileOrigin = DailySlot ? DailySlot->GetPosition() : FVector2D::ZeroVector;
+	const float Top = TileOrigin.Y + (DailySlot ? DailySlot->GetSize().Y : 0.f) + 10.f;
+	const float Left = TileOrigin.X + 300.f + 24.f;
+	const float Right = ClassicSlot ? ClassicSlot->GetPosition().X + ClassicSlot->GetSize().X : Left + 720.f;
+	if (UCanvasPanelSlot* TipsSlot = MenuTips ? Tiles->AddChildToCanvas(MenuTips) : nullptr)
+	{
+		TipsSlot->SetPosition(FVector2D(Left, Top));
+		TipsSlot->SetSize(FVector2D(FMath::Max(Right - Left, 100.f), 110.f));
 	}
 }
 
