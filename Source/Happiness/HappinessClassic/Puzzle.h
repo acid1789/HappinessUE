@@ -296,8 +296,23 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure)
 	FString FormatTimeString(float Seconds) const;
 
+	// Sets the board straight against the solution: wrong icons come off their cells, and wrongly ruled out icons come
+	// back (also the board FindErrorHint reasons from)
 	UFUNCTION(BlueprintCallable)
 	void FixPuzzle();
+
+	// True if the board has a mistake: an icon placed where it doesn't go, or ruled out of the cell it goes in
+	UFUNCTION(BlueprintPure)
+	bool IsBroken();
+
+	// Fix Puzzle (WBP_Happiness.ConfirmConfirm): undoes the player's moves, newest first, while the board is broken,
+	// each after bringing back the clues hidden after it (UndoClueHide, as Undo does); clues hidden before the first
+	// move it keeps stay hidden.
+	// The moves are Owner's undo list (WBP_Happiness's ActionList: each the row's copy from before the move), which
+	// loses the undone moves. The list is saved with the puzzle, so it only runs out first on a save without one (older
+	// saves, or one UHappinessSaveGame::RestoreUndo didn't match); then FixPuzzle sets the rest straight.
+	UFUNCTION(BlueprintCallable)
+	void FixPuzzleWithUndo(UObject* Owner);
 
 	// Hiding a clue goes in the undo order: WBP_Happiness.HideSelectedClue records the clue's widget before it is
 	// removed, with the undo list's length (ActionList, the board moves); WBP_Happiness.Undo first asks

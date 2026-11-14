@@ -1286,6 +1286,60 @@ FString UPuzzle::FormatTimeString(float Seconds) const
 	return FString::Printf(TEXT("%02d:%02d:%02d"), Hours, Minutes, Secs);
 }
 
+bool UPuzzle::IsBroken()
+{
+	for (int Row = 0; Row < m_Rows.Num(); Row++)
+	{
+		for (int Col = 0; Col < m_Rows[Row].m_Cells.Num(); Col++)
+		{
+			const FPuzzleCell& Cell = m_Rows[Row].m_Cells[Col];
+			const int Solution = SolutionIcon(Row, Col);
+			if (Cell.m_iFinalIcon >= 0 ? Cell.m_iFinalIcon != Solution : !Cell.m_bValues[Solution])
+				return true;
+		}
+	}
+	return false;
+}
+
+void UPuzzle::FixPuzzleWithUndo(UObject* Owner)
+{
+	// The undo list: an array of the Blueprint struct HappinessAction, whose members are named by the Blueprint
+	// (with suffixes): the row (Row) and the row as it was (an FPuzzleRow)
+	const FArrayProperty* ActionList = Owner ? FindFProperty<FArrayProperty>(Owner->GetClass(), TEXT("ActionList")) : nullptr;
+	const FStructProperty* Action = ActionList ? CastField<FStructProperty>(ActionList->Inner) : nullptr;
+	const FIntProperty* RowIndex = nullptr;
+	const FStructProperty* RowCopy = nullptr;
+	if (Action)
+	{
+		for (TFieldIterator<FProperty> It(Action->Struct); It; ++It)
+		{
+			if (const FIntProperty* Int = CastField<FIntProperty>(*It); Int && It->GetAuthoredName() == TEXT("Row"))
+				RowIndex = Int;
+			else if (const FStructProperty* Struct = CastField<FStructProperty>(*It); Struct && Struct->Struct == FPuzzleRow::StaticStruct())
+				RowCopy = Struct;
+		}
+	}
+	if (RowIndex && RowCopy)
+	{
+		FScriptArrayHelper Actions(ActionList, ActionList->ContainerPtrToValuePtr<void>(Owner));
+		while (IsBroken() && Actions.Num() > 0)
+		{
+			// As Undo does: the clues hidden after the last board move come back first
+			while (UndoClueHide(Actions.Num()))
+			{
+			}
+			const int32 Last = Actions.Num() - 1;
+			const uint8* Element = Actions.GetRawPtr(Last);
+			const int32 Row = RowIndex->GetPropertyValue_InContainer(Element);
+			if (m_Rows.IsValidIndex(Row))
+				m_Rows[Row] = *RowCopy->ContainerPtrToValuePtr<FPuzzleRow>(Element);
+			Actions.RemoveValues(Last, 1);
+		}
+	}
+	if (IsBroken())
+		FixPuzzle();
+}
+
 void UPuzzle::FixPuzzle()
 {
 	for (int i = 0; i < m_Rows.Num(); i++)

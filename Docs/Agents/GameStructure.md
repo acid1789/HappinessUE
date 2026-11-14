@@ -69,6 +69,13 @@ takes no taps.
 ## Puzzle code (`Source/Happiness/HappinessClassic/`)
 
 - `Puzzle.*`: generation, solving, rating (`ComputeRating`/`GetRating`), hint selection (`GenerateHint`).
+- Fix Puzzle (pause menu or the button panel's Fix button, then `WBP_Happiness.ConfirmConfirm`): `UPuzzle::FixPuzzleWithUndo`
+  undoes the player's moves from `WBP_Happiness.ActionList`, newest first, each after bringing back the clues hidden
+  after it (`UndoClueHide`, as Undo does), while the board is broken (`IsBroken`: an
+  icon placed where it doesn't go, or ruled out of the cell it goes in); the undone moves leave the list. The list is saved and
+  restored with the puzzle (see Save data), so it only runs out first on a save without it (older saves, or one
+  `RestoreUndo` didn't match); then `FixPuzzle` sets the rest straight against the solution. Clues hidden before
+  the moves it keeps stay hidden (no Unhide Clues); 30 s go on the clock.
 - `Clue.*`: every clue type, its analysis and its help text.
 - `Hint.*`: one hint (`UHint`): the action and its plain-English explanation (`GetExplanation`). With mistakes on the board (an icon placed
   where it doesn't go, or the right icon ruled out) a hint points at one instead (`UPuzzle::FindErrorHint`,
