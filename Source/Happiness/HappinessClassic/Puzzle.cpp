@@ -572,6 +572,19 @@ void UPuzzle::SetFinalIconWithClue(UClue* TheClue, int Row, int Col, int Icon)
 
 	int Final = m_Rows[Row].m_Cells[Col].m_iFinalIcon;
 
+	// A player move's knock-on placement that can't be made (the cell holds another icon, or this one is ruled out
+	// of it): the board is impossible, and the move stops here (RecordPlayerMove tells the player)
+	if (m_bRecordingCollateral && !m_bHypothetical)
+	{
+		if (m_bImpossibleMove)
+			return;
+		if (m_CollateralStep > 0 && ((Final >= 0 && Final != Icon) || !m_Rows[Row].m_Cells[Col].m_bValues[Icon]))
+		{
+			m_bImpossibleMove = true;
+			return;
+		}
+	}
+
 	if (Final >= 0 && Final != Icon)
 	{
 		if (!m_bHypothetical)
@@ -632,9 +645,22 @@ void UPuzzle::EliminateIconWithClue(UClue* TheClue, int Row, int Col, int Icon)
 
 	auto& Cell = m_Rows[Row].m_Cells[Col];
 
-	if (Cell.m_iFinalIcon == Icon && m_bRecordingCollateral && !m_bHypothetical)
+	if (m_bRecordingCollateral && !m_bHypothetical)
 	{
-		UnplaceIcon(Row, Col);
+		if (m_bImpossibleMove)
+			return;
+		if (Cell.m_iFinalIcon == Icon)
+		{
+			// The player ruling out the cell's placed icon (the move itself) clears the placement first. A knock-on
+			// elimination of a placed icon makes the board impossible instead: nothing is cleared, and the move stops
+			// here (RecordPlayerMove tells the player)
+			if (m_CollateralStep > 0)
+			{
+				m_bImpossibleMove = true;
+				return;
+			}
+			UnplaceIcon(Row, Col);
+		}
 	}
 
 	if (Cell.m_iFinalIcon == Icon)
@@ -654,6 +680,14 @@ void UPuzzle::EliminateIconWithClue(UClue* TheClue, int Row, int Col, int Icon)
 		Cell.m_bValues[Icon] = false;
 		if (m_bRecordingCollateral)
 			m_CollateralChanges.Add({ false, Row, Col, Icon, m_CollateralStep });
+
+		// A player move leaving the cell with no icon, or the icon with no cell in its row: impossible, and nothing
+		// more follows from it
+		if (m_bRecordingCollateral && !m_bHypothetical && IsImpossibleRow(Row))
+		{
+			m_bImpossibleMove = true;
+			return;
+		}
 
 		// Placements this leads to are the next step
 		TGuardValue<int> NextStep(m_CollateralStep, m_CollateralStep + 1);
@@ -1286,6 +1320,51 @@ FString UPuzzle::FormatTimeString(float Seconds) const
 	return FString::Printf(TEXT("%02d:%02d:%02d"), Hours, Minutes, Secs);
 }
 
+bool UPuzzle::IsImpossibleRow(int Row) const
+{
+	if (!m_Rows.IsValidIndex(Row))
+		return false;
+	const TArray<FPuzzleCell>& Cells = m_Rows[Row].m_Cells;
+	for (int Col = 0; Col < Cells.Num(); Col++)
+	{
+		// An open cell with no icon left
+		if (Cells[Col].m_iFinalIcon < 0 && !Cells[Col].m_bValues.Contains(true))
+			return true;
+	}
+	for (int Icon = 0; Icon < m_iSize; Icon++)
+	{
+		// An icon with no cell left, or placed twice
+		int Places = 0, Placed = 0;
+		for (const FPuzzleCell& Cell : Cells)
+		{
+			Placed += Cell.m_iFinalIcon == Icon;
+			Places += Cell.m_iFinalIcon == Icon || (Cell.m_iFinalIcon < 0 && Cell.m_bValues.IsValidIndex(Icon) && Cell.m_bValues[Icon]);
+		}
+		if (Places == 0 || Placed > 1)
+			return true;
+	}
+	return false;
+}
+
+void UPuzzle::ShowImpossible(UObject* View)
+{
+	// The puzzle screen's (WBP_Happiness) PuzzleFailed banner, UPuzzleFailedWidget::ShowImpossible
+	const FObjectPropertyBase* Banner = View ? FindFProperty<FObjectPropertyBase>(View->GetClass(), TEXT("PuzzleFailed")) : nullptr;
+	UObject* PuzzleFailed = Banner ? Banner->GetObjectPropertyValue_InContainer(View) : nullptr;
+	if (UFunction* Show = PuzzleFailed ? PuzzleFailed->FindFunction(TEXT("ShowImpossible")) : nullptr)
+		PuzzleFailed->ProcessEvent(Show, nullptr);
+}
+
+bool UPuzzle::IsImpossible() const
+{
+	for (int Row = 0; Row < m_Rows.Num(); Row++)
+	{
+		if (IsImpossibleRow(Row))
+			return true;
+	}
+	return false;
+}
+
 bool UPuzzle::IsBroken()
 {
 	for (int Row = 0; Row < m_Rows.Num(); Row++)
@@ -1529,11 +1608,16 @@ void UPuzzle::RecordPlayerMove(UObject* View, TFunctionRef<void()> Move)
 	m_CollateralChanges.Reset();
 	m_CollateralStep = 0;
 	m_bRecordingCollateral = true;
+	m_bImpossibleMove = false;
 	Move();
 	m_bRecordingCollateral = false;
 	// What IsCompleted would tidy up next anyway, so it isn't taken for something else changing the board
 	ReEnforceFinalIcons();
 	m_CollateralAfter = m_Rows;
+
+	// The board can't be solved from here: the screen says so, with Fix and Restart
+	if (m_bImpossibleMove || IsImpossible())
+		ShowImpossible(View);
 
 	m_LastStep = 0;
 	for (const FCollateralChange& Change : m_CollateralChanges)

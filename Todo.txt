@@ -21,7 +21,6 @@ IPad: 2256 x 1488
 
 --- Claude tasks ---
 Mistake hint targets a misleading clue
-Fix Puzzle Revamp
 Error Blows Up Puzzle
 
 --- Codex Tasks ---

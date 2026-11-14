@@ -9,6 +9,7 @@
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
+#include "Misc/ScopeExit.h"
 
 bool UHappinessSaveGame::bOldSaveChecked = false;
 bool UHappinessSaveGame::bOldSaveReset = false;
@@ -118,6 +119,15 @@ void UHappinessSaveGame::RestoreUndo(UUserWidget* Screen)
 	UHappinessSaveGame* Save = LastLoaded.Get();
 	LastLoaded = nullptr;
 	UPuzzle* Puzzle = Cast<UPuzzle>(GetSaveObjectProperty(Screen, TEXT("ThePuzzle")));
+	// A puzzle saved after a move that made the board impossible: the player is told again, with Fix and Restart. Also
+	// on saves without an undo list (a new puzzle never is impossible).
+	ON_SCOPE_EXIT
+	{
+		if (Save && Puzzle && Puzzle->IsImpossible())
+		{
+			UPuzzle::ShowImpossible(Screen);
+		}
+	};
 	const FArrayProperty* Actions = FindActionList(Screen);
 	if (!Save || !Puzzle || !Actions || Save->UndoSolution.IsEmpty() || Save->UndoSolution != Puzzle->m_Solution)
 	{
