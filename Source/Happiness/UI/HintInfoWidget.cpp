@@ -97,41 +97,27 @@ void UHintInfoWidget::BuildPresentation()
 	UVerticalBox* Content = WidgetTree->ConstructWidget<UVerticalBox>();
 	HintContent = Content;
 	Frame->AddChild(Content);
-	UHorizontalBox* ClueRow = WidgetTree->ConstructWidget<UHorizontalBox>();
-	Content->AddChildToVerticalBox(ClueRow)->SetPadding(FMargin(0, 14, 0, 0));
-	USizeBox* Heading = WidgetTree->ConstructWidget<USizeBox>();
-	Heading->SetWidthOverride(96); Heading->SetHeightOverride(28);
+	// The Hint badge, in the frame's top left corner: the first piece of the explanation's line (BuildLine), whose
+	// text runs on beside it and wraps underneath it
+	HintHeading = WidgetTree->ConstructWidget<USizeBox>();
+	HintHeading->SetWidthOverride(HintBadgeSize.X); HintHeading->SetHeightOverride(HintBadgeSize.Y);
 	UImage* Badge = WidgetTree->ConstructWidget<UImage>();
 	HintBadgeTexture = LoadObject<UTexture2D>(nullptr, TEXT("/Game/Happiness/UI/Textures/T_HintTitleBadge.T_HintTitleBadge"));
 	Badge->SetBrushFromTexture(HintBadgeTexture);
-	Heading->AddChild(Badge);
-	UHorizontalBoxSlot* HeadingSlot = ClueRow->AddChildToHorizontalBox(Heading);
-	HeadingSlot->SetPadding(FMargin(0, 8, 10, 0));
-	HeadingSlot->SetVerticalAlignment(VAlign_Top);
-	UWrapBox* Clue = WidgetTree->ConstructWidget<UWrapBox>();
-	Clue->SetExplicitWrapSize(false);
-	Clue->SetHorizontalAlignment(HAlign_Left);
-	Clue->SetInnerSlotPadding(FVector2D(0, 4));
-	UHorizontalBoxSlot* ClueSlot = ClueRow->AddChildToHorizontalBox(Clue);
-	ClueSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-	ClueLine = Clue;
-	auto AddLine = [&]() -> UPanelWidget*
+	HintHeading->AddChild(Badge);
+	// The hint's explanation, with the whole panel to itself: the clue it comes from is already described at the top
+	// of the screen (WBP_HelpPanel), so the panel doesn't repeat it
+	UWrapBox* Action = WidgetTree->ConstructWidget<UWrapBox>();
+	Action->SetExplicitWrapSize(false);
+	Action->SetHorizontalAlignment(HAlign_Left);
+	Action->SetInnerSlotPadding(FVector2D(0, 4));
+	Content->AddChildToVerticalBox(Action);
+	ActionLine = Action;
+	// The designer's clue line isn't shown
+	if (ClueLine)
 	{
-		UWrapBox* Line = WidgetTree->ConstructWidget<UWrapBox>();
-		Line->SetExplicitWrapSize(false);
-		Line->SetHorizontalAlignment(HAlign_Left);
-		Line->SetInnerSlotPadding(FVector2D(0, 4));
-		Content->AddChildToVerticalBox(Line);
-		return Line;
-	};
-	UBorder* Divider = WidgetTree->ConstructWidget<UBorder>();
-	Divider->SetBrush(FSlateRoundedBoxBrush(FLinearColor(.48f, .32f, .10f, .5f), 0.f));
-	Divider->SetPadding(FMargin(0));
-	USizeBox* DividerSize = WidgetTree->ConstructWidget<USizeBox>();
-	DividerSize->SetHeightOverride(1);
-	DividerSize->AddChild(Divider);
-	Content->AddChildToVerticalBox(DividerSize)->SetPadding(FMargin(0, 5, 0, 5));
-	ActionLine = AddLine();
+		ClueLine->SetVisibility(ESlateVisibility::Collapsed);
+	}
 }
 
 void UHintInfoWidget::NativePreConstruct()
@@ -141,10 +127,8 @@ void UHintInfoWidget::NativePreConstruct()
 	BuildPresentation();
 	if (!GetGameInstance() && HintContent)
 	{
-		FClueHelp Clue, Action;
-		Clue.AddText(TEXT("The flower must be somewhere to the left of the accordion, but they do not have to be next to each other."));
+		FClueHelp Action;
 		Action.AddText(TEXT("The accordion can only be in column 2. There is only one column to its left, so the flower must be in column 1. You can eliminate its other positions in this row."));
-		BuildLine(ClueLine, Clue, {});
 		BuildLine(ActionLine, Action, {});
 		Box->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	}
@@ -164,7 +148,6 @@ void UHintInfoWidget::ShowHint(UHint* Hint, const TArray<UObject*>& IconSets, UW
 		return;
 	}
 
-	BuildLine(ClueLine, Hint->TheClue->ClueHelp, IconSets);
 	BuildLine(ActionLine, Hint->GetExplanation(), IconSets);
 
 	LastReadingSize = FVector2D::ZeroVector;
@@ -229,22 +212,24 @@ void UHintInfoWidget::FitTextToPanel()
 	const FVector2D Available = Box->GetCachedGeometry().GetLocalSize() - FVector2D(24, 6);
 	if (Available.X <= 0 || Available.Y <= 0 || Available.Equals(LastReadingSize, .5f)) return;
 	LastReadingSize = Available;
-	// Keep both paragraphs together. Choose the largest type that fits the actual panel,
-	// including inline icons, instead of clipping text or adding a scroll bar.
+	// Choose the largest type that fits the actual panel, including inline icons, instead of clipping text or adding a
+	// scroll bar. The badge is the line's first piece.
 	const auto Measure = FSlateApplication::Get().GetRenderer()->GetFontMeasureService();
 	int32 BestPoints = 12;
 	for (int32 Points = 36; Points >= 12; --Points)
 	{
-		float Height = 32.f; // Clue row's top inset, divider, and paragraph spacing.
-		for (UPanelWidget* Line : {ClueLine.Get(), ActionLine.Get()})
+		float Height = 4.f; // Spacing.
+		for (UPanelWidget* Line : {ActionLine.Get()})
 		{
-			const float LineWidth = Line == ClueLine.Get() ? Available.X - 106.f : Available.X;
+			const float LineWidth = Available.X;
 			float X = 0, RowHeight = 0;
 			for (UWidget* Piece : Line->GetAllChildren())
 			{
 				FVector2D PieceSize(Points * 1.5f, Points * 1.5f);
 				if (UTextBlock* Text = Cast<UTextBlock>(Piece))
 					PieceSize = Measure->Measure(Text->GetText(), FSlateFontInfo(HintFont, Points));
+				else if (Piece == HintHeading)
+					PieceSize = HintBadgeSize;
 				const float SlotWidth = PieceSize.X + 14.f;
 				if (X > 0 && X + SlotWidth > LineWidth)
 				{
@@ -255,20 +240,19 @@ void UHintInfoWidget::FitTextToPanel()
 				RowHeight = FMath::Max(RowHeight, FMath::Max(float(PieceSize.Y), Points * 1.45f));
 			}
 			Height += RowHeight;
-			if (Line == ClueLine.Get()) Height = FMath::Max(Height, 50.f);
 		}
 		if (Height <= Available.Y) { BestPoints = Points; break; }
 	}
-	for (UPanelWidget* Line : {ClueLine.Get(), ActionLine.Get()})
+	for (UPanelWidget* Line : {ActionLine.Get()})
 	{
 		UWrapBox* Wrap = CastChecked<UWrapBox>(Line);
 		Wrap->SetExplicitWrapSize(true);
-		Wrap->SetWrapSize(Line == ClueLine.Get() ? Available.X - 106.f : Available.X);
+		Wrap->SetWrapSize(Available.X);
 		for (UWidget* Piece : Line->GetAllChildren())
 		{
 			if (UTextBlock* Text = Cast<UTextBlock>(Piece))
 				Text->SetFont(FSlateFontInfo(HintFont, BestPoints));
-			else if (USizeBox* Icon = Cast<USizeBox>(Piece))
+			else if (USizeBox* Icon = Piece != HintHeading ? Cast<USizeBox>(Piece) : nullptr)
 			{
 				Icon->SetWidthOverride(BestPoints * 1.5f);
 				Icon->SetHeightOverride(BestPoints * 1.5f);
@@ -288,6 +272,13 @@ void UHintInfoWidget::HideHint()
 void UHintInfoWidget::BuildLine(UPanelWidget* Line, const FClueHelp& Help, const TArray<UObject*>& IconSets)
 {
 	Line->ClearChildren();
+	// The explanation's line starts with the Hint badge, at its top left
+	if (Line == ActionLine && HintHeading)
+	{
+		UWrapBoxSlot* HeadingSlot = CastChecked<UWrapBoxSlot>(Line->AddChild(HintHeading));
+		HeadingSlot->SetPadding(FMargin(0, 0, 10, 0));
+		HeadingSlot->SetVerticalAlignment(VAlign_Top);
+	}
 	for (const FClueHelpSegment& Segment : Help.Segments)
 	{
 		if (Segment.Type == EClueHelpSegementType::Text)

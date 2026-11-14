@@ -1355,6 +1355,142 @@ FClueHelp UHint::GetExplanation()
 				}
 			}
 
+			// Next to either (the subject an option): go through the main icon's columns. Where it would be next to this
+			// column, the other option is next to it there anyway (both: too many); where it wouldn't, the other option
+			// can't be next to it, so the subject would have to be (not here). "If [Hibiscus] is in column 5, [Baseball]
+			// is next to it, so [Cosmos] can't be. If it's in column 1, [Baseball] can't be next to it, so [Cosmos] has
+			// to be. Either way, [Cosmos] can't be here"
+			if (!bExplained && TheClue->m_Type == eClueType::Horizontal && TheClue->m_HorizontalType == eHorizontalType::NextToEitherOr
+				&& Subject != 1)
+			{
+				const int MainSlot = 1;
+				const int OtherSlot = Subject == 0 ? 2 : 0;
+				const TArray<int> CanMain = Possible(SlotRows[MainSlot], SlotIcons[MainSlot]);
+				const TArray<int> CanOther = Possible(SlotRows[OtherSlot], SlotIcons[OtherSlot]);
+				TArray<int> BothCols, NeitherCols;
+				bool bAllFail = CanMain.Num() > 0 && CanOther.Num() > 0;
+				for (int M : CanMain)
+				{
+					// The subject here takes this column in its row
+					if (SlotRows[MainSlot] == Row && M == Col)
+						continue;
+					bool bOtherAlways = true, bOtherCan = false;
+					for (int O : CanOther)
+					{
+						const bool bBeside = FMath::Abs(O - M) == 1 && !(SlotRows[OtherSlot] == SlotRows[MainSlot] && O == M);
+						bOtherAlways &= bBeside;
+						bOtherCan |= bBeside;
+					}
+					if (FMath::Abs(M - Col) == 1 && bOtherAlways)
+						BothCols.Add(M);
+					else if (FMath::Abs(M - Col) != 1 && !bOtherCan)
+						NeitherCols.Add(M);
+					else
+						bAllFail = false;
+				}
+				if (bAllFail && (BothCols.Num() > 0 || NeitherCols.Num() > 0))
+				{
+					auto Columns = [](const TArray<int>& Cols)
+					{
+						FString Text = FString::Printf(TEXT("column %d"), Cols[0] + 1);
+						for (int i = 1; i < Cols.Num(); i++)
+							Text += (i == Cols.Num() - 1 ? TEXT(" or ") : TEXT(", ")) + FString::FromInt(Cols[i] + 1);
+						return Text;
+					};
+					// Both kinds of column: "If [M] is in column 5, [O] is next to it, so [S] can't be next to it too. If it's in
+					// column 1, [O] can't be next to it, so [S] has to be. Either way, [S] can't be here". One kind: "[M] can
+					// only be in column 3, where [O] is next to it, so [S] can't be next to it too, and can't be here"
+					const bool bBoth = BothCols.Num() > 0 && NeitherCols.Num() > 0;
+					if (BothCols.Num() > 0)
+					{
+						if (bBoth)
+							Help.AddText(TEXT("If"));
+						Help.AddIcon(SlotRows[MainSlot], SlotIcons[MainSlot]);
+						Help.AddText((bBoth ? TEXT("is in ") : TEXT("can only be in ")) + Columns(BothCols) + (bBoth ? TEXT(",") : TEXT(", where")));
+						Help.AddIcon(SlotRows[OtherSlot], SlotIcons[OtherSlot]);
+						Help.AddText(TEXT("is next to it, so"));
+						Help.AddIcon(Row, Icon);
+						Help.AddText(bBoth ? TEXT("can't be next to it too.") : TEXT("can't be next to it too, and can't be here"));
+					}
+					if (NeitherCols.Num() > 0)
+					{
+						if (bBoth)
+							Help.AddText(FString::Printf(TEXT("If it's in %s,"), *Columns(NeitherCols)));
+						else
+						{
+							Help.AddIcon(SlotRows[MainSlot], SlotIcons[MainSlot]);
+							Help.AddText(FString::Printf(TEXT("can only be in %s, where"), *Columns(NeitherCols)));
+						}
+						Help.AddIcon(SlotRows[OtherSlot], SlotIcons[OtherSlot]);
+						Help.AddText(TEXT("can't be next to it, so"));
+						Help.AddIcon(Row, Icon);
+						Help.AddText(bBoth ? TEXT("has to be.") : TEXT("has to be next to it, and can't be here"));
+					}
+					if (bBoth)
+					{
+						Help.AddText(TEXT("Either way,"));
+						Help.AddIcon(Row, Icon);
+						Help.AddText(TEXT("can't be here"));
+					}
+					bExplained = true;
+				}
+			}
+
+			// Next to either, the subject the middle icon: here, each option would be next to it wherever it can still
+			// go (both: too many), or neither could be. "If [Hibiscus] were here, [Baseball] would be next to it (it can
+			// only be in column 3), and so would [Cosmos] (it can only be in column 5). It can't be next to both, so
+			// [Hibiscus] can't be here"
+			if (!bExplained && TheClue->m_Type == eClueType::Horizontal && TheClue->m_HorizontalType == eHorizontalType::NextToEitherOr
+				&& Subject == 1)
+			{
+				// Where each option can be with the subject here (not this column, in the subject's row)
+				TArray<int> Spots[2];
+				bool bAlways[2] = { true, true }, bNever[2] = { true, true };
+				for (int k = 0; k < 2; k++)
+				{
+					const int Slot = k == 0 ? 0 : 2;
+					for (int c : Possible(SlotRows[Slot], SlotIcons[Slot]))
+					{
+						if (SlotRows[Slot] == Row && c == Col)
+							continue;
+						Spots[k].Add(c);
+						bAlways[k] &= FMath::Abs(c - Col) == 1;
+						bNever[k] &= FMath::Abs(c - Col) != 1;
+					}
+				}
+				auto Columns = [](const TArray<int>& Cols)
+				{
+					FString Text = FString::Printf(TEXT("column %d"), Cols[0] + 1);
+					for (int i = 1; i < Cols.Num(); i++)
+						Text += (i == Cols.Num() - 1 ? TEXT(" or ") : TEXT(", ")) + FString::FromInt(Cols[i] + 1);
+					return Text;
+				};
+				if (Spots[0].Num() > 0 && Spots[1].Num() > 0 && bAlways[0] && bAlways[1])
+				{
+					Help.AddText(TEXT("If"));
+					Help.AddIcon(Row, Icon);
+					Help.AddText(TEXT("were here,"));
+					Help.AddIcon(SlotRows[0], SlotIcons[0]);
+					Help.AddText(FString::Printf(TEXT("would be next to it (it can only be in %s), and so would"), *Columns(Spots[0])));
+					Help.AddIcon(SlotRows[2], SlotIcons[2]);
+					Help.AddText(FString::Printf(TEXT("(it can only be in %s). It can't be next to both, so"), *Columns(Spots[1])));
+					Help.AddIcon(Row, Icon);
+					Help.AddText(TEXT("can't be here"));
+					bExplained = true;
+				}
+				else if (bNever[0] && bNever[1])
+				{
+					Help.AddText(TEXT("Neither"));
+					Help.AddIcon(SlotRows[0], SlotIcons[0]);
+					Help.AddText(TEXT("nor"));
+					Help.AddIcon(SlotRows[2], SlotIcons[2]);
+					Help.AddText(TEXT("can be next to this column, but"));
+					Help.AddIcon(Row, Icon);
+					Help.AddText(TEXT("has to be next to one of them, so it can't be here"));
+					bExplained = true;
+				}
+			}
+
 			if (!bExplained)
 			{
 				// "[Bow] and [Hat] can't both fit, so [Top] can't be here"

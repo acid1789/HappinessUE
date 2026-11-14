@@ -14,9 +14,9 @@ class UTextBlock;
 class UWidget;
 
 /**
- * Hint info panel: while a hint is showing, explains it:
- *   - the clue it comes from, as the help line shows it ("[icon] is directly left of [icon]")
- *   - why the hint follows and what to do (UHint::GetExplanation), e.g. "Since [Daisy] is in this column, [Top] can't be here"
+ * Hint info panel: while a hint is showing, explains it after its Hint badge (top left, the text wrapping under it): why the hint follows and what to do
+ * (UHint::GetExplanation), e.g. "Since [Daisy] is in this column, [Top] can't be here". The clue it comes from isn't
+ * repeated: the help line at the top of the screen describes it (ClueLine is collapsed).
  *
 	* The widget spans from the puzzle grid to the screen bottom and stays laid out (only Box is hidden), so it always knows where the
  * hinted clue is: Box goes on the side of the clue with more room and stops short of it.
@@ -34,7 +34,7 @@ public:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UWidget> Box;
 
-	/** The hinted clue, as text and icons */
+	/** The designer's clue line; not shown (the help line at the top of the screen describes the clue) */
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UPanelWidget> ClueLine;
 
@@ -86,6 +86,9 @@ private:
 	UPROPERTY() TObjectPtr<UFont> HintFont;
 	UPROPERTY() TObjectPtr<UTexture2D> HintPanelTexture;
 	UPROPERTY() TObjectPtr<UTexture2D> HintBadgeTexture;
+	/** The Hint badge: the explanation line's first piece (BuildLine), so the text wraps underneath it */
+	UPROPERTY(Transient) TObjectPtr<class USizeBox> HintHeading;
+	const FVector2D HintBadgeSize = FVector2D(96.f, 28.f);
 
 	void BuildLine(UPanelWidget* Line, const FClueHelp& Help, const TArray<UObject*>& IconSets);
 	void PlaceBox(UWidget* HintClue);
