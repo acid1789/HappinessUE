@@ -34,6 +34,8 @@ namespace
 	const FLinearColor CampaignInk(.17f,.085f,.035f);
 	const FLinearColor CampaignGreen(.16f,.29f,.075f);
 	const FLinearColor CampaignIvory(.98f,.96f,.87f);
+	// Extra experience each level needs over the one before it, on top of the log curve
+	constexpr int32 ExpPerLevelStep = 20;
 }
 
 UCampaignEndScreenWidget::UCampaignEndScreenWidget(const FObjectInitializer& ObjectInitializer)
@@ -346,7 +348,7 @@ void UCampaignEndScreenWidget::Hide()
 
 int32 UCampaignEndScreenWidget::GetExpForNextLevel(int32 Level)
 {
-	return FMath::Max(1, FMath::TruncToInt(FMath::Loge(float(Level + 3)) * 1000.f));
+	return FMath::Max(1, FMath::TruncToInt(FMath::Loge(float(Level + 3)) * 1000.f) + ExpPerLevelStep * FMath::Max(0, Level - 1));
 }
 
 void UCampaignEndScreenWidget::AddPlayerExp(int32 Exp)

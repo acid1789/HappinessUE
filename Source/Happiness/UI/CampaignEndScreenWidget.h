@@ -202,7 +202,9 @@ private:
 	 *  the old values */
 	void AddPlayerExp(int32 Exp);
 
-	/** Experience from one level to the next, as the Free Play end screen has it: ln(level + 3) x 1000 */
+	/** Experience from one level to the next: ln(level + 3) x 1000, plus 20 for each level past the first, so each
+	 *  level costs a little more than the last. The Free Play end screen (WBP_EndScreen.ExpForNextLevel) calls this too. */
+	UFUNCTION(BlueprintPure, Category = "Happiness|Level")
 	static int32 GetExpForNextLevel(int32 Level);
 
 	FText GetNoteText() const;

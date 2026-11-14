@@ -6,6 +6,9 @@
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
 #include "Engine/Font.h"
+#include "Fonts/FontMeasure.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Rendering/SlateRenderer.h"
 #include "Engine/Texture2D.h"
 #include "GameFramework/PlayerController.h"
 #include "HappinessClassic/CampaignProgress.h"
@@ -24,6 +27,8 @@ namespace
 	const FLinearColor SunRim(0.85f, 0.55f, 0.15f, 1.f);
 	const FLinearColor PlayerLevelInk(0.10f, 0.25f, 0.10f, 1.f);
 	constexpr float SunSize = 144.f;
+	// The level's type size, up to two digits
+	constexpr int32 LevelPoints = 50;
 	// The twelve rewards ring the sun just inside its ray tips (72 from its center), as close as they go without
 	// overlapping: neighbors are 2 * RewardRadius * sin(15 deg) apart, and the art fills about 96% of its icon
 	constexpr float IconSize = 50.f;
@@ -84,7 +89,7 @@ void UPlayerLevelBadge::BuildLayout()
 	LevelText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("LevelText"));
 	if (const UFont* Font = LoadObject<UFont>(nullptr, TEXT("/Game/Happiness/UI/Fonts/LessonsSerif_Font.LessonsSerif_Font")))
 	{
-		LevelText->SetFont(FSlateFontInfo(Font, 50));
+		LevelText->SetFont(FSlateFontInfo(Font, LevelPoints));
 	}
 	LevelText->SetColorAndOpacity(FSlateColor(PlayerLevelInk));
 	LevelText->SetJustification(ETextJustify::Center);
@@ -198,6 +203,20 @@ void UPlayerLevelBadge::Refresh()
 		const FIntProperty* LevelProperty = PC ? FindFProperty<FIntProperty>(PC->GetClass(), TEXT("HappinessLevel")) : nullptr;
 		const int32 Level = LevelProperty ? LevelProperty->GetPropertyValue_InContainer(PC) : 1;
 		LevelText->SetText(FText::AsNumber(Level));
+		// Three digits and more get smaller type, as wide as two at the full size (which sit well inside the sun)
+		FSlateFontInfo Font = LevelText->GetFont();
+		Font.Size = LevelPoints;
+		if (Level >= 100 && FSlateApplication::IsInitialized())
+		{
+			const TSharedRef<FSlateFontMeasure> Measure = FSlateApplication::Get().GetRenderer()->GetFontMeasureService();
+			const float TwoDigits = Measure->Measure(TEXT("88"), Font).X;
+			const float Width = Measure->Measure(LevelText->GetText(), Font).X;
+			if (Width > TwoDigits && Width > 0.f)
+			{
+				Font.Size = FMath::FloorToInt(LevelPoints * TwoDigits / Width);
+			}
+		}
+		LevelText->SetFont(Font);
 	}
 	const UCampaignSubsystem* Campaign = UCampaignSubsystem::Get(this);
 	const bool bRewardsInitialized = KnownRewards.Num() == Icons.Num();

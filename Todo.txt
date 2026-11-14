@@ -20,10 +20,9 @@ IPad: 2256 x 1488
 --- Design Tasks ---
 
 --- Claude tasks ---
-Phone Notch
 Tips
-Game Mode Order
 Mistake hint targets a misleading clue
+Scale Back Exp
 
 --- Codex Tasks ---
 
@@ -65,3 +64,9 @@ Icon Sets (non-consumable):
 
 
 --- Category Ideas ---
+
+
+--- Tips ---
+Flower Names
+Undo
+Hide Clue

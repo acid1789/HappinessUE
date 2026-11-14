@@ -63,6 +63,8 @@ private:
 	void UpdateNotchShift(float Scale);
 
 	float AppliedNotchInset = 0.f;
+	/** iOS: when to read the notch from UIKit again */
+	mutable double NextNotchReadTime = 0.0;
 	/** The left offsets as designed, before any notch shift, by widget name */
 	TMap<FName, float> DesignedLeftOffsets;
 };

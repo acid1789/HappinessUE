@@ -8,7 +8,42 @@
 #include "HappinessClassic/CampaignProgress.h"
 
 #if PLATFORM_IOS && !PLATFORM_TVOS
-#include "IOS/IOSApplication.h"
+#include "IOS/IOSAppDelegate.h"
+#include "IOS/IOSView.h"
+#include <atomic>
+
+namespace
+{
+	// The notch's width in pixels when it is on the left, else 0 (-1 before the first reading). Read from UIKit on the
+	// main thread: the engine's own orientation (FIOSApplication::CachedOrientation) is only right once the phone has
+	// been turned, so at launch it said the notch was on the right.
+	std::atomic<float> GLeftNotchPixels{ -1.f };
+	std::atomic<bool> GLeftNotchQueued{ false };
+
+	void RefreshLeftNotch()
+	{
+		if (GLeftNotchQueued.exchange(true))
+		{
+			return;
+		}
+		dispatch_async(dispatch_get_main_queue(), ^{
+			IOSAppDelegate* Delegate = [IOSAppDelegate GetDelegate];
+			UIWindow* Window = Delegate ? Delegate.Window : nil;
+			float Pixels = 0.f;
+			// iOS keeps landscape's safe area the same on both sides, whichever side the notch is on. The notch is
+			// at the phone's top, opposite where the home button would be: on the left with the "home button" on
+			// the right.
+			if (Window != nil && Window.windowScene != nil
+				&& Window.windowScene.effectiveGeometry.interfaceOrientation == UIInterfaceOrientationLandscapeRight)
+			{
+				const float Scale = Delegate.IOSView != nil ? Delegate.IOSView.contentScaleFactor : Window.screen.scale;
+				Pixels = Window.safeAreaInsets.left * Scale;
+			}
+			GLeftNotchPixels = Pixels;
+			GLeftNotchQueued = false;
+		});
+	}
+}
 #endif
 
 void UButtonPanelWidget::NativeConstruct()
@@ -76,16 +111,19 @@ float UButtonPanelWidget::GetLeftNotchInset(float Scale) const
 	{
 		return 0.f;
 	}
+#if PLATFORM_IOS && !PLATFORM_TVOS
+	// Read again a few times a second, so it follows the phone being turned around
+	const double Now = FPlatformTime::Seconds();
+	if (Now >= NextNotchReadTime)
+	{
+		NextNotchReadTime = Now + 0.25;
+		RefreshLeftNotch();
+	}
+	const float Left = GLeftNotchPixels.load();
+#else
 	FMargin SafeZone;
 	FSlateApplication::Get().GetSafeZoneSize(SafeZone, FVector2D::ZeroVector);
-	float Left = SafeZone.Left;
-#if PLATFORM_IOS && !PLATFORM_TVOS
-	// iOS keeps landscape's safe area the same on both sides, whichever side the notch is on. The notch is at the
-	// phone's top, opposite where the home button would be: on the left with the "home button" on the right.
-	if (FIOSApplication::CachedOrientation != UIInterfaceOrientationLandscapeRight)
-	{
-		Left = 0.f;
-	}
+	const float Left = SafeZone.Left;
 #endif
 	// Pixels to widget units
 	return FMath::RoundToFloat(FMath::Max(0.f, Left) / Scale);
