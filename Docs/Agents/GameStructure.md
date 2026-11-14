@@ -88,7 +88,9 @@ takes no taps.
   where it doesn't go, or the right icon ruled out) a hint points at one instead (`UPuzzle::FindErrorHint`,
   `UHint::bError`): its reasons come from the board with the mistakes corrected (`FixPuzzle` on a copy): a clue that
   shows it straight away (its own explanation), else one that would leave an icon nowhere to go were the mistake
-  right, else the clue that settles that cell later ("No clue puts it there yet"). Wrong placements first. The cell's
+  right. Else no clue at all ("No clue puts it there yet"; `TheClue` null): it used to name the clue that settled the cell
+  further into a solve from the corrected board, which looked unrelated to the board the player has. `WBP_Happiness`'s
+  `DoHint` / `FinishHint` skip the clue widget's ShowHInt / FinishHint then, and the hint window shows without one. Wrong placements first. The cell's
   placed image then gets the hint's sparkles and red tint (`UGameCellWidget::UpdatePlacedHint`); once it's cleared, the
   hint goes on as the elimination. Clearing a placed icon (dialog Reset All, a middle click: `RestoreIocn` /
   `BreakFinalIcon`, which call `UPuzzle::ClearPlacement`) makes the icon possible again in the row's other open cells

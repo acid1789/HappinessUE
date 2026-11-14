@@ -21,7 +21,6 @@ IPad: 2256 x 1488
 
 --- Claude tasks ---
 Mistake hint targets a misleading clue
-Error Blows Up Puzzle
 
 --- Codex Tasks ---
 Free Play / Options Checks

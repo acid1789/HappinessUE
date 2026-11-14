@@ -190,7 +190,7 @@ namespace
 				if (NumMistakeExamples < 12)
 				{
 					MistakeExamples += FString::Printf(TEXT("  %s %s r%dc%d icon=%d | %s | %s\n"), bPlace ? TEXT("placed") : TEXT("ruledout"),
-						H->bErrorProvedByClue ? TEXT("proved") : TEXT("LATER"), H->Row, H->Col, H->Icon, *H->TheClue->ToString(),
+						H->bErrorProvedByClue ? TEXT("proved") : TEXT("LATER"), H->Row, H->Col, H->Icon, H->TheClue ? *H->TheClue->ToString() : TEXT("(no clue)"),
 						*HelpString(H->GetExplanation()));
 					NumMistakeExamples++;
 				}

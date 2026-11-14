@@ -755,7 +755,7 @@ UHint* UPuzzle::GenerateHint(const TArray<UClue*>& VisibleClues)
 	if (Best)
 	{
 		m_HintsUsed++;
-		if (m_bCampaign && BestClue->GetCampaignLesson() == m_CampaignLesson)
+		if (m_bCampaign && BestClue && BestClue->GetCampaignLesson() == m_CampaignLesson)
 		{
 			m_LessonHintsUsed++;
 		}
@@ -985,54 +985,23 @@ UHint* UPuzzle::FindErrorHint(const TArray<UClue*>& VisibleClues, UClue*& OutClu
 		}
 	}
 
-	bool bProvedByClue = BestClue != nullptr;
+	// No single clue shows any of them yet: the hint points at the first mistake alone, with no clue. A clue found by
+	// working the puzzle on from the corrected board would be about a board the player doesn't have, and look unrelated.
+	const bool bProvedByClue = BestClue != nullptr;
 	if (!BestClue)
 	{
-		// No single clue shows any of them yet: point at the first, with the clue that settles its cell when the
-		// puzzle is worked through from that board
-		BestMistake = 0;
-		m_Rows = Corrected;
-		for (int Step = 0; Step < 1000 && !BestClue; Step++)
-		{
-			bool bProgress = false;
-			for (UClue* Clue : AllClues)
-			{
-				SetMarker();
-				if (!Apply(*Clue))
-				{
-					RestoreMarker();
-					continue;
-				}
-				bProgress = true;
-				if (Shows(Mistakes[BestMistake]))
-					BestClue = Clue;
-				break;
-			}
-			if (!bProgress)
-				break;
-		}
-		// Or, failing that, a clue with an icon from its row
-		for (int Index = 0; Index < AllClues.Num() && !BestClue; Index++)
-		{
-			TArray<int> Rows;
-			AllClues[Index]->GetRows(Rows);
-			if (Rows.Contains(Mistakes[BestMistake].Row))
-				BestClue = AllClues[Index];
-		}
-		if (!BestClue && AllClues.Num() > 0)
-			BestClue = AllClues[0];
-	}
-	if (!BestClue)
-	{
-		m_Rows = Board;
-		return nullptr;
+		// A wrong placement before a wrong ruling out
+		BestMistake = Mistakes.IndexOfByPredicate([](const FMistake& Mistake) { return Mistake.bPlaced; });
+		if (BestMistake == INDEX_NONE)
+			BestMistake = 0;
 	}
 
 	// The hint, made on the corrected board, aimed at the mistake's cell
 	m_Rows = Corrected;
 	const FMistake& Mistake = Mistakes[BestMistake];
 	UHint* Hint = NewObject<UHint>(this);
-	Hint->Init(*this, *BestClue);
+	if (BestClue)
+		Hint->Init(*this, *BestClue);
 	Hint->TheClue = BestClue;
 	Hint->Row = Mistake.Row;
 	Hint->Col = Mistake.Col;

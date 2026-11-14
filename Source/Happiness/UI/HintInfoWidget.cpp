@@ -142,7 +142,8 @@ void UHintInfoWidget::NativeConstruct()
 
 void UHintInfoWidget::ShowHint(UHint* Hint, const TArray<UObject*>& IconSets, UWidget* HintClue)
 {
-	if (!Hint || !Hint->TheClue)
+	// A mistake no clue shows yet has no clue: the explanation says what's wrong with the cell
+	if (!Hint || (!Hint->TheClue && !Hint->bError))
 	{
 		HideHint();
 		return;
