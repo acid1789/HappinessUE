@@ -407,13 +407,14 @@ void UHappinessModeWidget::MakeStreakSaverButton()
 	StreakSaverLabel = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("StreakSaverLabel"));
 	Label(StreakSaverLabel, 16, 38.f, 25.f);
 
-	// A sibling above the Daily tile, with a 10px gap: their entire tap rectangles are separate.
+	// A sibling below the Daily tile, with a 10px gap: their entire tap rectangles are separate.
 	const UCanvasPanelSlot* DailySlot = Cast<UCanvasPanelSlot>(DailyButton->Slot);
 	const FVector2D TileOrigin = DailySlot ? DailySlot->GetPosition() : FVector2D::ZeroVector;
+	const float TileHeight = DailySlot ? DailySlot->GetSize().Y : 0.f;
 	if (UCanvasPanelSlot* ButtonSlot = Tiles->AddChildToCanvas(StreakSaverButton))
 	{
 		const FVector2D SaverButtonSize(300.f, 72.f);
-		ButtonSlot->SetPosition(TileOrigin + FVector2D(0.f, -SaverButtonSize.Y - 10.f));
+		ButtonSlot->SetPosition(TileOrigin + FVector2D(0.f, TileHeight + 10.f));
 		ButtonSlot->SetSize(SaverButtonSize);
 		ButtonSlot->SetZOrder(DailySlot ? DailySlot->GetZOrder() + 1 : 1);
 	}

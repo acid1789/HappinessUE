@@ -22,6 +22,8 @@ IPad: 2256 x 1488
 --- Claude tasks ---
 Phone Notch
 Tips
+Game Mode Order
+Mistake hint targets a misleading clue
 
 --- Codex Tasks ---
 

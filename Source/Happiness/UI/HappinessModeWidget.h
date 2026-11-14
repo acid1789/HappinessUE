@@ -113,7 +113,7 @@ protected:
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UButton> ClosePurchaseButton;
 
-	/** Opens the streak saver shop. Made in the Daily button's canvas, just above it, unless the layout has one. */
+	/** Opens the streak saver shop. Made in the Daily button's canvas, just below it, unless the layout has one. */
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UButton> StreakSaverButton;
 
