@@ -8,6 +8,8 @@
 #include "Components/UniformGridSlot.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
+#include "Engine/Font.h"
+#include "Engine/Texture2D.h"
 #include "UObject/ConstructorHelpers.h"
 
 namespace
@@ -69,6 +71,16 @@ UClueSelectWidget::UClueSelectWidget(const FObjectInitializer& ObjectInitializer
 {
 	static ConstructorHelpers::FObjectFinder<USoundBase> Button(TEXT("/Game/General/Audio/Cues/MenuAccept.MenuAccept"));
 	ButtonSound = Button.Object;
+	static ConstructorHelpers::FObjectFinder<UTexture2D> Garden(TEXT("/Game/General/Textures/T_OptionsGarden.T_OptionsGarden"));
+	static ConstructorHelpers::FObjectFinder<UTexture2D> Actions(TEXT("/Game/General/Textures/T_LessonNotebookButtons.T_LessonNotebookButtons"));
+	static ConstructorHelpers::FObjectFinder<UTexture2D> Empty(TEXT("/Game/General/Textures/T_OptionsUnchecked.T_OptionsUnchecked"));
+	static ConstructorHelpers::FObjectFinder<UTexture2D> Checked(TEXT("/Game/General/Textures/T_OptionsChecked.T_OptionsChecked"));
+	static ConstructorHelpers::FObjectFinder<UFont> Font(TEXT("/Game/Happiness/UI/Fonts/LessonsSerif_Font.LessonsSerif_Font"));
+	ClueGardenTexture = Garden.Object;
+	ClueActionTexture = Actions.Object;
+	ClueUncheckedTexture = Empty.Object;
+	ClueCheckedTexture = Checked.Object;
+	ClueGardenFont = Font.Object;
 
 	static ConstructorHelpers::FClassFinder<UUserWidget> CheckBox(TEXT("/Game/General/UI/WBP_CheckBox"));
 	CheckBoxClass = CheckBox.Class;
@@ -79,6 +91,7 @@ void UClueSelectWidget::NativePreConstruct()
 	Super::NativePreConstruct();
 
 	// Also runs in the designer, where every clue shows as included
+	BuildGardenPanel();
 	BuildCheckBoxes();
 	Refresh();
 	Panel->SetVisibility(bStartOpen ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
@@ -152,6 +165,7 @@ void UClueSelectWidget::BuildCheckBoxes()
 			Font.Size = LabelFontSize;
 			Label->SetFont(Font);
 		}
+		StyleCheckBox(CheckBox, 1136.f / NumColumns - 12.f, FMath::Min(64.f, 480.f / Rows) - 6.f);
 		SetCheckBoxChecked(CheckBox, true);
 
 		UClueSelectToggle* Toggle = NewObject<UClueSelectToggle>(this);
@@ -164,13 +178,13 @@ void UClueSelectWidget::BuildCheckBoxes()
 		}
 
 		UUniformGridSlot* GridSlot = ClueGrid->AddChildToUniformGrid(CheckBox, i % Rows, i / Rows);
-		GridSlot->SetHorizontalAlignment(HAlign_Left);
+		GridSlot->SetHorizontalAlignment(HAlign_Fill);
 		GridSlot->SetVerticalAlignment(VAlign_Center);
 
 		CheckBoxes.Add(CheckBox);
 		Toggles.Add(Toggle);
 	}
-	ClueGrid->SetSlotPadding(CluePadding);
+	ClueGrid->SetSlotPadding(FMargin(6.f, 3.f));
 }
 
 void UClueSelectWidget::Refresh()

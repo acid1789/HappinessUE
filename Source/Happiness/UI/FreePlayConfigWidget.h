@@ -5,29 +5,48 @@
 #include "FreePlayConfigWidget.generated.h"
 
 class UButton;
+class UCanvasPanel;
+class UFont;
+class UTextBlock;
+class UTexture2D;
+class UFreePlayConfigWidget;
 
-/**
- * The Free Play setup screen (WBP_HappinessConfig, whose Blueprint does the rest: Show, Start, Cancel, the size and
- * difficulty locks). Adds a Random button at the top right, made in code in the dialog's canvas and styled like its
- * Cancel button: it picks a random puzzle number, a size and a difficulty the player can play (PC_Happiness's
- * CanPlayHappinessSize / CanPlayHappinessDifficulty), and a random set of clue types (UFreePlaySubsystem, so the
- * clue selection shows it and it is saved).
- */
+/** One of the setup's size/difficulty segments; the original Blueprint selector owns the choice. */
+UCLASS()
+class UFreePlayOptionToggle : public UObject
+{
+    GENERATED_BODY()
+public:
+    TWeakObjectPtr<UFreePlayConfigWidget> Owner;
+    bool bDifficulty = false;
+    int32 Index = 0;
+    UFUNCTION() void HandleClicked();
+};
+
+/** Garden layout for WBP_HappinessConfig; its Blueprint still owns Show, Start, Cancel and unlock checks. */
 UCLASS()
 class HAPPINESS_API UFreePlayConfigWidget : public UUserWidget
 {
 	GENERATED_BODY()
 
 public:
+	UFreePlayConfigWidget(const FObjectInitializer& ObjectInitializer);
+
 	/** Random puzzle numbers are from 1 to this */
 	UPROPERTY(EditAnywhere, Category = "Random")
 	int32 MaxRandomPuzzleNumber = 99999;
 
 protected:
+	virtual void NativePreConstruct() override;
 	virtual void NativeConstruct() override;
+	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 private:
-	void MakeRandomButton();
+	friend class UFreePlayOptionToggle;
+	void BuildGardenLayout();
+	void FitToMenuCanvas();
+	void RefreshSegments();
+	void HandleOptionSelected(bool bDifficulty, int32 Index);
 
 	UFUNCTION()
 	void HandleRandomClicked();
@@ -39,6 +58,17 @@ private:
 	/** Calls a PC_Happiness check (CanPlayHappinessSize, CanPlayHappinessDifficulty) with one int; true without one */
 	bool CanPlay(FName Check, int32 Value) const;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UButton> RandomButton;
+	UPROPERTY(Transient) TObjectPtr<UButton> RandomButton;
+	UPROPERTY(Transient) TObjectPtr<UUserWidget> SizeSelection;
+	UPROPERTY(Transient) TObjectPtr<UUserWidget> DifficultySelection;
+	UPROPERTY(Transient) TArray<TObjectPtr<UButton>> SegmentButtons;
+	UPROPERTY(Transient) TArray<TObjectPtr<UTextBlock>> SegmentLabels;
+	UPROPERTY(Transient) TArray<TObjectPtr<UFreePlayOptionToggle>> SegmentHandlers;
+	UPROPERTY() TObjectPtr<UTexture2D> GardenTexture;
+	UPROPERTY() TObjectPtr<UTexture2D> ActionTexture;
+	UPROPERTY() TObjectPtr<UTexture2D> FieldTexture;
+	UPROPERTY() TObjectPtr<UTexture2D> SelectedTexture;
+	UPROPERTY() TObjectPtr<UFont> GardenFont;
+	int32 LastSizeSelection = INDEX_NONE;
+	int32 LastDifficultySelection = INDEX_NONE;
 };

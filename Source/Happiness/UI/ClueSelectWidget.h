@@ -7,6 +7,8 @@
 #include "ClueSelectWidget.generated.h"
 
 class UButton;
+class UFont;
+class UTexture2D;
 class UClueSelectWidget;
 class USoundBase;
 class UTextBlock;
@@ -126,8 +128,17 @@ private:
 	void HandleCluesChanged();
 
 	void BuildCheckBoxes();
+	void BuildGardenPanel();
+	void StyleCheckBox(UUserWidget* CheckBox, float Width, float Height);
 	void PlayButtonSound() const;
 	class UFreePlaySubsystem* GetFreePlay() const;
+
+	UPROPERTY() TObjectPtr<UTexture2D> ClueGardenTexture;
+	UPROPERTY() TObjectPtr<UTexture2D> ClueActionTexture;
+	UPROPERTY() TObjectPtr<UTexture2D> ClueUncheckedTexture;
+	UPROPERTY() TObjectPtr<UTexture2D> ClueCheckedTexture;
+	UPROPERTY() TObjectPtr<UFont> ClueGardenFont;
+	bool bGardenPanelBuilt = false;
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UUserWidget>> CheckBoxes;

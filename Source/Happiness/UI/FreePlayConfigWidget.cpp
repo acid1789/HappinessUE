@@ -15,63 +15,26 @@
 
 #define LOCTEXT_NAMESPACE "FreePlayConfig"
 
-namespace
+void UFreePlayConfigWidget::NativePreConstruct()
 {
-	// In the dialog's canvas (1060 x 690): the top right corner, level with the title
-	constexpr float RandomButtonWidth = 200.f;
-	constexpr float RandomButtonHeight = 64.f;
-	constexpr float RandomButtonRightInset = 54.f;
-	constexpr float RandomButtonTop = 32.f;
+	Super::NativePreConstruct();
+	BuildGardenLayout();
+	RefreshSegments();
 }
 
 void UFreePlayConfigWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
-	MakeRandomButton();
+	BuildGardenLayout();
+	FitToMenuCanvas();
+	if (RandomButton) RandomButton->OnClicked.AddUniqueDynamic(this, &UFreePlayConfigWidget::HandleRandomClicked);
 }
 
-void UFreePlayConfigWidget::MakeRandomButton()
+void UFreePlayConfigWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
-	// Beside the Cancel button's own canvas: the dialog's
-	UButton* Cancel = Cast<UButton>(GetWidgetFromName(TEXT("Button_Cancel")));
-	UCanvasPanel* Dialog = Cast<UCanvasPanel>(GetWidgetFromName(TEXT("CanvasPanel_26")));
-	if (RandomButton || !Cancel || !Dialog)
-	{
-		return;
-	}
-
-	RandomButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("Button_Random"));
-	RandomButton->SetStyle(Cancel->GetStyle());
-	RandomButton->SetCursor(EMouseCursor::Hand);
-	UOverlay* Art = WidgetTree->ConstructWidget<UOverlay>();
-	RandomButton->SetContent(Art);
-
-	// Cancel's label. Not its rim (Button_CancelRim, a frame inset in the button): at this button's size it closed in
-	// on the text as a second box inside the button's outline.
-	UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("RandomLabel"));
-	Label->SetText(LOCTEXT("Random", "Random"));
-	Label->SetJustification(ETextJustify::Center);
-	if (const UTextBlock* CancelLabel = Cast<UTextBlock>(GetWidgetFromName(TEXT("TextBlock_2"))))
-	{
-		Label->SetFont(CancelLabel->GetFont());
-		Label->SetColorAndOpacity(CancelLabel->GetColorAndOpacity());
-	}
-	Label->SetVisibility(ESlateVisibility::HitTestInvisible);
-	if (UOverlaySlot* LabelSlot = Art->AddChildToOverlay(Label))
-	{
-		LabelSlot->SetHorizontalAlignment(HAlign_Center);
-		LabelSlot->SetVerticalAlignment(VAlign_Center);
-	}
-	if (UCanvasPanelSlot* ButtonSlot = Dialog->AddChildToCanvas(RandomButton))
-	{
-		ButtonSlot->SetAnchors(FAnchors(1.f, 0.f));
-		ButtonSlot->SetAlignment(FVector2D(1.f, 0.f));
-		ButtonSlot->SetPosition(FVector2D(-RandomButtonRightInset, RandomButtonTop));
-		ButtonSlot->SetSize(FVector2D(RandomButtonWidth, RandomButtonHeight));
-		// Above the heading art and title (Z 10)
-		ButtonSlot->SetZOrder(20);
-	}
-	RandomButton->OnClicked.AddUniqueDynamic(this, &UFreePlayConfigWidget::HandleRandomClicked);
+	FitToMenuCanvas();
+	Super::NativeTick(MyGeometry, InDeltaTime);
+	RefreshSegments();
 }
 
 void UFreePlayConfigWidget::HandleRandomClicked()
