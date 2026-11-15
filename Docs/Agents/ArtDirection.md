@@ -604,3 +604,34 @@ First inspect it in context, identify specific strengths and weaknesses, and ite
 The visual identity of **Happiness** should be recognizable because of its **quality, illustration style, color, warmth, clarity, and consistency** — not because it depends on a narrow theme.
 
 The game should feel like a pleasant place to spend time solving puzzles.
+
+
+## Free Play setup refresh (2026-11-14)
+
+Approved direction A: `output/imagegen/free-play-refresh-concept-a-2026-11-14.png`.
+Implemented by `UI/FreePlayConfigStyle.cpp` on the existing `UFreePlayConfigWidget` parent.
+Uses the existing `T_OptionsGarden`, `T_LessonNotebookButtons` and `LessonsSerif_Font`, plus
+`T_FreePlayField` and `T_FreePlaySelected`: tightly cropped cream/gold and blue/gold control
+surfaces from `output/imagegen/free-play-control-surfaces-v1.png`, imported as UI textures
+with no mipmaps and MaxTextureSize 512, drawn as nine-slice boxes. These are constructor-held
+texture references, so they are visible to the cooker.
+The Blueprint setup/save/unlock behavior remains on its original widgets. The size and
+difficulty segments invoke those selectors rather than duplicating their state or gameplay logic.
+The original clue selector and popup remain; its main trigger receives matching type and color.
+Native action symbols reuse `UPauseMenuGlyph` (10 is the new die for Random).
+Review renders: `output/imagegen/free-play-concept-a-implemented.png` (1920x1080) and
+`output/imagegen/free-play-concept-a-tablet.png` (1600x1200). Source prompts sit beside the art.
+
+Runtime host correction: GameSelect auto-sized its Free Play slot from desired size; the new
+stretch-based root has zero desired size. `FitToMenuCanvas` switches that host to full anchors,
+zero offsets/alignment and no auto-size, including after Show configures the slot. Rebuilt and
+tested in PIE with the deliberately auto-sized legacy host: 1605x720 UI units in a 2412x1082
+viewport, autoSize=0 and anchors 0,0..1,1. Actual game capture:
+`output/imagegen/free-play-runtime-fixed00000.png`. The earlier isolated renders did not test hosting.
+
+Clue Types popup now uses UI/ClueSelectStyle.cpp: the same 1280x850 garden frame and
+serif typography as Free Play, three aligned columns of full-row toggles, and framed Select All /
+Clear All / Done actions. Checkbox art is exactly Options: T_OptionsUnchecked and T_OptionsChecked,
+46px square. WBP_CheckBox keeps its original Button_53, CheckBox, CheckMark and label so its Check
+function and click delegates still control the selection. No new assets. PIE capture:
+output/imagegen/free-play-clue-types-garden.png.
