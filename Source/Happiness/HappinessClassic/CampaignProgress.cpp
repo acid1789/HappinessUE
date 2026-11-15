@@ -526,6 +526,8 @@ FLessonPuzzleResult UCampaignSubsystem::FinishLessonPuzzle(UPuzzle* Puzzle)
 	FLessonProgress& Progress = GetMutableProgress(Result.Lesson);
 	Result.bMaster = IsMasterStage(Result.Stage);
 	Result.PreviousPoints = Result.bMaster ? Progress.MasterPoints : Progress.Points;
+	// Before this puzzle's points can move the current stage on
+	Result.bReplay = Result.Stage != (Result.bMaster ? GetCurrentMasterStage(Result.Lesson) : GetCurrentStage(Result.Lesson));
 
 	// Scored once, when first solved. A board with mistakes earns nothing and the puzzle stays open, so the
 	// player can restart it and still earn its points.
@@ -591,14 +593,17 @@ void UCampaignSubsystem::PrepareNextLessonPuzzle(const UObject* WorldContextObje
 		return;
 	}
 
-	// Next puzzle always moves on through the lesson: the stage that currently earns points (the final once all
-	// points are earned), whether the last puzzle unlocked it or was a replay of an earlier stage. In Master Mode,
-	// its current stage. (Master Mode itself is only entered from the campaign tree, never by Next.)
+	// Next puzzle moves on through the lesson: the stage that currently earns points (the final once all points are
+	// earned), as the last puzzle may have unlocked it. In Master Mode, its current stage. (Master Mode itself is only
+	// entered from the campaign tree, never by Next.) After a replay of another stage (FLessonPuzzleResult::bReplay),
+	// that same stage again.
 	FCampaignSaveData& SaveData = Campaign->Data;
 	const ECampaignLesson Lesson = SaveData.SessionLesson;
 	const bool bToMaster = Campaign->IsMasterUnlocked(Lesson) && IsMasterStage(SaveData.SessionStage);
 	const int32 CurrentStage = bToMaster ? Campaign->GetCurrentMasterStage(Lesson) : Campaign->GetCurrentStage(Lesson);
-	if (SaveData.bInSession && SaveData.SessionStage != CurrentStage)
+	const FLessonPuzzleResult& Last = Campaign->LastResult;
+	const bool bReplaying = Last.bReplay && Last.Lesson == Lesson && Last.Stage == SaveData.SessionStage;
+	if (SaveData.bInSession && !bReplaying && SaveData.SessionStage != CurrentStage)
 	{
 		SaveData.SessionStage = CurrentStage;
 		SaveData.bPuzzleOpen = false;

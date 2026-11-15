@@ -345,8 +345,9 @@ void ULessonEndScreenWidget::Show(UPuzzle* Puzzle, float PuzzleSeconds)
 
 	Result = Campaign->FinishLessonPuzzle(Puzzle);
 
-	// The stage Next Puzzle plays: the one that currently earns points (see UCampaignSubsystem::PrepareNextLessonPuzzle)
-	NextStage = Campaign->GetCurrentStage(Result.Lesson);
+	// The stage Next Puzzle plays: the one that currently earns points, or after a replay the same stage again (see
+	// UCampaignSubsystem::PrepareNextLessonPuzzle)
+	NextStage = Result.bReplay ? Result.Stage : Campaign->GetCurrentStage(Result.Lesson);
 
 	LessonText->SetText(FText::Format(LOCTEXT("LessonStageRows", "{0}\n{1}"),
 		UCampaignTree::GetLessonDisplayName(Result.Lesson), UCampaignSubsystem::GetStageDisplayName(Result.Stage)));

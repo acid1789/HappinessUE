@@ -263,10 +263,11 @@ void UCampaignEndScreenWidget::Show(UPuzzle* Puzzle, float PuzzleSeconds)
 	ExpToAdd = float(TotalExp);
 	ExpRate = ExpFillTime > 0.f ? ExpToAdd / ExpFillTime : ExpToAdd;
 
-	// The stage Next Puzzle plays (see UCampaignSubsystem::PrepareNextLessonPuzzle)
+	// The stage Next Puzzle plays (see UCampaignSubsystem::PrepareNextLessonPuzzle): after a replay, the same stage
 	// (Master Mode's current stage after a Master Mode puzzle; the final never leads into Master Mode)
 	const bool bNextMaster = Campaign->IsMasterUnlocked(Result.Lesson) && Result.bMaster;
-	NextStage = bNextMaster ? Campaign->GetCurrentMasterStage(Result.Lesson) : Campaign->GetCurrentStage(Result.Lesson);
+	NextStage = Result.bReplay ? Result.Stage
+		: bNextMaster ? Campaign->GetCurrentMasterStage(Result.Lesson) : Campaign->GetCurrentStage(Result.Lesson);
 
 	// The bar: the clue's campaign track, or Master Mode's for a Master Mode puzzle
 	if (StageLabel)

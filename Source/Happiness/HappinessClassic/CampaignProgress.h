@@ -84,6 +84,11 @@ struct FLessonPuzzleResult
 	UPROPERTY(BlueprintReadOnly, Category = "Campaign")
 	int32 Score = 0;
 
+	/** A replay: not the stage that was earning points (an earlier stage, or in Master Mode not its current stage).
+	 *  Next Puzzle then plays the same stage again (PrepareNextLessonPuzzle). */
+	UPROPERTY(BlueprintReadOnly, Category = "Campaign")
+	bool bReplay = false;
+
 	/** Points added to the lesson; 0 when replaying an earlier stage or the final */
 	UPROPERTY(BlueprintReadOnly, Category = "Campaign")
 	int32 PointsEarned = 0;
