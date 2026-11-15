@@ -75,7 +75,9 @@ void UPuzzleFailedWidget::BuildLayout()
 
 	UHorizontalBox* Row = WidgetTree->ConstructWidget<UHorizontalBox>();
 	Banner->SetContent(Row);
-	UndoButton = MakeButton(LOCTEXT("Undo", "Undo"), false);
+	UTextBlock* Caption = nullptr;
+	UndoButton = MakeButton(LOCTEXT("Undo", "Undo"), false, &Caption);
+	UndoCaption = Caption;
 	RestartButton = MakeButton(LOCTEXT("Restart", "Restart"), true);
 
 	USizeBox* UndoSize = WidgetTree->ConstructWidget<USizeBox>();
@@ -85,6 +87,7 @@ void UPuzzleFailedWidget::BuildLayout()
 	Row->AddChildToHorizontalBox(UndoSize)->SetVerticalAlignment(VAlign_Center);
 
 	UTextBlock* Message = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Message"));
+	MessageText = Message;
 	Message->SetText(LOCTEXT("Message", "Some Icons Are Wrong"));
 	Message->SetFont(FSlateFontInfo(GardenFont, 25));
 	Message->SetColorAndOpacity(PuzzleFailedInk);
@@ -105,7 +108,7 @@ void UPuzzleFailedWidget::BuildLayout()
 	RestartButton->OnClicked.AddUniqueDynamic(this, &UPuzzleFailedWidget::HandleRestart);
 }
 
-UButton* UPuzzleFailedWidget::MakeButton(const FText& Label, bool bRestart)
+UButton* UPuzzleFailedWidget::MakeButton(const FText& Label, bool bRestart, UTextBlock** OutCaption)
 {
 	UButton* Button = WidgetTree->ConstructWidget<UButton>();
 	FSlateBrush Face;
@@ -143,6 +146,10 @@ UButton* UPuzzleFailedWidget::MakeButton(const FText& Label, bool bRestart)
 	Content->AddChildToHorizontalBox(GlyphSizeBox)->SetVerticalAlignment(VAlign_Center);
 	UTextBlock* Caption = WidgetTree->ConstructWidget<UTextBlock>();
 	Caption->SetText(Label);
+	if (OutCaption)
+	{
+		*OutCaption = Caption;
+	}
 	Caption->SetFont(FSlateFontInfo(GardenFont, 20));
 	Caption->SetColorAndOpacity(PuzzleFailedInk);
 	Caption->SetShadowOffset(FVector2D::ZeroVector);
@@ -157,7 +164,58 @@ UButton* UPuzzleFailedWidget::MakeButton(const FText& Label, bool bRestart)
 
 void UPuzzleFailedWidget::Show()
 {
+	SetImpossible(false);
 	SetVisibility(ESlateVisibility::Visible);
+}
+
+void UPuzzleFailedWidget::ShowImpossible()
+{
+	SetImpossible(true);
+	SetVisibility(ESlateVisibility::Visible);
+}
+
+void UPuzzleFailedWidget::SetImpossible(bool bInImpossible)
+{
+	bImpossible = bInImpossible;
+	if (MessageText)
+	{
+		MessageText->SetText(bImpossible ? LOCTEXT("Impossible", "Impossible Puzzle State") : LOCTEXT("Message", "Some Icons Are Wrong"));
+	}
+	if (UndoCaption)
+	{
+		UndoCaption->SetText(bImpossible ? LOCTEXT("Fix", "Fix") : LOCTEXT("Undo", "Undo"));
+	}
+}
+
+void UPuzzleFailedWidget::RunFix()
+{
+	// The puzzle screen this banner is on
+	UUserWidget* Screen = GetTypedOuter<UUserWidget>();
+	while (Screen && !Screen->FindFunction(TEXT("ConfirmConfirm")))
+	{
+		Screen = Screen->GetTypedOuter<UUserWidget>();
+	}
+	UFunction* Confirm = Screen ? Screen->FindFunction(TEXT("ConfirmConfirm")) : nullptr;
+	const FProperty* Type = Screen ? Screen->GetClass()->FindPropertyByName(TEXT("ConfirmType")) : nullptr;
+	if (!Confirm || !Type)
+	{
+		return;
+	}
+	void* Value = Type->ContainerPtrToValuePtr<void>(Screen);
+	const int64 Fix = static_cast<int64>(EHappinessConfirmType::FixPuzzle);
+	if (const FEnumProperty* EnumType = CastField<FEnumProperty>(Type))
+	{
+		EnumType->GetUnderlyingProperty()->SetIntPropertyValue(Value, Fix);
+	}
+	else if (const FByteProperty* ByteType = CastField<FByteProperty>(Type))
+	{
+		ByteType->SetIntPropertyValue(Value, Fix);
+	}
+	else
+	{
+		return;
+	}
+	Screen->ProcessEvent(Confirm, nullptr);
 }
 
 void UPuzzleFailedWidget::Hide()
@@ -169,6 +227,11 @@ void UPuzzleFailedWidget::HandleUndo()
 {
 	UGameplayStatics::PlaySound2D(this, ClickSound);
 	Hide();
+	if (bImpossible)
+	{
+		RunFix();
+		return;
+	}
 	OnUndo.Broadcast();
 }
 
