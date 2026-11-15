@@ -261,6 +261,10 @@ LessonLockArt image in WBP_CampaignTree preserves the texture reference for cook
 T_LessonNotebookButtons supply the blank surfaces; all labels, progress, stage states and actions stay live.
 The right page scrolls long descriptions. Once a clue's Master Mode is shown (after its reveal animation), the
 Master stage row replaces the Campaign stage row, like the bar and text above it; the popup keeps its size.
+From then on a Normal / Master switch sits on the left page under the diagram (`ViewSwitchButton`, made in `BuildNotebookLayout`):
+one button labelled with the track it switches to ("Normal" on Master, "Master" on Normal). Normal shows the Campaign track again (bar, text, stage buttons) for replays, Master
+shows Master Mode (`bNormalView`, which `IsShowingMaster` follows). Opening a clue from the tree (`ShowLesson`)
+starts on Master; coming back after a puzzle (`ShowLessonAfterPuzzle`) keeps the choice.
 Campaign's seven stage buttons are narrower than Lessons' five: their labels go on two lines and shrink to fit. The shared ULessonClueDiagram captures
 its lesson when its Slate widget is constructed: recreate it when changing the notebook to another clue.
 Learn More broadcasts `OnLearnMoreRequested(ECampaignLesson)`. `UCampaignTreeWidget::HandleLearnMore` opens

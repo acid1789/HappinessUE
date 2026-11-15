@@ -382,7 +382,7 @@ void ULessonPopupWidget::BuildNotebookLayout()
 	Place(TitleText, FVector2D(170,100), FVector2D(500,125));
 	NotebookDiagram = WidgetTree->ConstructWidget<ULessonClueDiagram>();
 	NotebookDiagram->SetVisibility(ESlateVisibility::HitTestInvisible);
-	Place(NotebookDiagram, FVector2D(225,260), FVector2D(390,215));
+	Place(NotebookDiagram, FVector2D(225,230), FVector2D(390,215));
 	UScrollBox* Explanation = WidgetTree->ConstructWidget<UScrollBox>();
 	Explanation->SetScrollBarVisibility(ESlateVisibility::Visible);
 	Explanation->SetScrollbarThickness(FVector2D(6,6));
@@ -456,6 +456,25 @@ void ULessonPopupWidget::BuildNotebookLayout()
 		AddActionContent(CloseButton, CloseLabel, 2, false);
 		Place(CloseButton, FVector2D(375,830), FVector2D(350,88));
 	}
+	// The Normal / Master switch, on the left page under the diagram (centred on it) and level with Learn More: one
+	// button, labelled with the track it switches to (Refresh). It may overlap the diagram's box a little.
+	ViewSwitchButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("ViewSwitchButton"));
+	ViewSwitchLabel = WidgetTree->ConstructWidget<UTextBlock>();
+	ViewSwitchButton->SetStyle(NotebookButtonStyle(false));
+	ViewSwitchButton->SetBackgroundColor(FLinearColor::White);
+	ViewSwitchButton->SetCursor(EMouseCursor::Hand);
+	ViewSwitchLabel->SetFont(FSlateFontInfo(NotebookFont, 30));
+	ViewSwitchLabel->SetColorAndOpacity(NotebookInk);
+	ViewSwitchLabel->SetJustification(ETextJustify::Center);
+	ViewSwitchLabel->SetText(LOCTEXT("NormalView", "Normal"));
+	if (UButtonSlot* SwitchSlot = Cast<UButtonSlot>(ViewSwitchButton->AddChild(ViewSwitchLabel)))
+	{
+		SwitchSlot->SetHorizontalAlignment(HAlign_Center);
+		SwitchSlot->SetVerticalAlignment(VAlign_Center);
+	}
+	ViewSwitchButton->OnClicked.AddUniqueDynamic(this, &ULessonPopupWidget::HandleViewSwitchClicked);
+	Place(ViewSwitchButton, FVector2D(295, 425), FVector2D(250, 80), 2);
+
 	PlayTimeText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("PlayTimeText"));
 	PlayTimeText->SetFont(FSlateFontInfo(NotebookFont, 26));
 	PlayTimeText->SetColorAndOpacity(NotebookInk);
@@ -682,7 +701,7 @@ bool ULessonPopupWidget::IsShowingMaster() const
 {
 	// Not while the reveal animation runs: until it ends the popup shows the completed campaign
 	const UCampaignSubsystem* Campaign = GetCampaign();
-	return bRevealMasterControls || bPreviewMasterCompletion || ((bPreviewMasterTransition || (Campaign && Campaign->IsMasterRevealed(Lesson))) && RevealPhase == ERevealPhase::None);
+	return bRevealMasterControls || bPreviewMasterCompletion || ((bPreviewMasterTransition || (Campaign && Campaign->IsMasterRevealed(Lesson) && !bNormalView)) && RevealPhase == ERevealPhase::None);
 }
 
 FText ULessonPopupWidget::GetMasterProgressText() const
@@ -713,6 +732,7 @@ void ULessonPopupWidget::ShowLesson(ECampaignLesson InLesson)
 	}
 	RevealPhase = bReveal ? ERevealPhase::Drain : ERevealPhase::None;
 	RevealElapsed = 0.f;
+	bNormalView = false;
 	HideEraser();
 	ShowLessonAfterPuzzle(InLesson);
 }
@@ -992,6 +1012,18 @@ void ULessonPopupWidget::Refresh()
 	{
 		StageBox->SetVisibility(bMaster && MasterBox ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
 	}
+	// The Normal / Master switch: once the clue's Master Mode is shown (not during its reveal or the previews)
+	const bool bCanSwitch = Campaign && Campaign->IsMasterRevealed(Lesson) && RevealPhase == ERevealPhase::None
+		&& !bRevealMasterControls && !bPreviewMasterCompletion && !bPreviewMasterTransition;
+	if (ViewSwitchButton)
+	{
+		ViewSwitchButton->SetVisibility(bCanSwitch ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	}
+	if (ViewSwitchLabel)
+	{
+		ViewSwitchLabel->SetText(bMaster ? LOCTEXT("NormalView", "Normal") : LOCTEXT("MasterView", "Master"));
+	}
+
 	const int32 FirstMaster = UCampaignSubsystem::GetFirstMasterStage();
 	for (int32 i = 0; i < MasterButtons.Num(); i++)
 	{
@@ -1040,6 +1072,13 @@ void ULessonPopupWidget::HandlePlayClicked()
 	{
 		ChooseStage(IsShowingMaster() ? Campaign->GetCurrentMasterStage(Lesson) : Campaign->GetCurrentStage(Lesson));
 	}
+}
+
+void ULessonPopupWidget::HandleViewSwitchClicked()
+{
+	bNormalView = !bNormalView;
+	UGameplayStatics::PlaySound2D(this, LoadObject<USoundBase>(nullptr, TEXT("/Game/General/Audio/Cues/MenuAccept.MenuAccept")));
+	Refresh();
 }
 
 void ULessonPopupWidget::HandleCloseClicked()

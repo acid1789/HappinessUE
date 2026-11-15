@@ -247,6 +247,16 @@ private:
 	UFUNCTION()
 	void HandleProgressChanged();
 
+	/** The Normal / Master switch (left page, under the diagram, once the clue's Master Mode is shown): toggles which track the popup shows */
+	UFUNCTION()
+	void HandleViewSwitchClicked();
+	/** The switch, made in BuildNotebookLayout; its label names the track it switches to: "Normal" on Master, "Master" on Normal (Refresh) */
+	UPROPERTY(Transient) TObjectPtr<UButton> ViewSwitchButton;
+	UPROPERTY(Transient) TObjectPtr<UTextBlock> ViewSwitchLabel;
+	/** The player switched a Master Mode clue back to its normal (Campaign) stages. Back to Master when a clue is
+	 *  opened from the tree (ShowLesson); kept when the popup comes back after a puzzle (ShowLessonAfterPuzzle). */
+	bool bNormalView = false;
+
 	UCampaignSubsystem* GetCampaign() const;
 	void BuildStageButtons();
 	void BuildNotebookLayout();
@@ -256,7 +266,7 @@ private:
 	void AddActionContent(UButton* Button, UTextBlock* Label, int32 Symbol, bool bPrimary);
 	UButton* AddStageButton(UPanelWidget* Box, int32 Stage, const FText& Name, float Width, float Spacing);
 
-	/** Master Mode is open and revealed for the shown clue: the bar, text and Play button follow it */
+	/** Master Mode is open and revealed for the shown clue, and the switch is on Master: the bar, text and Play button follow it */
 	bool IsShowingMaster() const;
 
 	FText GetMasterProgressText() const;
