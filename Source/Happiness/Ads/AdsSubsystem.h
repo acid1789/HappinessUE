@@ -102,6 +102,8 @@ public:
 #endif
 
 private:
+	/** Shipping, or a dev build launched with -RealAds: the ad units from config, not Google's test units */
+	static bool UseRealAdUnits();
 	FString GetInterstitialAdUnitID() const;
 	FString GetBannerAdUnitID() const;
 	void StartAds();

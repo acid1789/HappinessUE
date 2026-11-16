@@ -37,8 +37,8 @@
 
 namespace
 {
-	const FLinearColor FreePlayInk(.17f, .085f, .035f);
-	const FLinearColor FreePlayIvory(1.f, .95f, .8f);
+	const FLinearColor ConfigInk(.17f, .085f, .035f);
+	const FLinearColor ConfigIvory(1.f, .95f, .8f);
 
 	FSlateBrush FreePlayImage(UTexture2D* Texture)
 	{
@@ -162,7 +162,7 @@ void UFreePlayConfigWidget::BuildGardenLayout()
 	UImage* Garden = WidgetTree->ConstructWidget<UImage>();
 	Garden->SetBrush(FreePlayImage(GardenTexture)); Garden->SetVisibility(ESlateVisibility::HitTestInvisible);
 	Place(Dialog, Garden, {}, {1280, 850}, 0);
-	auto Text = [&](const FText& Caption, int32 Points, FLinearColor Color = FreePlayInk)
+	auto Text = [&](const FText& Caption, int32 Points, FLinearColor Color = ConfigInk)
 	{
 		UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>();
 		Label->SetText(Caption); Label->SetFont(FSlateFontInfo(GardenFont, Points)); Label->SetColorAndOpacity(Color);
@@ -183,8 +183,8 @@ void UFreePlayConfigWidget::BuildGardenLayout()
 	FEditableTextBoxStyle NumberStyle = Number->GetWidgetStyle();
 	NumberStyle.BackgroundImageNormal = NumberStyle.BackgroundImageHovered = NumberStyle.BackgroundImageFocused = FreePlayField(FieldTexture);
 	NumberStyle.TextStyle.SetFont(FSlateFontInfo(GardenFont, 34));
-	NumberStyle.ForegroundColor = FreePlayInk; NumberStyle.FocusedForegroundColor = FreePlayInk;
-	NumberStyle.Padding = FMargin(18, 10); Number->SetWidgetStyle(NumberStyle); Number->SetForegroundColor(FreePlayInk);
+	NumberStyle.ForegroundColor = ConfigInk; NumberStyle.FocusedForegroundColor = ConfigInk;
+	NumberStyle.Padding = FMargin(18, 10); Number->SetWidgetStyle(NumberStyle); Number->SetForegroundColor(ConfigInk);
 	Number->SetJustification(ETextJustify::Center); Place(Dialog, Number, {450, 240}, {745, 80});
 
 	auto Action = [&](UButton* Button, const FText& Caption, int32 Symbol, bool Primary, FVector2D Position, FVector2D Extent, int32 Points)
@@ -199,11 +199,11 @@ void UFreePlayConfigWidget::BuildGardenLayout()
 		{
 			USizeBox* GlyphSize = WidgetTree->ConstructWidget<USizeBox>(); GlyphSize->SetWidthOverride(42); GlyphSize->SetHeightOverride(42);
 			UPauseMenuGlyph* Glyph = WidgetTree->ConstructWidget<UPauseMenuGlyph>(); Glyph->Symbol = Symbol;
-			Glyph->Color = Primary ? FreePlayIvory : FreePlayInk; GlyphSize->AddChild(Glyph);
+			Glyph->Color = Primary ? ConfigIvory : ConfigInk; GlyphSize->AddChild(Glyph);
 			UHorizontalBoxSlot* GlyphSlot = Content->AddChildToHorizontalBox(GlyphSize);
 			GlyphSlot->SetVerticalAlignment(VAlign_Center); GlyphSlot->SetPadding(FMargin(0, 0, 16, 0));
 		}
-		UHorizontalBoxSlot* LabelSlot = Content->AddChildToHorizontalBox(Text(Caption, Points, Primary ? FreePlayIvory : FreePlayInk));
+		UHorizontalBoxSlot* LabelSlot = Content->AddChildToHorizontalBox(Text(Caption, Points, Primary ? ConfigIvory : ConfigInk));
 		LabelSlot->SetVerticalAlignment(VAlign_Center);
 		UButtonSlot* ContentSlot = CastChecked<UButtonSlot>(Button->AddChild(Content));
 		ContentSlot->SetHorizontalAlignment(HAlign_Center); ContentSlot->SetVerticalAlignment(VAlign_Center);
@@ -247,9 +247,9 @@ void UFreePlayConfigWidget::BuildGardenLayout()
 	UButtonSlot* TriggerSlot = CastChecked<UButtonSlot>(Open->AddChild(Trigger));
 	TriggerSlot->SetHorizontalAlignment(HAlign_Fill); TriggerSlot->SetVerticalAlignment(VAlign_Fill);
 	Clues->SummaryText->SetFont(FSlateFontInfo(GardenFont, 30));
-	Clues->SummaryText->SetColorAndOpacity(FreePlayIvory); Clues->SummaryText->SetJustification(ETextJustify::Center);
+	Clues->SummaryText->SetColorAndOpacity(ConfigIvory); Clues->SummaryText->SetJustification(ETextJustify::Center);
 	Place(Trigger, Clues->SummaryText, {45, 11}, {620, 58}, 1);
-	Place(Trigger, Text(FText::FromString(TEXT("\u203a")), 40, FreePlayIvory), {674, 1}, {40, 65}, 2);
+	Place(Trigger, Text(FText::FromString(TEXT("\u203a")), 40, ConfigIvory), {674, 1}, {40, 65}, 2);
 	UCanvasPanelSlot* OpenSlot = CastChecked<UCanvasPanelSlot>(Open->Slot);
 	OpenSlot->SetAnchors(FAnchors(0, 0)); OpenSlot->SetAlignment({0, 0});
 	OpenSlot->SetPosition({450, 540}); OpenSlot->SetSize({745, 80});
@@ -270,7 +270,7 @@ void UFreePlayConfigWidget::RefreshSegments()
 	{
 		const bool bSelected = Index < 6 ? Index == SizeIndex : Index - 6 == DifficultyIndex;
 		SegmentButtons[Index]->SetStyle(FreePlayButton(FreePlayField(bSelected ? SelectedTexture : FieldTexture)));
-		SegmentLabels[Index]->SetColorAndOpacity(bSelected ? FreePlayIvory : FreePlayInk);
+		SegmentLabels[Index]->SetColorAndOpacity(bSelected ? ConfigIvory : ConfigInk);
 	}
 }
 

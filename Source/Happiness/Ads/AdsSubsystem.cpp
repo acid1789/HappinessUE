@@ -2,6 +2,8 @@
 
 #include "Containers/Ticker.h"
 #include "HAL/IConsoleManager.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
 #include "Engine/GameViewportClient.h"
@@ -146,25 +148,32 @@ void UAdsSubsystem::SetAdsRemoved(bool bRemoved)
 	}
 }
 
-FString UAdsSubsystem::GetInterstitialAdUnitID() const
+bool UAdsSubsystem::UseRealAdUnits()
 {
 #if UE_BUILD_SHIPPING
-	if (!InterstitialAdUnitID.IsEmpty())
+	return true;
+#else
+	// Dev builds: -RealAds on the command line tests the real ad units (e.g. a load error only they give); don't tap the ads
+	static const bool bRealAds = FParse::Param(FCommandLine::Get(), TEXT("RealAds"));
+	return bRealAds;
+#endif
+}
+
+FString UAdsSubsystem::GetInterstitialAdUnitID() const
+{
+	if (UseRealAdUnits() && !InterstitialAdUnitID.IsEmpty())
 	{
 		return InterstitialAdUnitID;
 	}
-#endif
 	return TestInterstitialAdUnitID;
 }
 
 FString UAdsSubsystem::GetBannerAdUnitID() const
 {
-#if UE_BUILD_SHIPPING
-	if (!BannerAdUnitID.IsEmpty())
+	if (UseRealAdUnits() && !BannerAdUnitID.IsEmpty())
 	{
 		return BannerAdUnitID;
 	}
-#endif
 	return TestBannerAdUnitID;
 }
 
@@ -224,9 +233,9 @@ void UAdsSubsystem::LoadInterstitial()
 			});
 #endif
 		}),
-		FOnInterstitialLoadFailedNative::CreateLambda([](EAdErrorCode, const FString& Message)
+		FOnInterstitialLoadFailedNative::CreateLambda([Unit = GetInterstitialAdUnitID()](EAdErrorCode Code, const FString& Message)
 		{
-			UE_LOG(LogHappinessAds, Warning, TEXT("Ads: interstitial failed to load: %s"), *Message);
+			UE_LOG(LogHappinessAds, Warning, TEXT("Ads: interstitial failed to load (%s, error %d): %s"), *Unit, (int32)Code, *Message);
 		}));
 #endif
 }
@@ -338,9 +347,9 @@ void UAdsSubsystem::LoadBanner()
 				}
 			});
 		}),
-		FOnBannerLoadFailedNative::CreateLambda([WeakThis](EAdErrorCode, const FString& Message)
+		FOnBannerLoadFailedNative::CreateLambda([WeakThis, Unit = GetBannerAdUnitID()](EAdErrorCode Code, const FString& Message)
 		{
-			UE_LOG(LogHappinessAds, Warning, TEXT("Ads: banner failed to load: %s"), *Message);
+			UE_LOG(LogHappinessAds, Warning, TEXT("Ads: banner failed to load (%s, error %d): %s"), *Unit, (int32)Code, *Message);
 			OnGameThread([WeakThis]()
 			{
 				if (WeakThis.IsValid())

@@ -388,6 +388,32 @@ This resolved the legacy 8ball package without raw filesystem edits to a uasset.
 
 - Streak Saver shop render: use `/Script/Happiness.StreakSaverPanel` with `previewStreakSaverState` 0 (normal), 1 (broken streak), 2 (pending payment), or 3 (store unavailable). The flag opens only the render instance and supplies sample text with no purchases or save changes.
 
+## Android release builds (Google Play)
+
+Raise `StoreVersion` in `Config/DefaultEngine.ini` first (Play needs a higher version code each upload). Then, with the
+editor closed:
+
+```bash
+env -u NoDefaultCurrentDirectoryInExePath "/e/UE4/UE_5.8/Engine/Build/BatchFiles/RunUAT.bat" BuildCookRun \
+  -project=E:/HappinessUE/Happiness.uproject -platform=Android -cookflavor=ASTC -clientconfig=Shipping -distribution \
+  -build -nocompileeditor -cook -stage -pak -package -archive -archivedirectory=E:/HappinessUE/Saved/PlayRelease \
+  -utf8output -nop4 -unattended > Saved/PlayRelease.log 2>&1
+```
+
+The bundle is `Saved/PlayRelease/Android_ASTC/Happiness-Android-Shipping.aab`; copy it to `Saved/PlayRelease/Happiness-v<N>.aab`.
+- Run UAT from `E:/UE4/UE_5.8`, not through the checkout's `Engine` symlink: through the symlink it also sees the
+  engine's targets and stops with "multiple Game targets ... no DefaultGameTarget".
+- Unset `NoDefaultCurrentDirectoryInExePath` (as for `Tools/ios_package.sh`): with it set, the last Gradle step
+  fails with `'gradlew.bat' is not recognized` after the bundle is already signed.
+- The Android compile groups files into different unity units than the editor build, so a file-local name clash
+  can show up only here (see the unity build note in AGENTS.md).
+- **Rebuild the editor (`Tools/puzzle.sh --build`) after every pull, before a release build.** The cook runs in the
+  editor DLL (`-nocompileeditor`) but the game binary is compiled fresh. If a pull changed a class's UPROPERTYs and the
+  DLL is older, the cooked Blueprint defaults follow the old layout and the game aborts at startup in
+  `FExportArchive::HandleBadExportIndex` (iOS 0.51 and 0.53, Nov 2026). A full cook doesn't help. A Development build
+  writes the asset that failed to `Documents/Happiness/Saved/Logs/Happiness.log`; copy it off with `xcrun devicectl
+  device copy from --domain-type appDataContainer --domain-identifier com.ronsgames.happiness`.
+
 ## iOS builds (Mac mini remote build)
 
 `bash Tools/ios_package.sh [Development|Shipping]` builds, cooks and packages `Saved/IOSPackage/Happiness.ipa`. The PC
@@ -396,6 +422,12 @@ compiles and signs through Unreal's remote build. Settings: `Config/DefaultEngin
 To install on the iPad (plugged into the Mac): `scp` the .ipa to the Mac, then
 `xcrun devicectl device install app --device 00008110-0009504A2650401E <ipa>` and
 `xcrun devicectl device process launch --device 00008110-0009504A2650401E com.ronsgames.happiness`.
+
+Shipping builds strip the executable's symbol table between the build and the packaging step (`strip_stub` in the
+script; `IOS_STRIP=1` does it for Development too, `IOS_STRIP=0` turns it off). Unreal's own iOS strip keeps every
+global symbol, about 95 MB of names (239 MB executable, 144 MB stripped). The script keeps the undefined symbols and the
+exported `operator new`/`delete`, and fails the build if the export table changes. Shipping builds print no log, so
+crash reports from them have no function names either way.
 
 What it needs, each learned the hard way:
 - UE 5.8.4 or later: 5.8.3's ".app finalize" step fails on macOS 27 ("Touch UBT generated tiles", no error text; UE-396802).
