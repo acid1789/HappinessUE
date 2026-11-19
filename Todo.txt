@@ -1,4 +1,4 @@
-Discord: https://discord.gg/nfYQT3ar
+Discord: https://discord.gg/kcAN3UjTwX
 Android Alpha Link: https://play.google.com/store/apps/details?id=com.ronsgames.happiness
 
 
@@ -20,6 +20,11 @@ IPad: 2256 x 1488
 --- Design Tasks ---
 
 --- Claude tasks ---
+Puzzle Wrong - Fix Puzzle instead of Undo
+Did fix do anything?
+Glossary
+Package Size
+Hint stays after leaving a Free Play puzzle: start a new one and the old hint panel and top clue are still shown (icons not on the new board), and Hint won't replace them until the game restarts (seen in PIE, Nov 18)
 
 --- Codex Tasks ---
 
@@ -61,3 +66,11 @@ Icon Sets (non-consumable):
 
 
 --- Category Ideas ---
+
+
+--- App Store Shots ---
+Main Menu - Tripple Digit Level, all Masters unlocked, ads removed
+Game Basics Lesson - Nothing completed
+Free Play
+Gameplay - Free Play, All Clues, 6x6 puzzle
+Icon Sets - Vehicles - Tools at the top

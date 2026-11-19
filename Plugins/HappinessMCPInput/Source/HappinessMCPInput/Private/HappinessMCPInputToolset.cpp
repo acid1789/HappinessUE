@@ -1,6 +1,7 @@
 #include "HappinessMCPInputToolset.h"
 
 #include "Editor.h"
+#include "Engine/GameViewportClient.h"
 #include "Engine/LocalPlayer.h"
 #include "Framework/Application/SlateApplication.h"
 #include "GameFramework/PlayerController.h"
@@ -21,22 +22,23 @@ namespace
 			return nullptr;
 		}
 
+		TSharedPtr<SViewport> ViewportWidget;
 		FLevelEditorModule* LevelEditor = FModuleManager::GetModulePtr<FLevelEditorModule>(TEXT("LevelEditor"));
-		if (!LevelEditor)
-		{
-			return nullptr;
-		}
-
-		TSharedPtr<ILevelEditor> LevelEditorInstance = LevelEditor->GetFirstLevelEditor();
+		TSharedPtr<ILevelEditor> LevelEditorInstance = LevelEditor ? LevelEditor->GetFirstLevelEditor() : nullptr;
 		TSharedPtr<SLevelViewport> LevelViewport = LevelEditorInstance.IsValid()
 			? LevelEditorInstance->GetActiveViewportInterface()
 			: nullptr;
-		if (!LevelViewport.IsValid() || !LevelViewport->HasPlayInEditorViewport())
+		if (LevelViewport.IsValid() && LevelViewport->HasPlayInEditorViewport())
 		{
-			return nullptr;
+			ViewportWidget = LevelViewport->GetViewportWidget().Pin();
 		}
-
-		TSharedPtr<SViewport> ViewportWidget = LevelViewport->GetViewportWidget().Pin();
+		// PIE in its own window (PlayMode_InEditorFloating): the play world's game viewport
+		UWorld* PlayWorld = GEditor ? GEditor->PlayWorld.Get() : nullptr;
+		UGameViewportClient* GameViewport = PlayWorld ? PlayWorld->GetGameViewport() : nullptr;
+		if (!ViewportWidget.IsValid() && GameViewport)
+		{
+			ViewportWidget = GameViewport->GetGameViewportWidget();
+		}
 		if (!ViewportWidget.IsValid())
 		{
 			return nullptr;
@@ -109,6 +111,19 @@ bool UHappinessMCPInputToolset::TapViewport(float X, float Y)
 	SlateApplication.ProcessTouchEndedEvent(FPointerEvent(
 		0, 0, ScreenPosition, ScreenPosition, 0.f, true));
 	return true;
+}
+
+bool UHappinessMCPInputToolset::ScrollViewport(float X, float Y, float Delta)
+{
+	FVector2D ScreenPosition;
+	TSharedPtr<SWindow> Window = FindPIEViewportPoint(X, Y, ScreenPosition);
+	if (!Window.IsValid())
+	{
+		return false;
+	}
+	FPointerEvent WheelEvent(0, ScreenPosition, ScreenPosition, TSet<FKey>(), EKeys::MouseWheelAxis, Delta,
+		FSlateApplication::Get().GetModifierKeys());
+	return FSlateApplication::Get().ProcessMouseWheelOrGestureEvent(WheelEvent, nullptr);
 }
 
 bool UHappinessMCPInputToolset::ExecPIECommand(const FString& Command)

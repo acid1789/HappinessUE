@@ -18,6 +18,11 @@ public:
 	UFUNCTION(meta = (AICallable), Category = "HappinessMCPInput")
 	static bool TapViewport(float X, float Y);
 
+	/** Turns the mouse wheel at normalized coordinates in the active Play-In-Editor viewport, scrolling what is there
+	 *  (a scroll box: negative Delta scrolls down). One notch is 1. */
+	UFUNCTION(meta = (AICallable), Category = "HappinessMCPInput")
+	static bool ScrollViewport(float X, float Y, float Delta);
+
 	/** Runs a console command in the Play-In-Editor world (the game's dev commands, e.g. Happiness.SolvePuzzle). False if PIE isn't running or the command wasn't handled. */
 	UFUNCTION(meta = (AICallable), Category = "HappinessMCPInput")
 	static bool ExecPIECommand(const FString& Command);

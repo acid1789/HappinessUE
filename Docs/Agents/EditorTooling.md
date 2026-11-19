@@ -296,6 +296,7 @@ python Tools/mcp_call.py $A StopPIE '{}'
   short effects in the logs, or ask the user to look.
 - **`ClickViewport`** uses coordinates normalized to the PIE viewport (0 to 1). To aim from a capture, subtract the
   viewport's top-left corner in the capture and divide by the viewport's size there.
+- **Store screenshots at an exact size:** set `NewWindowWidth`/`NewWindowHeight`/`NewWindowPosition` on `/Script/UnrealEd.Default__LevelEditorPlaySettings` (ObjectTools.set_properties), start PIE with `PlayMode_InEditorFloating`, run `Happiness.HideVersionLabel 1`, and take `shot showui`. The PNG is the whole window: crop the side borders and title bar to the requested size. The input tools find a floating PIE window too, and `ScrollViewport` (x, y, delta; negative scrolls down) turns the mouse wheel there, for scroll boxes such as the icon sets list. `Happiness.IconSets.SimulateStore 1` shows the Purchase sets as unbought (reopen the screen).
 - **`ClickViewport` can miss buttons.** Its mouse up lands a frame after the down, by when the real cursor's position
   has taken the button's hover away, and a mouse click only counts while hovered: a button gets both events (the
   Slate debugger shows them) and does nothing. `TapViewport` sends touch events, which don't need hover, so its taps

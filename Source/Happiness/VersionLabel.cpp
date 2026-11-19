@@ -3,6 +3,7 @@
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
 #include "Engine/GameViewportClient.h"
+#include "HAL/IConsoleManager.h"
 #include "Misc/App.h"
 #include "Misc/ConfigCacheIni.h"
 #include "Styling/CoreStyle.h"
@@ -26,6 +27,11 @@ namespace
 			: LexToString(Config);
 		return FString::Printf(TEXT("v%d %s"), StoreVersion, ConfigName);
 	}
+
+	// Hidden for store screenshots taken in the editor (Happiness.HideVersionLabel 1). Read every frame.
+	TAutoConsoleVariable<int32> CVarHideVersionLabel(
+		TEXT("Happiness.HideVersionLabel"), 0,
+		TEXT("1 hides the build label in the top-left corner, e.g. for store screenshots taken in the editor."));
 }
 
 void UVersionLabelSubsystem::Initialize(FSubsystemCollectionBase& Collection)
@@ -58,7 +64,7 @@ void UVersionLabelSubsystem::AddToViewport()
 	{
 		FSlateFontInfo Font = FCoreStyle::GetDefaultFontStyle("Regular", 7);
 		Label = SNew(SSafeZone)
-			.Visibility(EVisibility::HitTestInvisible)
+			.Visibility_Lambda([]() { return CVarHideVersionLabel.GetValueOnGameThread() ? EVisibility::Collapsed : EVisibility::HitTestInvisible; })
 			.HAlign(HAlign_Left)
 			.VAlign(VAlign_Top)
 			.Padding(FMargin(4.f, 2.f))
