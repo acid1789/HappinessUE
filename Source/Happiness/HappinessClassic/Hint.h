@@ -42,8 +42,14 @@ public:
 
 	/** A mistake's explanation, made with the board as it would be without the mistakes */
 	FClueHelp ErrorExplanation;
+	/** Just the reason in it: why the mistake is wrong, from TheClue (empty when no clue shows it yet) */
+	FClueHelp ErrorReason;
 	/** The mistake's clue shows it straight from that board (else it's the clue that settles the cell later on) */
 	bool bErrorProvedByClue = false;
+	/** The mistake broke one of the puzzle's givens (its reason says so; TheClue is null, as givens have no widget) */
+	bool bErrorGiven = false;
+	/** Fix Puzzle's report (UPuzzle::FindFixMistake): the mistake took Icon off the cell, where it was rightly placed */
+	bool bErrorWasPlaced = false;
 
 
 	UHint() = default;

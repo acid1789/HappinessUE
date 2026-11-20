@@ -16,9 +16,10 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPuzzleFailedAction);
 /**
  * Shown instead of an end screen when the board is completed with mistakes (PuzzleFailed in WBP_Happiness).
  * A slim banner sits over the top edge of the grid so the marked icons stay visible. The clear root blocks board
- * input while the player chooses Undo or Restart.
+ * input while the player chooses Fix Puzzle (WBP_Happiness's Fix Puzzle, as confirmed from the pause menu) or Restart.
+ * On a Master Mode stage, which has no fixing, Fix Puzzle is Undo instead (OnUndo).
  * Also shown when a move leaves the board impossible (UPuzzle::IsImpossible, ShowImpossible): "Impossible Puzzle
- * State", with Fix (WBP_Happiness's Fix Puzzle, as confirmed from the pause menu) in Undo's place.
+ * State", always with Fix Puzzle.
  * Builds its own widgets (no Blueprint layout); either button hides it and fires its event.
  */
 UCLASS()
@@ -52,6 +53,8 @@ public:
 
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
+	/** In the designer and widget renders (no game running) it shows, as the mistakes banner */
+	virtual void NativePreConstruct() override;
 
 private:
 	void BuildLayout();
@@ -80,6 +83,9 @@ private:
 	TObjectPtr<UTextBlock> UndoCaption;
 
 	bool bImpossible = false;
+
+	/** The left button is Fix Puzzle (RunFix); else Undo (OnUndo) */
+	bool bFix = false;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UTexture2D> FrameTexture;

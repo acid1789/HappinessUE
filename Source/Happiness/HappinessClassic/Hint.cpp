@@ -808,6 +808,7 @@ void UHint::MakeError(bool bPlaced, bool bProvedByClue, const FClueHelp* GivenRe
 	// wrong placement why Icon can't be in this cell, for a wrongly ruled out icon why it goes here
 	bSetFinalIcon = !bPlaced;
 	const FClueHelp Reason = GivenReason ? *GivenReason : bProvedByClue ? GetExplanation() : FClueHelp();
+	ErrorReason = Reason;
 
 	FClueHelp Help;
 	Help.AddText(TEXT("That's a mistake: "));

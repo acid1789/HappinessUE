@@ -138,6 +138,10 @@ namespace
 	// hint must point at the mistake (UPuzzle::FindErrorHint)
 	bool bCheckMistakes = false;
 	int32 MistakeChecks = 0, MistakesFound = 0, MistakesProved = 0, UnplaceChecks = 0, UnplaceFails = 0;
+	// ... and a given broken (its icon ruled out of its cell, or another icon placed there): the hint must say it
+	// was given (UHint::bErrorGiven)
+	int32 GivenChecks = 0, GivenFound = 0;
+	FString GivenExamples;
 	FString MistakeFailures, MistakeExamples;
 	int32 NumMistakeExamples = 0;
 
@@ -224,6 +228,35 @@ namespace
 						MistakeFailures += FString::Printf(TEXT("  unplace r%dc%d icon=%d: row not restored\n"), Row, Col, Wrong);
 				}
 			}
+		}
+
+		for (const UClue* Given : P.m_GivenClues)
+		{
+			if (!Given || Given->m_Type != eClueType::Given)
+				continue;
+			const int GivenRow = Given->m_iRow, GivenCol = Given->m_iCol, GivenIcon = P.SolutionIcon(GivenRow, GivenCol);
+			for (int Kind = 0; Kind < 2; Kind++)
+			{
+				P.m_Rows = Board;
+				// Ruling out a placed icon unplaces it first, as the game does (not in a hypothetical move)
+				P.m_bHypothetical = Kind != 0;
+				if (Kind == 0)
+					P.PlayerEliminateIcon(GivenRow, GivenCol, GivenIcon, nullptr);
+				else
+					P.PlayerSetFinalIcon(GivenRow, GivenCol, (GivenIcon + 1) % P.m_iSize, nullptr);
+				P.m_bHypothetical = false;
+				GivenChecks++;
+				UHint* H = P.GenerateHint(P.m_Clues);
+				GivenFound += H && H->bErrorGiven ? 1 : 0;
+				if (GivenExamples.Len() < 3000)
+				{
+					GivenExamples += FString::Printf(TEXT("  given r%dc%d icon=%d %s -> %s r%dc%d icon=%d | %s\n"), GivenRow, GivenCol, GivenIcon,
+						Kind == 0 ? TEXT("ruledout") : TEXT("otherplaced"), !H ? TEXT("no hint") : !H->bError ? TEXT("not a mistake hint")
+						: H->bErrorGiven ? TEXT("GIVEN") : TEXT("not given"), H ? H->Row : -1, H ? H->Col : -1, H ? H->Icon : -1,
+						H ? *HelpString(H->GetExplanation()) : TEXT(""));
+				}
+			}
+			break;
 		}
 		P.m_Rows = Board;
 	}
@@ -804,6 +837,7 @@ int32 UPuzzleCommandlet::Main(const FString& Params)
 		Out += FString::Printf(TEXT("MISTAKES checks=%d found=%d proved=%d unplace=%d unplaceFails=%d\n"), MistakeChecks, MistakesFound,
 			MistakesProved, UnplaceChecks, UnplaceFails);
 		Out += MistakeFailures + MistakeExamples;
+		Out += FString::Printf(TEXT("GIVEN MISTAKES checks=%d saidGiven=%d\n"), GivenChecks, GivenFound) + GivenExamples;
 	}
 
 	if (bExplain)

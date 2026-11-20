@@ -1,6 +1,7 @@
 #include "UI/PuzzleFailedWidget.h"
 
 #include "UI/ConfirmDialogWidget.h"
+#include "HappinessClassic/CampaignProgress.h"
 #include "UI/LessonEndScreenWidget.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/Border.h"
@@ -22,6 +23,10 @@
 namespace
 {
 	const FLinearColor PuzzleFailedInk(.10f, .05f, .02f);
+	// Undo / Fix Puzzle and Restart, both the width "Fix Puzzle" needs clear of the button's end vines; the message
+	// between them fits "Impossible Puzzle State"
+	constexpr float ButtonWidth = 190.f;
+	constexpr float MessageWidth = 400.f;
 }
 
 UPuzzleFailedWidget::UPuzzleFailedWidget(const FObjectInitializer& ObjectInitializer)
@@ -47,6 +52,15 @@ TSharedRef<SWidget> UPuzzleFailedWidget::RebuildWidget()
 	return Super::RebuildWidget();
 }
 
+void UPuzzleFailedWidget::NativePreConstruct()
+{
+	Super::NativePreConstruct();
+	if (!GetGameInstance())
+	{
+		SetVisibility(ESlateVisibility::Visible);
+	}
+}
+
 void UPuzzleFailedWidget::BuildLayout()
 {
 	// The clear root blocks puzzle input. The banner alone covers the grid's upper border.
@@ -59,7 +73,7 @@ void UPuzzleFailedWidget::BuildLayout()
 	WidgetTree->RootWidget = Root;
 
 	USizeBox* BannerSize = WidgetTree->ConstructWidget<USizeBox>();
-	BannerSize->SetWidthOverride(748.f);
+	BannerSize->SetWidthOverride(2.f * ButtonWidth + MessageWidth + 34.f);	// 17 padding each side
 	BannerSize->SetHeightOverride(50.f);
 	Root->SetContent(BannerSize);
 
@@ -76,12 +90,12 @@ void UPuzzleFailedWidget::BuildLayout()
 	UHorizontalBox* Row = WidgetTree->ConstructWidget<UHorizontalBox>();
 	Banner->SetContent(Row);
 	UTextBlock* Caption = nullptr;
-	UndoButton = MakeButton(LOCTEXT("Undo", "Undo"), false, &Caption);
+	UndoButton = MakeButton(LOCTEXT("Fix", "Fix Puzzle"), false, &Caption);
 	UndoCaption = Caption;
 	RestartButton = MakeButton(LOCTEXT("Restart", "Restart"), true);
 
 	USizeBox* UndoSize = WidgetTree->ConstructWidget<USizeBox>();
-	UndoSize->SetWidthOverride(139.f);
+	UndoSize->SetWidthOverride(ButtonWidth);
 	UndoSize->SetHeightOverride(42.f);
 	UndoSize->SetContent(UndoButton);
 	Row->AddChildToHorizontalBox(UndoSize)->SetVerticalAlignment(VAlign_Center);
@@ -94,12 +108,12 @@ void UPuzzleFailedWidget::BuildLayout()
 	Message->SetJustification(ETextJustify::Center);
 	Message->SetShadowOffset(FVector2D::ZeroVector);
 	USizeBox* MessageSize = WidgetTree->ConstructWidget<USizeBox>();
-	MessageSize->SetWidthOverride(436.f);
+	MessageSize->SetWidthOverride(MessageWidth);
 	MessageSize->SetContent(Message);
 	Row->AddChildToHorizontalBox(MessageSize)->SetVerticalAlignment(VAlign_Center);
 
 	USizeBox* RestartSize = WidgetTree->ConstructWidget<USizeBox>();
-	RestartSize->SetWidthOverride(139.f);
+	RestartSize->SetWidthOverride(ButtonWidth);
 	RestartSize->SetHeightOverride(42.f);
 	RestartSize->SetContent(RestartButton);
 	Row->AddChildToHorizontalBox(RestartSize)->SetVerticalAlignment(VAlign_Center);
@@ -181,9 +195,11 @@ void UPuzzleFailedWidget::SetImpossible(bool bInImpossible)
 	{
 		MessageText->SetText(bImpossible ? LOCTEXT("Impossible", "Impossible Puzzle State") : LOCTEXT("Message", "Some Icons Are Wrong"));
 	}
+	// Fix Puzzle, except for mistakes on a Master Mode stage, which has no fixing (UPauseMenuWidget::Show): Undo
+	bFix = bImpossible || UCampaignSubsystem::AreAssistsAllowed(this);
 	if (UndoCaption)
 	{
-		UndoCaption->SetText(bImpossible ? LOCTEXT("Fix", "Fix") : LOCTEXT("Undo", "Undo"));
+		UndoCaption->SetText(bFix ? LOCTEXT("Fix", "Fix Puzzle") : LOCTEXT("Undo", "Undo"));
 	}
 }
 
@@ -227,7 +243,7 @@ void UPuzzleFailedWidget::HandleUndo()
 {
 	UGameplayStatics::PlaySound2D(this, ClickSound);
 	Hide();
-	if (bImpossible)
+	if (bFix)
 	{
 		RunFix();
 		return;

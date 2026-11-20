@@ -2,6 +2,8 @@
 #include "Components/PanelSlot.h"
 #include "Components/PanelWidget.h"
 #include "Kismet/GameplayStatics.h"
+#include "UI/PauseMenuWidget.h"
+#include "UI/FixReportWidget.h"
 #include "CampaignTree.h"
 #include "Clue.h"
 #include "PuzzleRow.h"
@@ -850,6 +852,43 @@ UHint* UPuzzle::FindErrorHint(const TArray<UClue*>& VisibleClues, UClue*& OutClu
 	FixPuzzle();
 	const TArray<FPuzzleRow> Corrected = m_Rows;
 
+	// A given broken comes first, as the givens settle it from the start: its cell's icon ruled out or another icon
+	// placed there, or a Not Here given's icon placed in its cell
+	for (const FMistake& Mistake : Mistakes)
+	{
+		for (const UClue* Given : m_GivenClues)
+		{
+			if (!Given || Given->m_iRow != Mistake.Row || Given->m_iCol != Mistake.Col)
+				continue;
+			const bool bGiven = Given->m_Type == eClueType::Given;
+			if (!bGiven && !(Given->m_Type == eClueType::NotHere && Mistake.bPlaced && Mistake.Icon == Given->m_iHorizontal1))
+				continue;
+			FClueHelp Reason;
+			if (bGiven)
+			{
+				Reason.AddIcon(Mistake.Row, SolutionIcon(Mistake.Row, Mistake.Col));
+				Reason.AddText(TEXT("was given in this cell at the start."));
+			}
+			else
+			{
+				Reason.AddText(TEXT("The puzzle gave at the start that"));
+				Reason.AddIcon(Mistake.Row, Mistake.Icon);
+				Reason.AddText(TEXT("isn't in this cell."));
+			}
+			// Not aimed at a clue: givens have no clue widget to show
+			m_Rows = Corrected;
+			UHint* Hint = NewObject<UHint>(this);
+			Hint->Row = Mistake.Row;
+			Hint->Col = Mistake.Col;
+			Hint->Icon = Mistake.Icon;
+			Hint->MakeError(Mistake.bPlaced, true, &Reason);
+			Hint->bErrorGiven = true;
+			m_Rows = Board;
+			OutClue = nullptr;
+			return Hint;
+		}
+	}
+
 	// The board (after a clue's analysis) shows the mistake for what it is: the placed icon ruled out of the cell, or
 	// the ruled out icon placed in it
 	auto Shows = [this](const FMistake& Mistake)
@@ -1349,7 +1388,138 @@ bool UPuzzle::IsBroken()
 	return false;
 }
 
+namespace
+{
+	/** The puzzle screen's (WBP_Happiness) pause menu */
+	UPauseMenuWidget* FixPauseMenu(const UObject* View)
+	{
+		const FObjectPropertyBase* Property = View ? FindFProperty<FObjectPropertyBase>(View->GetClass(), TEXT("PauseMenu")) : nullptr;
+		return Property ? Cast<UPauseMenuWidget>(Property->GetObjectPropertyValue_InContainer(View)) : nullptr;
+	}
+
+	/** The puzzle screen's RefreshPuzzle (a function without parameters), which shows the board as it is */
+	void FixRefreshView(UObject* View)
+	{
+		UFunction* Refresh = View ? View->FindFunction(TEXT("RefreshPuzzle")) : nullptr;
+		if (Refresh && Refresh->ParmsSize == 0)
+			View->ProcessEvent(Refresh, nullptr);
+	}
+}
+
 void UPuzzle::FixPuzzleWithUndo(UObject* Owner)
+{
+	if (IsFixing())
+		return;
+	StopCollateral();
+	m_FixUndone = 0;
+	m_FixLastRow = INDEX_NONE;
+	m_bFixWasBroken = IsBroken();
+	UUserWidget* View = Cast<UUserWidget>(Owner);
+	if (!View || FixStepDelay <= 0.f)
+	{
+		while (UndoForFix(Owner))
+			m_FixUndone++;
+		if (IsBroken())
+			FixPuzzle();
+		return;
+	}
+
+	// Confirmed over the pause menu: the puzzle resumes (WBP_Happiness's UnPause: the clock runs again and the menu
+	// goes, bringing back the board). The board takes no taps until the report is closed.
+	UPauseMenuWidget* Menu = FixPauseMenu(View);
+	UFunction* UnPause = View->FindFunction(TEXT("UnPause"));
+	if (Menu && Menu->IsVisible())
+	{
+		if (UnPause && UnPause->ParmsSize == 0)
+			View->ProcessEvent(UnPause, nullptr);
+		else
+			Menu->SetVisibility(ESlateVisibility::Collapsed);
+	}
+	m_FixView = View;
+	m_FixViewVisibility = View->GetVisibility();
+	View->SetVisibility(ESlateVisibility::HitTestInvisible);
+	m_NextFixTime = FPlatformTime::Seconds() + FixStepDelay;
+	m_FixTicker = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(this, [this](float DeltaTime)
+	{
+		return TickFix(DeltaTime);
+	}));
+}
+
+bool UPuzzle::TickFix(float DeltaTime)
+{
+	if (!m_FixView.IsValid())
+	{
+		m_FixTicker.Reset();
+		return false;
+	}
+	if (FPlatformTime::Seconds() < m_NextFixTime)
+		return true;
+
+	// One move undone, then a wait so it can be seen; once the board is right (after that wait), the end
+	if (UndoForFix(m_FixView.Get()))
+	{
+		m_FixUndone++;
+		m_NextFixTime = FPlatformTime::Seconds() + FixStepDelay;
+		if (USoundBase* Sound = FixUndoSound.LoadSynchronous())
+			UGameplayStatics::PlaySound2D(m_FixView.Get(), Sound);
+		FixRefreshView(m_FixView.Get());
+		return true;
+	}
+	m_FixTicker.Reset();
+	FinishFix();
+	return false;
+}
+
+UHint* UPuzzle::FindFixMistake()
+{
+	// The last move undone is the player's first mistake: the board had none before it. With that move put back on
+	// it, its mistakes are the only ones on the board, and the error hint explains one (a wrong placement first).
+	if (m_FixUndone == 0 || !m_Rows.IsValidIndex(m_FixLastRow) || IsBroken())
+		return nullptr;
+	const FPuzzleRow Before = m_Rows[m_FixLastRow];
+	m_Rows[m_FixLastRow] = m_FixLastAfter;
+	UClue* Clue = nullptr;
+	UHint* Mistake = FindErrorHint(TArray<UClue*>(), Clue);
+	m_Rows[m_FixLastRow] = Before;
+	// The move took a rightly placed icon off its cell (the row before it, Before, had it placed): the report says so
+	if (Mistake && Mistake->bSetFinalIcon && Mistake->Row == m_FixLastRow && Before.m_Cells.IsValidIndex(Mistake->Col)
+		&& Before.m_Cells[Mistake->Col].m_iFinalIcon == Mistake->Icon)
+		Mistake->bErrorWasPlaced = true;
+	return Mistake;
+}
+
+void UPuzzle::FinishFix()
+{
+	UUserWidget* View = m_FixView.Get();
+	m_FixView.Reset();
+	UHint* Mistake = FindFixMistake();
+	if (IsBroken())
+	{
+		FixPuzzle();
+		FixRefreshView(View);
+	}
+	if (!View)
+		return;
+
+	FText Message;
+	if (m_FixUndone > 0)
+		Message = FText::Format(NSLOCTEXT("Puzzle", "FixUndid", "Undid {0} {0}|plural(one=move,other=moves). Puzzle is in a good state again"), m_FixUndone);
+	else if (m_bFixWasBroken)
+		Message = NSLOCTEXT("Puzzle", "FixFixed", "Fixed the mistakes. Puzzle is in a good state again");
+	else
+		Message = NSLOCTEXT("Puzzle", "FixNothing", "No mistakes found. Puzzle is in a good state");
+
+	// The board takes taps again once the report is closed
+	const ESlateVisibility Visibility = m_FixViewVisibility;
+	TWeakObjectPtr<UUserWidget> WeakView = View;
+	UFixReportWidget::Open(View, Mistake, Message, [WeakView, Visibility]()
+	{
+		if (UUserWidget* Screen = WeakView.Get())
+			Screen->SetVisibility(Visibility);
+	});
+}
+
+bool UPuzzle::UndoForFix(UObject* Owner)
 {
 	// The undo list: an array of the Blueprint struct HappinessAction, whose members are named by the Blueprint
 	// (with suffixes): the row (Row) and the row as it was (an FPuzzleRow)
@@ -1367,25 +1537,27 @@ void UPuzzle::FixPuzzleWithUndo(UObject* Owner)
 				RowCopy = Struct;
 		}
 	}
-	if (RowIndex && RowCopy)
+	if (!RowIndex || !RowCopy || !IsBroken())
+		return false;
+	FScriptArrayHelper Actions(ActionList, ActionList->ContainerPtrToValuePtr<void>(Owner));
+	if (Actions.Num() == 0)
+		return false;
+
+	// As Undo does: the clues hidden after the last board move come back first
+	while (UndoClueHide(Actions.Num()))
 	{
-		FScriptArrayHelper Actions(ActionList, ActionList->ContainerPtrToValuePtr<void>(Owner));
-		while (IsBroken() && Actions.Num() > 0)
-		{
-			// As Undo does: the clues hidden after the last board move come back first
-			while (UndoClueHide(Actions.Num()))
-			{
-			}
-			const int32 Last = Actions.Num() - 1;
-			const uint8* Element = Actions.GetRawPtr(Last);
-			const int32 Row = RowIndex->GetPropertyValue_InContainer(Element);
-			if (m_Rows.IsValidIndex(Row))
-				m_Rows[Row] = *RowCopy->ContainerPtrToValuePtr<FPuzzleRow>(Element);
-			Actions.RemoveValues(Last, 1);
-		}
 	}
-	if (IsBroken())
-		FixPuzzle();
+	const int32 Last = Actions.Num() - 1;
+	const uint8* Element = Actions.GetRawPtr(Last);
+	const int32 Row = RowIndex->GetPropertyValue_InContainer(Element);
+	if (m_Rows.IsValidIndex(Row))
+	{
+		m_FixLastRow = Row;
+		m_FixLastAfter = m_Rows[Row];
+		m_Rows[Row] = *RowCopy->ContainerPtrToValuePtr<FPuzzleRow>(Element);
+	}
+	Actions.RemoveValues(Last, 1);
+	return true;
 }
 
 void UPuzzle::FixPuzzle()
@@ -1687,7 +1859,7 @@ TArray<FPuzzleRow> UPuzzle::GetShownRows()
 
 bool UPuzzle::IsCompletedShown()
 {
-	return !IsShowingCollateral() && IsCompleted();
+	return !IsFixing() && !IsShowingCollateral() && IsCompleted();
 }
 
 namespace
@@ -1893,6 +2065,11 @@ void UPuzzle::BeginDestroy()
 	{
 		FTSTicker::GetCoreTicker().RemoveTicker(m_CollateralTicker);
 		m_CollateralTicker.Reset();
+	}
+	if (m_FixTicker.IsValid())
+	{
+		FTSTicker::GetCoreTicker().RemoveTicker(m_FixTicker);
+		m_FixTicker.Reset();
 	}
 	Super::BeginDestroy();
 }

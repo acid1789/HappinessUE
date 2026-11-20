@@ -25,6 +25,7 @@ Did fix do anything?
 Glossary
 Package Size
 Hint stays after leaving a Free Play puzzle: start a new one and the old hint panel and top clue are still shown (icons not on the new board), and Hint won't replace them until the game restarts (seen in PIE, Nov 18)
+XCode 27
 
 --- Codex Tasks ---
 

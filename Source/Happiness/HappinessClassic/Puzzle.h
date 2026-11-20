@@ -4,6 +4,7 @@
 #include <UObject/Object.h>
 #include <Containers/Ticker.h>
 #include <Sound/SoundBase.h>
+#include <Components/SlateWrapperTypes.h>
 #include "Clue.h"
 #include "PuzzleRow.h"
 #include "Hint.h"
@@ -11,6 +12,7 @@
 
 class UPanelSlot;
 class UPanelWidget;
+class UUserWidget;
 class UWidget;
 
 /** A clue the player hid (UPuzzle::RecordClueHide), so Undo can bring it back where it was */
@@ -126,6 +128,15 @@ public:
 
 	UPROPERTY(EditAnywhere)
 	TSoftObjectPtr<USoundBase> CollateralEliminateSound = TSoftObjectPtr<USoundBase>(FSoftObjectPath(TEXT("/Game/General/Audio/Cues/MenuCancel.MenuCancel")));
+
+	// Fix Puzzle (FixPuzzleWithUndo): seconds between the moves it undoes, so each shows on the board. Also the wait
+	// before the first and after the last. 0: all at once.
+	UPROPERTY(EditAnywhere)
+	float FixStepDelay = 0.5f;
+
+	// Played for each move Fix Puzzle undoes: the Undo button's sound (WBP_ButtonPanel)
+	UPROPERTY(EditAnywhere)
+	TSoftObjectPtr<USoundBase> FixUndoSound = TSoftObjectPtr<USoundBase>(FSoftObjectPath(TEXT("/Game/General/Audio/Cues/MenuCancel.MenuCancel")));
 
 	// Set by InitCampaign: clue generation is limited to lessons up to m_CampaignLesson
 	UPROPERTY(BlueprintReadOnly)
@@ -274,7 +285,9 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure)
 	TArray<FPuzzleRow> GetShownRows();
 
-	// IsCompleted, once every step of the last player move is shown
+	// IsCompleted, once every step of the last player move is shown. Never while Fix Puzzle plays out (IsFixing): it
+	// starts on a full board with mistakes, which WBP_Happiness's RefreshPuzzle (called right after it starts) would
+	// otherwise answer with the Some Icons Are Wrong banner, unhiding every clue.
 	UFUNCTION(BlueprintCallable, BlueprintPure)
 	bool IsCompletedShown();
 
@@ -321,8 +334,16 @@ public:
 	// The moves are Owner's undo list (WBP_Happiness's ActionList: each the row's copy from before the move), which
 	// loses the undone moves. The list is saved with the puzzle, so it only runs out first on a save without one (older
 	// saves, or one UHappinessSaveGame::RestoreUndo didn't match); then FixPuzzle sets the rest straight.
+	// It plays out on the board: confirmed over the pause menu, the puzzle resumes (Owner's UnPause), then the moves
+	// are undone FixStepDelay apart, Owner's RefreshPuzzle showing each, and the screen takes no input meanwhile.
+	// Then a report opens in the middle of the screen (UFixReportWidget): where the player went wrong (the last move
+	// undone, FindFixMistake) and how many moves were undone, until its OK.
 	UFUNCTION(BlueprintCallable)
 	void FixPuzzleWithUndo(UObject* Owner);
+
+	// Fix Puzzle is still playing out (FixPuzzleWithUndo)
+	UFUNCTION(BlueprintPure)
+	bool IsFixing() const { return m_FixTicker.IsValid(); }
 
 	// Hiding a clue goes in the undo order: WBP_Happiness.HideSelectedClue records the clue's widget before it is
 	// removed, with the undo list's length (ActionList, the board moves); WBP_Happiness.Undo first asks
@@ -422,6 +443,25 @@ private:
 	double m_NextStepTime = 0.0;
 	FTSTicker::FDelegateHandle m_CollateralTicker;
 	TWeakObjectPtr<UObject> m_CollateralView;
+
+	// Fix Puzzle playing out (FixPuzzleWithUndo): the puzzle screen and its visibility before it was made to take no
+	// input, whether the board had mistakes, the moves undone so far and when the next is, and the last move undone
+	// (its row, and the row as the move left it)
+	FTSTicker::FDelegateHandle m_FixTicker;
+	TWeakObjectPtr<UUserWidget> m_FixView;
+	ESlateVisibility m_FixViewVisibility = ESlateVisibility::SelfHitTestInvisible;
+	bool m_bFixWasBroken = false;
+	int m_FixUndone = 0;
+	double m_NextFixTime = 0.0;
+	int m_FixLastRow = INDEX_NONE;
+	FPuzzleRow m_FixLastAfter;
+	// Undoes the last move of Owner's undo list (and the clues hidden after it) if the board is broken
+	bool UndoForFix(UObject* Owner);
+	bool TickFix(float DeltaTime);
+	void FinishFix();
+	// Once the undos have left the board right: the player's first mistake (the last move undone) as an error hint,
+	// explained with the clue that shows it wrong (UHint::ErrorReason). Null if the undo list ran out first.
+	UHint* FindFixMistake();
 
 	// The clues the player hid, the last one last (RecordClueHide)
 	UPROPERTY(Transient)
