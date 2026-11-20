@@ -9,6 +9,7 @@
 #include "Components/TextBlock.h"
 #include "Engine/Font.h"
 #include "Engine/Texture2D.h"
+#include "GameFramework/PlayerController.h"
 #include "HappinessClassic/IconSets.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -22,32 +23,45 @@ namespace
 	constexpr float TipsIconSize = 52.f;
 	// Longer tips wrap onto a second line here (the widget is a little wider)
 	constexpr float TipsWrapWidth = 680.f;
+}
 
-	/** The written tips */
-	TArray<FText> GetWrittenTips()
-	{
-		return {
-			LOCTEXT("HideClue", "When you are done with a clue, you can hide it with the Hide Clue button."),
-			LOCTEXT("UndoHide", "Hid a clue by mistake? The Undo button brings it back."),
-			LOCTEXT("UnhideAll", "You can bring back every hidden clue with Unhide Clues in the Pause menu."),
-			LOCTEXT("Hint", "Stuck? The Hint button finds a useful clue and explains why it helps."),
-			LOCTEXT("Horizontal", "Horizontal clues compare columns left to right, no matter which row each icon is in."),
-			LOCTEXT("Vertical", "Vertical clues describe icons that share a column."),
-			LOCTEXT("Rows", "Each row is one category. Every icon in it belongs in exactly one column."),
-			LOCTEXT("Campaign", "Finish every lesson to unlock Campaign mode."),
-			LOCTEXT("Master", "Complete a clue's Campaign final to unlock its Master Mode."),
-			LOCTEXT("Daily", "There is a new Daily Puzzle every day. Play each day to build your streak."),
-			LOCTEXT("StreakSaver", "Missed a day? A Streak Saver keeps your daily streak going."),
-			LOCTEXT("DailyPuzzleClues", "Daily Puzzles only use clues you have learned in the Lessons."),
-			LOCTEXT("FixPuzzle", "When you discover a mistake, Fix Puzzle in the Pause menu can help."),
-			LOCTEXT("PlayerInfo", "Access the Player Info by tapping on the Sun in the top right of the main screen."),
-			LOCTEXT("GameRules", "You can access Game Rules from the Pause menu or Player Info."),
-			LOCTEXT("IconSets", "You can choose which icon sets get used in puzzles in the Icon Sets."),
-			LOCTEXT("HintButton", "The Hint button animation can be disabled in the options."),
-			LOCTEXT("FreePlayIcons", "You can choose which clues are used on a puzzle in Free Play."),
-			LOCTEXT("ClueInfo", "Tapping on a clue shows a description of what the clue means."),
-		};
-	}
+TArray<FText> UMenuTipsWidget::GetWrittenTips()
+{
+	return {
+		LOCTEXT("HideClue", "When you are done with a clue, you can hide it with the Hide Clue button."),
+		LOCTEXT("UndoHide", "Hid a clue by mistake? The Undo button brings it back."),
+		LOCTEXT("UnhideAll", "You can bring back every hidden clue with Unhide Clues in the Pause menu."),
+		LOCTEXT("Hint", "Stuck? The Hint button finds a useful clue and explains why it helps."),
+		LOCTEXT("Horizontal", "Horizontal clues compare columns left to right, no matter which row each icon is in."),
+		LOCTEXT("Vertical", "Vertical clues describe icons that share a column."),
+		LOCTEXT("Rows", "Each row is one category. Every icon in it belongs in exactly one column."),
+		LOCTEXT("Campaign", "Finish every lesson to unlock Campaign mode."),
+		LOCTEXT("Master", "Complete a clue's Campaign final to unlock its Master Mode."),
+		LOCTEXT("Daily", "There is a new Daily Puzzle every day. Play each day to build your streak."),
+		LOCTEXT("StreakSaver", "Missed a day? A Streak Saver keeps your daily streak going."),
+		LOCTEXT("DailyPuzzleClues", "Daily Puzzles only use clues you have learned in the Lessons."),
+		LOCTEXT("FixPuzzle", "When you discover a mistake, Fix Puzzle in the Pause menu can help."),
+		LOCTEXT("PlayerInfo", "Access the Player Info by tapping on the Sun in the top right of the main screen."),
+		LOCTEXT("GameRules", "You can access Game Rules from the Pause menu or Player Info."),
+		LOCTEXT("IconSets", "You can choose which icon sets get used in puzzles in the Icon Sets."),
+		LOCTEXT("HintButton", "The Hint button animation can be disabled in the options."),
+		LOCTEXT("FreePlayIcons", "You can choose which clues are used on a puzzle in Free Play."),
+		LOCTEXT("ClueInfo", "Tapping on a clue shows a description of what the clue means."),
+		LOCTEXT("ShowTips", "Tips can be disabled in the options."),
+	};
+}
+
+FText UMenuTipsWidget::MakeIconTipText(const FText& IconName)
+{
+	return FText::Format(LOCTEXT("IconTip", "- {0}"), IconName);
+}
+
+bool UMenuTipsWidget::AreTipsEnabled(const UUserWidget& Widget)
+{
+	// The option lives on the player controller with the other settings, as the hint button's does
+	const APlayerController* PC = Widget.GetOwningPlayer();
+	const FBoolProperty* Option = PC ? FindFProperty<FBoolProperty>(PC->GetClass(), TEXT("Happiness_ShowTips")) : nullptr;
+	return !Option || Option->GetPropertyValue_InContainer(PC);
 }
 
 UMenuTipsWidget::UMenuTipsWidget(const FObjectInitializer& ObjectInitializer)
@@ -124,6 +138,15 @@ void UMenuTipsWidget::NativeConstruct()
 void UMenuTipsWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
+	// Tips off: the frame goes too. The widget itself stays, so it keeps ticking and comes back when they are on.
+	if (UWidget* Root = WidgetTree ? WidgetTree->RootWidget : nullptr)
+	{
+		const ESlateVisibility Shown = AreTipsEnabled(*this) ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed;
+		if (Root->GetVisibility() != Shown)
+		{
+			Root->SetVisibility(Shown);
+		}
+	}
 	if (!Content || TipSeconds <= 0.f)
 	{
 		return;
@@ -150,12 +173,12 @@ void UMenuTipsWidget::ShowNextTip()
 
 	UTexture2D* Texture = nullptr;
 	FText IconName;
-	if (FMath::FRand() < IconTipChance && PickIcon(Texture, IconName))
+	if (FMath::FRand() < IconTipChance && PickIcon(this, Texture, IconName))
 	{
 		// "[Cosmos] - Cosmos"
 		Icon->SetBrushFromTexture(Texture);
 		IconBox->SetVisibility(ESlateVisibility::HitTestInvisible);
-		TipText->SetText(FText::Format(LOCTEXT("IconTip", "- {0}"), IconName));
+		TipText->SetText(MakeIconTipText(IconName));
 		LastTip = INDEX_NONE;
 		return;
 	}
@@ -171,9 +194,9 @@ void UMenuTipsWidget::ShowNextTip()
 	TipText->SetText(Tips[Index]);
 }
 
-bool UMenuTipsWidget::PickIcon(UTexture2D*& OutTexture, FText& OutName) const
+bool UMenuTipsWidget::PickIcon(const UObject* WorldContext, UTexture2D*& OutTexture, FText& OutName)
 {
-	const UIconSetSubsystem* IconSets = UIconSetSubsystem::Get(this);
+	const UIconSetSubsystem* IconSets = UIconSetSubsystem::Get(WorldContext);
 	if (!IconSets)
 	{
 		return false;

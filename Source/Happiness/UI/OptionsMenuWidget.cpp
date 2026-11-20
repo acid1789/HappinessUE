@@ -62,6 +62,7 @@ void UOptionsMenuWidget::BuildLayout()
 	MusicSlider = Cast<USlider>(GetWidgetFromName(TEXT("MusicVolume")));
 	SleepToggle = Cast<UUserWidget>(GetWidgetFromName(TEXT("CB_PreventSleepOnIdle")));
 	HintToggle = Cast<UUserWidget>(GetWidgetFromName(TEXT("CB_HintAnimation")));
+	TipsToggle = Cast<UUserWidget>(GetWidgetFromName(TEXT("CB_ShowTips")));
 	CancelAction = Cast<UButton>(GetWidgetFromName(TEXT("Button_Cancel")));
 	ApplyAction = Cast<UButton>(GetWidgetFromName(TEXT("Button_Confirm")));
 	ExtraSettingsHost = Cast<UVerticalBox>(GetWidgetFromName(TEXT("ExtraSettings")));
@@ -70,7 +71,7 @@ void UOptionsMenuWidget::BuildLayout()
 	if (!Root) return;
 	// Keep the original controls, including their Blueprint delegates and settings bindings.
 	for (UWidget* Control : {static_cast<UWidget*>(EffectsSlider), static_cast<UWidget*>(MusicSlider),
-		static_cast<UWidget*>(SleepToggle), static_cast<UWidget*>(HintToggle),
+		static_cast<UWidget*>(SleepToggle), static_cast<UWidget*>(HintToggle), static_cast<UWidget*>(TipsToggle),
 		static_cast<UWidget*>(CancelAction), static_cast<UWidget*>(ApplyAction), static_cast<UWidget*>(ExtraSettingsHost)})
 		if (Control) Control->RemoveFromParent();
 	Root->ClearChildren();
@@ -209,6 +210,7 @@ void UOptionsMenuWidget::BuildLayout()
 	Checkbox(SleepToggle, LOCTEXT("Sleep", "Prevent Sleep on Idle"));
 #endif
 	Checkbox(HintToggle, LOCTEXT("HintAnimation", "Animate Hint Button"));
+	Checkbox(TipsToggle, LOCTEXT("ShowTips", "Show Tips"));
 	if (ExtraSettingsHost)
 	{
 		// Future WBP_CheckBox children receive the same row styling and scrolling automatically.

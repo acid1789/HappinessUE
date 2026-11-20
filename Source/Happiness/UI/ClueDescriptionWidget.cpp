@@ -8,6 +8,7 @@
 #include "Components/TextBlock.h"
 #include "Engine/Font.h"
 #include "Engine/Texture2D.h"
+#include "UI/MenuTipsWidget.h"
 #include "UObject/ConstructorHelpers.h"
 
 UClueDescriptionWidget::UClueDescriptionWidget(const FObjectInitializer& ObjectInitializer)
@@ -59,7 +60,95 @@ void UClueDescriptionWidget::NativePreConstruct()
 void UClueDescriptionWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
+	UpdateTip(InDeltaTime);
 	StylePieces();
+}
+
+void UClueDescriptionWidget::UpdateTip(float InDeltaTime)
+{
+	// Only in the game: the designer keeps its sample clue
+	UHorizontalBox* Line = Cast<UHorizontalBox>(GetWidgetFromName(TEXT("HorizontalBox")));
+	if (!Line || !GetGameInstance())
+	{
+		return;
+	}
+	// A selected clue fills the line with its own pieces (WBP_HelpPanel.SetFromClue clears the line first, the tip
+	// with it); it shows instead of the tips
+	for (UWidget* Piece : Line->GetAllChildren())
+	{
+		if (Piece != TipIcon && Piece != TipText)
+		{
+			return;
+		}
+	}
+	if (!UMenuTipsWidget::AreTipsEnabled(*this))
+	{
+		// Tips off: nothing on the line, so the frame hides
+		if (Line->GetChildrenCount() > 0)
+		{
+			Line->ClearChildren();
+		}
+		return;
+	}
+	if (Line->GetChildrenCount() == 0)
+	{
+		// No clue now: a tip, from the start
+		TipTime = 0.f;
+		ShowNextTip(*Line);
+	}
+	else if (TipSeconds > 0.f)
+	{
+		TipTime += InDeltaTime;
+		if (TipTime >= TipSeconds)
+		{
+			TipTime = FMath::Fmod(TipTime, TipSeconds);
+			ShowNextTip(*Line);
+		}
+	}
+	// Fade in, show, fade out; the next tip comes in at the end of the fade out
+	const float Fade = FMath::Max(FadeSeconds, KINDA_SMALL_NUMBER);
+	const float Opacity = TipSeconds > 0.f ? FMath::Clamp(FMath::Min(TipTime / Fade, (TipSeconds - TipTime) / Fade), 0.f, 1.f) : 1.f;
+	TipIcon->SetRenderOpacity(Opacity);
+	TipText->SetRenderOpacity(Opacity);
+}
+
+void UClueDescriptionWidget::ShowNextTip(UHorizontalBox& Line)
+{
+	if (!TipIcon)
+	{
+		TipIcon = WidgetTree->ConstructWidget<UImage>();
+		TipIcon->SetVisibility(ESlateVisibility::HitTestInvisible);
+	}
+	if (!TipText)
+	{
+		// StylePieces gives it the clue's font and ink
+		TipText = WidgetTree->ConstructWidget<UTextBlock>();
+		TipText->SetVisibility(ESlateVisibility::HitTestInvisible);
+	}
+	Line.ClearChildren();
+
+	UTexture2D* Texture = nullptr;
+	FText IconName;
+	if (FMath::FRand() < IconTipChance && UMenuTipsWidget::PickIcon(this, Texture, IconName))
+	{
+		// "[Cosmos] - Cosmos"
+		TipIcon->SetBrushFromTexture(Texture);
+		Line.AddChildToHorizontalBox(TipIcon);
+		TipText->SetText(UMenuTipsWidget::MakeIconTipText(IconName));
+		LastTip = INDEX_NONE;
+	}
+	else
+	{
+		const TArray<FText> Tips = UMenuTipsWidget::GetWrittenTips();
+		int32 Index = FMath::RandRange(0, Tips.Num() - 1);
+		if (Tips.Num() > 1 && Index == LastTip)
+		{
+			Index = (Index + 1 + FMath::RandRange(0, Tips.Num() - 2)) % Tips.Num();
+		}
+		LastTip = Index;
+		TipText->SetText(Tips[Index]);
+	}
+	Line.AddChildToHorizontalBox(TipText);
 }
 
 void UClueDescriptionWidget::StylePieces()

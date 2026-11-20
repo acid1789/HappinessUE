@@ -28,6 +28,7 @@ protected:
 	UPROPERTY(Transient) TObjectPtr<USlider> MusicSlider;
 	UPROPERTY(Transient) TObjectPtr<UUserWidget> SleepToggle;
 	UPROPERTY(Transient) TObjectPtr<UUserWidget> HintToggle;
+	UPROPERTY(Transient) TObjectPtr<UUserWidget> TipsToggle;
 	UPROPERTY(Transient) TObjectPtr<UButton> CancelAction;
 	UPROPERTY(Transient) TObjectPtr<UButton> ApplyAction;
 

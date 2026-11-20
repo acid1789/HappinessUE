@@ -41,6 +41,15 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Tips")
 	float IconTipChance = 0.35f;
 
+	/** The written tips (also shown in the puzzle screen's clue info while no clue is selected, UClueDescriptionWidget) */
+	static TArray<FText> GetWrittenTips();
+	/** An icon from a set that is on, and its name; false if there are none */
+	static bool PickIcon(const UObject* WorldContext, UTexture2D*& OutTexture, FText& OutName);
+	/** The text beside an icon tip's icon: "- Cosmos" */
+	static FText MakeIconTipText(const FText& IconName);
+	/** The "Show Tips" option (PC_Happiness Happiness_ShowTips, saved in SG_Settings); on if the controller doesn't have it */
+	static bool AreTipsEnabled(const UUserWidget& Widget);
+
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
 	virtual void NativeConstruct() override;
@@ -50,8 +59,6 @@ private:
 	void BuildLayout();
 	/** Show another tip, not the one just shown */
 	void ShowNextTip();
-	/** An icon from a set that is on, and its name; false if there are none */
-	bool PickIcon(UTexture2D*& OutTexture, FText& OutName) const;
 
 	UPROPERTY(Transient) TObjectPtr<UWidget> Content;
 	UPROPERTY(Transient) TObjectPtr<USizeBox> IconBox;
